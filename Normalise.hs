@@ -8,8 +8,8 @@ import Data.List
 import Data.Maybe
 
 
-normalise :: Supero -> Supero
-normalise supero = supero{funcs = Map.map normaliseFunc (funcs supero)}
+normalise :: Prog -> Prog
+normalise prog = prog{funcs = Map.map normaliseFunc (funcs prog)}
 
 
 normaliseFunc :: Func -> Func
@@ -17,18 +17,15 @@ normaliseFunc (Func name body) = Func name [(a,simplify b) | (a,b) <- body]
 
 
 
-populate :: Supero -> Supero
-populate supero = supero{funcs = Map.map insert fs}
+populate :: Prog -> Prog
+populate (Prog funcs) = Prog $ Map.map insert funcs
     where
-        fs = funcs supero
-        news = collect fs
+        news = collect funcs
         
         insert func = func{funcAlts = newalts ++ funcAlts func}
             where
-                newalts = [(args,simplify $ inlineExpr fs call args)
+                newalts = [(args,simplify $ inlineExpr funcs call args)
                           | Apply (Fun call) args <- news, call == funcName func]
-                wrap (Var x) = Var x
-                wrap x = Jail x
 
 
 
@@ -42,8 +39,8 @@ collect funcs = nub $ filter isValid $ concatMap (allOver . snd) $ concatMap fun
         isValid _ = False
 
 
-inline :: Supero -> Supero
-inline supero@Supero{funcs=funcs} = supero{funcs = Map.map f funcs}
+inline :: Prog -> Prog
+inline (Prog funcs) = Prog $ Map.map f funcs
     where
         f func = func{funcAlts = map (g 5) (funcAlts func)}
 

@@ -15,7 +15,7 @@ import Debug.Trace
 type FuncMap = Map.Map String Func
 type Binding = [(Expr, Expr)]
 
-data Supero = Supero {funcs :: FuncMap}
+data Prog = Prog {funcs :: FuncMap}
 
 
 data Func = Func {funcName :: String, funcAlts :: [([Expr], Expr)]}
@@ -131,9 +131,8 @@ instance Play Expr where
 
 
 
-instance Show Supero where
-    show (Supero funcs) =
-            concatMap (("\n\n"++) . show) (Map.elems funcs)
+instance Show Prog where
+    show (Prog funcs) = concat $ intersperse "\n\n" $ map show $ Map.elems funcs
 
 
 instance Show Func where

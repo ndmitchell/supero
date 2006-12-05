@@ -8,8 +8,8 @@ import Data.List
 import qualified Data.Map as Map
 
 
-convert :: Core -> Supero
-convert core = Supero (Map.fromList [(funcName x, x) | x <- fs])
+convert :: Core -> Prog
+convert core = Prog (Map.fromList [(funcName x, x) | x <- fs])
     where
         (n,fs) = mapAccumL convertFunc 0 $ coreFuncs $ drop1mod core
 

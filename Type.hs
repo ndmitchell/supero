@@ -162,7 +162,10 @@ instance Show Func where
 docFunc :: Func -> Doc
 docFunc (Func name xs) = vcat (map f xs)
     where
-        f (FuncAlt _ conds x) = text name <+> hsep (map (docExpr True) conds) <+> text "=" <+> docExpr False x
+        f (FuncAlt i conds x) = hsep $
+            text (name ++ "$" ++ show i) :
+            map (docExpr True) conds ++
+            text "=" : docExpr False x : []
 
 
 docExpr :: Bool -> Expr -> Doc

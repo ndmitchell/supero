@@ -10,4 +10,4 @@ unique x = length x == length (nub x)
 
 fst3 (a,b,c) = a
 snd3 (a,b,c) = b
-thr3 (a,b,c) = c
+thd3 (a,b,c) = c

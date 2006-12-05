@@ -8,6 +8,7 @@ import qualified Data.Map as Map
 import Data.Play
 import Data.List
 import Data.Maybe
+import General
 
 
 normalise :: Prog -> Prog
@@ -59,7 +60,7 @@ inlineExpr :: FuncMap -> String -> [Expr] -> Expr
 inlineExpr funcs call args =
     case findBestRhs (fromJust $ Map.lookup call funcs) args of
         Nothing -> Apply (Fun call) args
-        Just x -> x
+        Just x -> thd3 x
 
 
 simplify :: Expr -> Expr

@@ -33,17 +33,15 @@ asking for:   f y z
 Gives:        Apply (body[x/y]) z
 -}
 
-findBestRhs :: Func -> [Expr] -> Maybe Expr
+findBestRhs :: Func -> [Expr] -> Maybe (Int,Binding,Expr)
 findBestRhs func args = listToMaybe $ concatMap f $ funcAlts func
     where
-        f (FuncAlt _ lhs rhs) =
+        f (FuncAlt n lhs rhs) =
             case matchBinding lhs used of
-                Just bind | isValid bind -> [mkApply (replaceBinding bind rhs) other]
+                Just bind -> [(n, bind, mkApply (replaceBinding bind rhs) other)]
                 Nothing -> []
             where
                 (used,other) = splitAt (length lhs) args
-
-        isValid _ = True
 
 
 

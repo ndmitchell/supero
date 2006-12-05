@@ -24,8 +24,10 @@ populate (Prog funcs) = Prog $ Map.map insert funcs
     where
         news = collect funcs
         
-        insert func = func{funcAlts = newalts ++ funcAlts func}
+        insert func = func{funcAlts = newalts2 ++ funcAlts func}
             where
+                oldalt = altNum $ head $ funcAlts func
+                newalts2 = reverse $ zipWith (\n x -> x{altNum=n}) [oldalt+1..] $ reverse newalts
                 newalts = [FuncAlt 0 args (simplify $ inlineExpr funcs call args)
                           | Apply (Fun call) args <- news, call == funcName func]
 

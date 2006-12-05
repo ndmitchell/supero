@@ -61,16 +61,6 @@ inlineExpr funcs call args =
         Nothing -> Apply (Fun call) args
         Just x -> x
 
-{-
-    replaceBinding bind2 rhs
-    where
-        noJail (Jail x) = x
-        noJail x = x
-
-        bind2 = [(a, mapUnder noJail b) | (a,b) <- bind]
-        (bind,rhs) = findBestRhs (fromJust $ Map.lookup call funcs) args
--}
-
 
 simplify :: Expr -> Expr
 simplify = mapUnder f

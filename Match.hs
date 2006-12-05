@@ -6,6 +6,7 @@ import Data.List
 import Data.Play
 import Data.Maybe
 import Control.Monad
+import General
 
 
 type Binding = [(Int, Expr)]
@@ -22,11 +23,6 @@ findExactRhs func args = liftM (uncurry replaceBinding) $
         -- and both sides must be var's
         isValid xs = all isVar b && unique b
             where b = map snd xs
-
-
-unique :: Eq a => [a] -> Bool
-unique x = length x == length (nub x)
-
 
 
 {-

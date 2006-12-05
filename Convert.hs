@@ -52,7 +52,7 @@ drop1mod (Core name imports datas funcs) = Core "" [] (map g datas) (concatMap h
 
 
 convertFunc :: Int -> CoreFunc -> (Int, Func)
-convertFunc n x = (n2, Func (coreFuncName x) [(map Var args2, convertExpr expr2)])
+convertFunc n x = (n2, Func (coreFuncName x) [FuncAlt 0 (map Var args2) (convertExpr expr2)])
     where
         (n2,args2,expr2) = freshFree (coreFuncArgs x) (coreFuncBody x) n
     

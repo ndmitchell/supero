@@ -18,7 +18,10 @@ type Binding = [(Expr, Expr)]
 data Prog = Prog {funcs :: FuncMap}
 
 
-data Func = Func {funcName :: String, funcAlts :: [([Expr], Expr)]}
+data Func = Func {funcName :: String, funcAlts :: [FuncAlt]}
+
+
+data FuncAlt = FuncAlt {altNum :: Int, altMatch :: [Expr], altBody :: Expr}
 
 
 data Expr = Var Int
@@ -78,9 +81,10 @@ Gives:        Apply (body[x/y]) z
 findBestRhs :: Func -> [Expr] -> Maybe Expr
 findBestRhs func args = listToMaybe $ concatMap f $ funcAlts func
     where
-        f (lhs,rhs) = case matchBinding lhs used of
-                          Just bind | isValid bind -> [mkApply (replaceBinding bind rhs) other]
-                          Nothing -> []
+        f (FuncAlt _ lhs rhs) =
+            case matchBinding lhs used of
+                Just bind | isValid bind -> [mkApply (replaceBinding bind rhs) other]
+                Nothing -> []
             where
                 (used,other) = splitAt (length lhs) args
 
@@ -89,7 +93,7 @@ findBestRhs func args = listToMaybe $ concatMap f $ funcAlts func
 
 
 matchBindings :: Func -> [Expr] -> [(Binding,Expr)]
-matchBindings func call = [(bind,rhs) | (lhs,rhs) <- funcAlts func, Just bind <- [matchBinding lhs call]]
+matchBindings func call = [(bind,rhs) | FuncAlt _ lhs rhs <- funcAlts func, Just bind <- [matchBinding lhs call]]
 
 
 -- lhs may be more general than rhs
@@ -158,7 +162,7 @@ instance Show Func where
 docFunc :: Func -> Doc
 docFunc (Func name xs) = vcat (map f xs)
     where
-        f (conds,x) = text name <+> hsep (map (docExpr True) conds) <+> text "=" <+> docExpr False x
+        f (FuncAlt _ conds x) = text name <+> hsep (map (docExpr True) conds) <+> text "=" <+> docExpr False x
 
 
 docExpr :: Bool -> Expr -> Doc

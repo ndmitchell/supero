@@ -13,7 +13,7 @@ normalise prog = prog{funcs = Map.map normaliseFunc (funcs prog)}
 
 
 normaliseFunc :: Func -> Func
-normaliseFunc (Func name body) = Func name [(a,simplify b) | (a,b) <- body]
+normaliseFunc (Func name body) = Func name [alt{altBody = simplify (altBody alt)} | alt <- body]
 
 
 
@@ -24,13 +24,13 @@ populate (Prog funcs) = Prog $ Map.map insert funcs
         
         insert func = func{funcAlts = newalts ++ funcAlts func}
             where
-                newalts = [(args,simplify $ inlineExpr funcs call args)
+                newalts = [FuncAlt 0 args (simplify $ inlineExpr funcs call args)
                           | Apply (Fun call) args <- news, call == funcName func]
 
 
 
 collect :: FuncMap -> [Expr]
-collect funcs = nub $ filter isValid $ concatMap (allOver . snd) $ concatMap funcAlts $ Map.elems funcs
+collect funcs = nub $ filter isValid $ concatMap (allOver . altBody) $ concatMap funcAlts $ Map.elems funcs
     where
         isValid (Apply (Fun call) args)
             | not (any isJail args)
@@ -44,9 +44,10 @@ inline (Prog funcs) = Prog $ Map.map f funcs
     where
         f func = func{funcAlts = map (g 5) (funcAlts func)}
 
-        g 0 (lhs,rhs) = (lhs,simplify rhs)        
+        g 0 (FuncAlt i lhs rhs) = FuncAlt i lhs (simplify rhs)
 
-        g n (lhs,Case (Apply (Fun call) args) alts) = g (n-1) (lhs, Case (inlineExpr funcs call args) alts)
+        g n (FuncAlt i lhs (Case (Apply (Fun call) args) alts)) =
+            g (n-1) (FuncAlt i lhs (Case (inlineExpr funcs call args) alts))
         g _ x = g 0 x
 
 

@@ -22,7 +22,6 @@ data FuncAlt = FuncAlt {altNum :: Int, altMatch :: [Expr], altBody :: Expr}
 
 
 data Expr = Var Int
-          | Lambda [Int] Expr
           | Case Expr [(Expr, Expr)]
           | Apply Expr [Expr]
           | Fun String
@@ -30,7 +29,6 @@ data Expr = Var Int
           | Prim String
           | Const Const
           | Jail Expr
-          | Any
           deriving (Eq,Show)
 
 

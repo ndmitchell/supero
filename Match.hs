@@ -1,5 +1,5 @@
 
-module Match where
+module Match(findExactRhs, findBestRhs, matchBinding, replaceBinding) where
 
 import Type
 import Data.List

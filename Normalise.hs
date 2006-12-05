@@ -2,6 +2,8 @@
 module Normalise where
 
 import Type
+import Match
+
 import qualified Data.Map as Map
 import Data.Play
 import Data.List

@@ -28,7 +28,6 @@ data Expr = Var Int
           | Ctr String
           | Prim String
           | Const Const
-          | Jail Expr
           deriving (Eq,Show)
 
 
@@ -47,7 +46,6 @@ instance Show Const where
 
 
 isVar (Var{}) = True; isVar _ = False
-isJail (Jail{}) = True; isJail _ = False
 
 mkApply x [] = x
 mkApply x xs = Apply x xs
@@ -64,7 +62,6 @@ instance Play Expr where
                     f (a:b:xs) = (a,b) : f xs
             
             Apply x xs -> (x:xs, \(x:xs) -> Apply x xs)
-            Jail x -> playOne Jail x
             
             _ -> playDefault x
 
@@ -94,7 +91,6 @@ docExpr = f
         f _ (Ctr x) = text x
         f _ (Fun x) = text x
         f _ (Prim x) = text (x ++ "#")
-        f _ (Jail x) = braces $ f False x
         f _ (Const x) = text $ show x
         
         f b (Apply x xs) = p b $ f True x <+> hsep (map (f True) xs)

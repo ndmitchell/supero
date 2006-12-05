@@ -35,7 +35,6 @@ collect :: FuncMap -> [Expr]
 collect funcs = nub $ filter isValid $ concatMap (allOver . altBody) $ concatMap funcAlts $ Map.elems funcs
     where
         isValid (Apply (Fun call) args)
-            | not (any isJail args)
             = (isNothing $ findExactRhs func args) && (isJust $ findBestRhs func args)
             where func = fromJust $ Map.lookup call funcs
         isValid _ = False

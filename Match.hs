@@ -8,7 +8,7 @@ import Data.Maybe
 import Control.Monad
 
 
-type Binding = [(Expr, Expr)]
+type Binding = [(Int, Expr)]
 
 
 
@@ -20,8 +20,13 @@ findExactRhs func args = liftM (uncurry replaceBinding) $
         -- to be a perfect match each variable must occur exactly once
         -- in lhs and rhs
         -- and both sides must be var's
-        isValid xs = let (a,b) = unzip xs in f a && f b
-        f x = all isVar x && length x == length (nub x)
+        isValid xs = unique a && all isVar b && unique b
+            where (a,b) = unzip xs
+
+
+unique :: Eq a => [a] -> Bool
+unique x = length x == length (nub x)
+
 
 
 {-
@@ -66,7 +71,7 @@ matchBinding xs ys = liftM nub $ fs xs ys
             return (res++rest)
         fs _ _ = Nothing
         
-        f (Var x) y = Just [(Var x,y)]
+        f (Var x) y = Just [(x,y)]
         f (Apply x xs) (Apply y ys) = fs (x:xs) (y:ys)
         f x y = if x == y then Just [] else Nothing
 
@@ -81,10 +86,10 @@ replaceBinding bind x =
             where
                 g (lhs,rhs) = (lhs, replaceBinding bind2 rhs)
                     where
-                        free = [Var x | Var x <- allOver lhs]
+                        free = [x | Var x <- allOver lhs]
                         bind2 = filter ((`notElem` free) . fst) bind
         
-        x@(Var _) -> fromMaybe x (lookup x bind)
+        (Var x) -> fromMaybe (Var x) (lookup x bind)
         x -> generate (map f children)
             where (children,generate) = replaceChildren x
     

@@ -50,7 +50,12 @@ matchBindings :: Func -> [Expr] -> [(Binding,Expr)]
 matchBindings func call = [(bind,rhs) | FuncAlt _ lhs rhs <- funcAlts func, Just bind <- [matchBinding lhs call]]
 
 
--- lhs may be more general than rhs
+-- | Given two expressions, give a substitution
+--   of free variables in the LHS to items, which when
+--   substituted gives the RHS
+--
+--   matchBinding LHS RHS = Just binding
+--   iff LHS[binding] = RHS
 matchBinding :: [Expr] -> [Expr] -> Maybe Binding
 matchBinding xs ys = liftM nub $ fs xs ys
     where
@@ -67,6 +72,8 @@ matchBinding xs ys = liftM nub $ fs xs ys
 
 
 
+-- | Given a binding, where every lhs of a Variable,
+--   replace the appropriate places in the expression
 replaceBinding :: Binding -> Expr -> Expr
 replaceBinding bind x =
     case x of

@@ -49,7 +49,6 @@ inline supero@Supero{funcs=funcs} = supero{funcs = Map.map f funcs}
 
         g 0 (lhs,rhs) = (lhs,simplify rhs)        
 
-        g n (lhs,Apply (Fun call) args) = g (n-1) (lhs, inlineExpr funcs call args)
         g n (lhs,Case (Apply (Fun call) args) alts) = g (n-1) (lhs, Case (inlineExpr funcs call args) alts)
         g _ x = g 0 x
 

@@ -20,8 +20,8 @@ findExactRhs func args = liftM (uncurry replaceBinding) $
         -- to be a perfect match each variable must occur exactly once
         -- in lhs and rhs
         -- and both sides must be var's
-        isValid xs = unique a && all isVar b && unique b
-            where (a,b) = unzip xs
+        isValid xs = all isVar b && unique b
+            where b = map snd xs
 
 
 unique :: Eq a => [a] -> Bool
@@ -55,6 +55,15 @@ matchBindings :: Func -> [Expr] -> [(Binding,Expr)]
 matchBindings func call = [(bind,rhs) | FuncAlt _ lhs rhs <- funcAlts func, Just bind <- [matchBinding lhs call]]
 
 
+
+-- find all RHS's that match
+findAllRhs :: Func -> [Expr] -> [(Int,Binding,Expr)]
+findAllRhs func call = [(n,bind,replaceBinding bind rhs)
+                       | FuncAlt n lhs rhs <- funcAlts func, Just bind <- [matchBinding lhs call]]
+
+
+
+
 -- | Given two expressions, give a substitution
 --   of free variables in the LHS to items, which when
 --   substituted gives the RHS
@@ -62,7 +71,7 @@ matchBindings func call = [(bind,rhs) | FuncAlt _ lhs rhs <- funcAlts func, Just
 --   matchBinding LHS RHS = Just binding
 --   iff LHS[binding] = RHS
 matchBinding :: [Expr] -> [Expr] -> Maybe Binding
-matchBinding xs ys = liftM nub $ fs xs ys
+matchBinding xs ys = fs xs ys >>= check
     where
         fs [] [] = return []
         fs (x:xs) (y:ys) = do
@@ -74,6 +83,11 @@ matchBinding xs ys = liftM nub $ fs xs ys
         f (Var x) y = Just [(x,y)]
         f (Apply x xs) (Apply y ys) = fs (x:xs) (y:ys)
         f x y = if x == y then Just [] else Nothing
+        
+        
+        check bind = if unique (map fst bind2) then Just bind2 else Nothing
+            where bind2 = nub bind
+        
 
 
 

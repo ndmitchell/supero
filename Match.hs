@@ -14,15 +14,15 @@ type Binding = [(Int, Expr)]
 
 
 -- find the RHS that matches perfectly
-findExactRhs :: Func -> [Expr] -> Maybe Expr
-findExactRhs func args = liftM (uncurry replaceBinding) $
-        listToMaybe $ filter (isValid . fst) $ matchBindings func args
+findExactRhs :: Func -> [Expr] -> Maybe (Int,Binding,Expr)
+findExactRhs func call = listToMaybe
+    [(n,bind,replaceBinding bind rhs)
+        | FuncAlt n lhs rhs <- funcAlts func, Just bind <- [matchBinding lhs call], isValid bind]
     where
-        -- to be a perfect match each variable must occur exactly once
-        -- in lhs and rhs
-        -- and both sides must be var's
+        -- to be a perfect match each RHS must be a unique Var
         isValid xs = all isVar b && unique b
             where b = map snd xs
+
 
 
 {-
@@ -44,19 +44,6 @@ findBestRhs func args = listToMaybe $ concatMap f $ funcAlts func
                 (used,other) = splitAt (length lhs) args
 
         isValid _ = True
-
-
-
-matchBindings :: Func -> [Expr] -> [(Binding,Expr)]
-matchBindings func call = [(bind,rhs) | FuncAlt _ lhs rhs <- funcAlts func, Just bind <- [matchBinding lhs call]]
-
-
-
--- find all RHS's that match
-findAllRhs :: Func -> [Expr] -> [(Int,Binding,Expr)]
-findAllRhs func call = [(n,bind,replaceBinding bind rhs)
-                       | FuncAlt n lhs rhs <- funcAlts func, Just bind <- [matchBinding lhs call]]
-
 
 
 

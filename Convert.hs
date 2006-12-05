@@ -9,10 +9,9 @@ import qualified Data.Map as Map
 
 
 convert :: Core -> Supero
-convert core = Supero n core2{coreFuncs=[]} (Map.fromList [(funcName x, x) | x <- fs])
+convert core = Supero (Map.fromList [(funcName x, x) | x <- fs])
     where
-        core2 = drop1mod core
-        (n,fs) = mapAccumL convertFunc 0 (coreFuncs core2)
+        (n,fs) = mapAccumL convertFunc 0 $ coreFuncs $ drop1mod core
 
 
 drop1mod :: Core -> Core

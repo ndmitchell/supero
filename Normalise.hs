@@ -13,12 +13,6 @@ normalise supero = supero{funcs = Map.map normaliseFunc (funcs supero)}
 
 
 normaliseFunc :: Func -> Func
-normaliseFunc (Func name [(args, Case (Var i) alts)]) =
-        Func name (map f alts ++ [(args,simplify $ Case (Var i) alts)])
-    where
-        rep x = map (\(Var a) -> if a == i then x else Var a) args
-        f (lhs,rhs) = (rep lhs, simplify rhs)
-
 normaliseFunc (Func name body) = Func name [(a,simplify b) | (a,b) <- body]
 
 

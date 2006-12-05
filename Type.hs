@@ -27,9 +27,23 @@ data Expr = Var Int
           | Apply Expr [Expr]
           | Fun String
           | Ctr String
+          | Prim String
+          | Const Const
           | Jail Expr
           | Any
           deriving (Eq,Show)
+
+
+data Const = ConstStr String
+           | ConstInt Int
+           | ConstChr Char
+           deriving Eq
+
+
+instance Show Const where
+    show (ConstStr x) = show x
+    show (ConstInt x) = show x ++ "#"
+    show (ConstChr x) = show x
 
 
 isVar (Var{}) = True; isVar _ = False
@@ -151,7 +165,9 @@ docExpr = f
         f _ (Var i) = text $ show i
         f _ (Ctr x) = text x
         f _ (Fun x) = text x
+        f _ (Prim x) = text (x ++ "#")
         f _ (Jail x) = braces $ f False x
+        f _ (Const x) = text $ show x
         
         f b (Apply x xs) = p b $ f True x <+> hsep (map (f True) xs)
 

@@ -6,16 +6,33 @@ import Safe
 import Yhc.Core
 import Data.List
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 
 convert :: Core -> Prog
 convert core = Prog (Map.fromList [(funcName x, x) | x <- fs])
     where
-        (n,fs) = mapAccumL convertFunc 0 $ coreFuncs $ drop1mod core
+        (n,fs) = mapAccumL convertFunc 0 $ coreFuncs $ fixPrims $ drop1mod core
+
+
+
+fixPrims :: Core -> Core
+fixPrims core = core{coreFuncs = mapUnderCore usePrim norm}
+    where
+        (prim,norm) = partition (isPrim . coreFuncBody) (coreFuncs core)
+        prims = Set.fromList (map coreFuncName prim)
+
+        usePrim (CoreFun x) | x `Set.member` prims = CorePrim x
+        usePrim x = x
+        
+        isPrim (CorePos _ x) = isPrim x
+        isPrim (CoreApp x []) = isPrim x
+        isPrim (CoreVar x) = x == "primitive"
+        isPrim _ = False
 
 
 drop1mod :: Core -> Core
-drop1mod (Core name imports datas funcs) = Core "" [] (map g datas) (map h funcs)
+drop1mod (Core name imports datas funcs) = Core "" [] (map g datas) (concatMap h funcs)
     where
         f x = case break (== '.') x of
                    (_,"") -> x
@@ -24,7 +41,9 @@ drop1mod (Core name imports datas funcs) = Core "" [] (map g datas) (map h funcs
         g (CoreData name free args) = CoreData (f name) free (map g2 args)
         g2 (CoreCtor name items) = CoreCtor (f name) items
         
-        h (CoreFunc name args body) = CoreFunc (f name) args (mapOverCore h2 body)
+        h (CoreFunc name args body) 
+            | name == "main" = []
+            | otherwise = [CoreFunc (f name) args (mapOverCore h2 body)]
         h2 (CoreFun x) = CoreFun $ f x
         h2 (CoreCon x) = CoreCon $ f x
         h2 x = x
@@ -46,7 +65,9 @@ convertExpr x = case x of
         CoreApp x xs -> Apply (f x) (fs xs)
         CoreCon x -> Ctr x
         CoreFun x -> Fun x
-        _ -> error $ show x
+        CorePrim x -> Prim x
+        CoreStr x -> Const $ ConstStr x
+        _ -> error $ "Convert.convertExpr: " ++ show x
     where
         f = convertExpr
         fs = map f

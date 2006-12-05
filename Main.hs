@@ -8,8 +8,10 @@ import System.Environment
 
 main = do
     (x:_) <- getArgs
+    pm <- loadCore "Primitive.ycr"
     cr <- loadCore x
-    print $ pipe $ normalise $ convert cr
+    let core = coreReachable ["main"] $ coreOverlay cr pm
+    print $ pipe $ normalise $ convert core
 
     where
         -- inline . populate

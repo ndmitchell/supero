@@ -57,8 +57,6 @@ mkApply x xs = Apply x xs
 instance Play Expr where
     replaceChildren x =
         case x of
-            Lambda n x -> playOne (Lambda n) x
-            
             Case x xs -> (x : concatMap (\(a,b) -> [a,b]) xs,
                          \(y:ys) -> Case y (f ys))
                 where

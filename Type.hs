@@ -9,7 +9,6 @@ import Data.Maybe
 import Control.Monad
 import Text.PrettyPrint.HughesPJ
 
-import Debug.Trace
 
 
 type FuncMap = Map.Map String Func

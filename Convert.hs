@@ -66,7 +66,11 @@ convertExpr x = case x of
         CoreCon x -> Ctr x
         CoreFun x -> Fun x
         CorePrim x -> Prim x
+        
         CoreStr x -> Const $ ConstStr x
+        CoreInt x -> Const $ ConstInt x
+        CoreInteger x -> Const $ ConstInteger x
+        
         _ -> error $ "Convert.convertExpr: " ++ show x
     where
         f = convertExpr

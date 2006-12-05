@@ -36,6 +36,7 @@ data Expr = Var Int
 
 data Const = ConstStr String
            | ConstInt Int
+           | ConstInteger Integer
            | ConstChr Char
            deriving Eq
 
@@ -43,6 +44,7 @@ data Const = ConstStr String
 instance Show Const where
     show (ConstStr x) = show x
     show (ConstInt x) = show x ++ "#"
+    show (ConstInteger x) = show x ++ "##"
     show (ConstChr x) = show x
 
 

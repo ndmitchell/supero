@@ -1,11 +1,15 @@
 
-module Match(findExactRhs, findBestRhs, matchBinding, replaceBinding) where
+module Match(Binding, findExactRhs, findBestRhs, matchBinding, replaceBinding) where
 
 import Type
 import Data.List
 import Data.Play
 import Data.Maybe
 import Control.Monad
+
+
+type Binding = [(Expr, Expr)]
+
 
 
 -- find the RHS that matches perfectly

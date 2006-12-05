@@ -10,7 +10,6 @@ import Text.PrettyPrint.HughesPJ
 
 
 type FuncMap = Map.Map String Func
-type Binding = [(Expr, Expr)]
 
 data Prog = Prog {funcs :: FuncMap}
 

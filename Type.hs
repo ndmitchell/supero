@@ -72,15 +72,21 @@ instance Show Prog where
 
 instance Show Func where
     show = render . docFunc
+    
+instance Show FuncAlt where
+    show = render . docFuncAlt ""
 
 
 docFunc :: Func -> Doc
-docFunc (Func name xs) = vcat (map f xs)
-    where
-        f (FuncAlt i conds x) = hsep $
-            text (name ++ "$" ++ show i) :
-            map (docExpr True) conds ++
-            text "=" : docExpr False x : []
+docFunc (Func name xs) = vcat (map (docFuncAlt name) xs)
+
+
+docFuncAlt :: String -> FuncAlt -> Doc
+docFuncAlt name (FuncAlt i conds x) =
+    hsep $
+        text (name ++ "$" ++ show i) :
+        map (docExpr True) conds ++
+        text "=" : docExpr False x : []
 
 
 docExpr :: Bool -> Expr -> Doc

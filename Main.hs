@@ -13,7 +13,7 @@ main = do
     cr <- loadCore x
     let core = coreReachable ["main"] $ coreOverlay cr pm
         prog = optimise $ convert core
-    print $ revert core prog
+    print $ coreReachable ["main"] $ revert core prog
 
 
 optimise :: Prog -> Prog

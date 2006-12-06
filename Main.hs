@@ -8,14 +8,19 @@ import System.Environment
 
 
 main = do
-    (x:_) <- getArgs
+    (x:xs) <- getArgs
+    let n = if null xs then 1 else read (head xs)
     pm <- loadCore "Primitive.ycr"
     cr <- loadCore x
     let core = coreReachable ["main"] $ coreOverlay cr pm
-        prog = optimise $ convert core
+        prog = optimise n $ convert core
     print $ coreReachable ["main"] $ revert core prog
 
 
-optimise :: Prog -> Prog
-optimise = pipe . normalise
-    where pipe = inline . populate
+optimise :: Int -> Prog -> Prog
+optimise n = f n . normalise
+    where
+        f 0 = id
+        f n = pipe . f (n-1)
+    
+        pipe = inline . populate

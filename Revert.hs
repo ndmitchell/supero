@@ -33,10 +33,12 @@ revertAlt funcs name (FuncAlt n lhs rhs) = newfunc : newmain
         
         f :: Expr -> CoreExpr
         f (Const (ConstStr x)) = CoreStr x
+        f (Const (ConstInt x)) = CoreInt x
         f (Ctr x) = CoreCon x
         f (Var x) = CoreVar $ toVar x
         f (Prim x) = CorePrim x
         f (Apply (Fun x) xs) = callFun x xs
+        f (Fun x) = f (Apply (Fun x) [])
         f (Apply x xs) = CoreApp (f x) (map f xs)
         f (Case on alts) = CoreCase (f on) [(f a, f b) | (a,b) <- alts]
         f x = error $ "Revert.revertAlt.f: " ++ show x
@@ -45,12 +47,16 @@ revertAlt funcs name (FuncAlt n lhs rhs) = newfunc : newmain
         callFun name args = CoreApp (CoreFun (name ++ "_" ++ show n)) (map f $ bindArgs ++ extraArgs)
             where
                 extraArgs = drop (length lhs) args
-                bindArgs = map (fromJust . (`lookup` bind)) frees
+                bindArgs = [x | Just x <- map (`lookup` bind) frees]
             
                 frees = listArgs lhs
                 func = fromJust $ Map.lookup name funcs
-                Just (n,bind,_) = findBestRhs func args
                 lhs = head [altMatch alt | alt <- funcAlts func, altNum alt == n]
+
+                (n,bind,_) = case findBestRhs func args of
+                                 Just x -> x
+                                 Nothing -> (0, zip frees args, undefined)
+
 
 
 listArgs lhs = nub [n | Var n <- concatMap allOver lhs]

@@ -3,6 +3,7 @@ import Yhc.Core
 import Convert
 import Type
 import Normalise
+import Revert
 import System.Environment
 
 
@@ -11,8 +12,10 @@ main = do
     pm <- loadCore "Primitive.ycr"
     cr <- loadCore x
     let core = coreReachable ["main"] $ coreOverlay cr pm
-    print $ pipe $ normalise $ convert core
+        prog = optimise $ convert core
+    print $ revert core prog
 
-    where
-        -- inline . populate
-        pipe = inline . populate -- id -- . populate
+
+optimise :: Prog -> Prog
+optimise = pipe . normalise
+    where pipe = inline . populate

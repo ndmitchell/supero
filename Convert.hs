@@ -1,5 +1,5 @@
 
-module Convert(convert) where
+module Convert(convert, drop1mod) where
 
 import Type
 import Safe
@@ -32,7 +32,7 @@ fixPrims core = core{coreFuncs = mapUnderCore usePrim norm}
 
 
 drop1mod :: Core -> Core
-drop1mod (Core name imports datas funcs) = Core "" [] (map g datas) (concatMap h funcs)
+drop1mod (Core name imports datas funcs) = Core name imports (map g datas) (concatMap h funcs)
     where
         f x = case break (== '.') x of
                    (_,"") -> x

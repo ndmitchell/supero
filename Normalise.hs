@@ -33,14 +33,41 @@ populate (Prog funcs) = Prog $ Map.map insert funcs
                           | Apply (Fun call) args <- news, call == funcName func]
 
 
-
+-- | Put together a list of function calls which need special instances generating
+--   Need to do this if:
+--   * The best one is not that close
+--   * Will not result in it calling itself
 collect :: FuncMap -> [Expr]
-collect funcs = nub $ filter isValid $ concatMap (allOver . altBody) $ concatMap funcAlts $ Map.elems funcs
+collect funcs = nub $ concat [f func alt expr
+              | func <- Map.elems funcs, alt <- funcAlts func, expr <- allOver (altBody alt)]
     where
-        isValid (Apply (Fun call) args)
-            = (isNothing $ findExactRhs func args) && (isJust $ findBestRhs func args)
-            where func = fromJust $ Map.lookup call funcs
-        isValid _ = False
+        f func alt (Apply (Fun call) args)
+            | (isNothing $ findExactRhs func args) &&
+              (isJust unfold) && noSelf
+            = [Apply (Fun call) args2]
+            where
+                args2 = args -- should be blurring here! map (blur 3) args
+            
+                func = fromJust $ Map.lookup call funcs
+                unfold = findBestRhs func args
+                
+                noSelf = not $ any isSelf $ allOver $ thd3 $ fromJust unfold
+                isSelf (Apply (Fun call) args) =
+                        call == funcName func && isJust res &&
+                        fst3 (fromJust res) == altNum alt &&
+                        length args == length (altMatch alt)
+                    where res = findBestRhs func args
+                isSelf _ = False
+
+        f _ _ _ = []
+
+
+
+blur :: Int -> Expr -> Expr
+blur 0 _ = Var 0 -- needs to be a unique variable!
+blur n x = generate (map (blur (n-1)) children)
+    where (children,generate) = replaceChildren x
+
 
 
 inline :: Prog -> Prog

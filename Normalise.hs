@@ -32,8 +32,16 @@ import General
 -- generate new versions based on this.
 
 
-call_eval :: Prog -> Prog
-call_eval (Prog funcs) = Prog $ removeEval $ create (required funcs2) funcs2
+-- the list of data structures than cannot be specialised
+type Call_Eval = Map.Map String [Int]
+
+
+call_eval_analysis :: Prog -> Call_Eval
+call_eval_analysis prog = Map.fromList [("foldl",[2])]
+
+
+call_eval :: Call_Eval -> Prog -> Prog
+call_eval analysis (Prog funcs) = Prog $ removeEval $ create (required funcs2) funcs2
     where funcs2 = insertEval funcs
 
 

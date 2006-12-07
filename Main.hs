@@ -14,13 +14,16 @@ main = do
     cr <- loadCore x
     let core = coreReachable ["main"] $ coreOverlay cr pm
         prog = optimise n $ convert core
-    print $ coreReachable ["main"] $ revert core prog
+        core2 = coreReachable ["main"] $ revert core prog
+    print core2
 
 
 optimise :: Int -> Prog -> Prog
-optimise n = f n . simplify
+optimise n prog = f n $ simplify prog
     where
+        analysis = call_eval_analysis prog
+    
         f 0 = id
         f n = pipe . f (n-1)
     
-        pipe = case_call . call_eval
+        pipe = case_call . call_eval analysis

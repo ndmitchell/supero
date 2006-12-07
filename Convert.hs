@@ -64,7 +64,7 @@ convertExpr x = case x of
         CoreVar x -> Var $ read x
         CoreApp x xs -> Apply (f x) (fs xs)
         CoreCon x -> Ctr x
-        CoreFun x -> Fun x
+        CoreFun x -> Fun x 0
         CorePrim x -> Prim x
         
         CoreStr x -> Const $ ConstStr x

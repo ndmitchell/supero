@@ -23,7 +23,7 @@ data FuncAlt = FuncAlt {altNum :: Int, altMatch :: [Expr], altBody :: Expr}
 data Expr = Var Int
           | Case Expr [(Expr, Expr)]
           | Apply Expr [Expr]
-          | Fun String
+          | Fun String Int
           | Ctr String
           | Prim String
           | Const Const
@@ -97,7 +97,7 @@ docExpr = f
     where
         f _ (Var i) = text $ show i
         f _ (Ctr x) = text x
-        f _ (Fun x) = text x
+        f _ (Fun x i) = text $ x ++ "$" ++ show i
         f _ (Eval x) = braces $ f False x
         f _ (Prim x) = text (x ++ "#")
         f _ (Const x) = text $ show x

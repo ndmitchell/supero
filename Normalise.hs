@@ -30,7 +30,7 @@ populate (Prog funcs) = Prog $ Map.map insert funcs
                 oldalt = altNum $ head $ funcAlts func
                 newalts2 = reverse $ zipWith (\n x -> x{altNum=n}) [oldalt+1..] $ reverse newalts
                 newalts = [FuncAlt 0 args (simplify $ inlineExpr funcs call args)
-                          | Apply (Fun call) args <- news, call == funcName func]
+                          | Apply (Fun call n) args <- news, call == funcName func]
 
 
 -- | Put together a list of function calls which need special instances generating
@@ -41,10 +41,10 @@ collect :: FuncMap -> [Expr]
 collect funcs = nub $ concat [f func alt expr
               | func <- Map.elems funcs, alt <- funcAlts func, expr <- allOver (altBody alt)]
     where
-        f func alt (Apply (Fun call) args)
+        f func alt (Apply (Fun call n) args)
             | (isNothing $ findExactRhs func args) &&
               (isJust unfold) && noSelf
-            = [Apply (Fun call) args2]
+            = [Apply (Fun call n) args2]
             where
                 args2 = args -- should be blurring here! map (blur 3) args
             
@@ -52,7 +52,7 @@ collect funcs = nub $ concat [f func alt expr
                 unfold = findBestRhs func args
                 
                 noSelf = not $ any isSelf $ allOver $ thd3 $ fromJust unfold
-                isSelf (Apply (Fun call) args) =
+                isSelf (Apply (Fun call n) args) =
                         call == funcName func && isJust res &&
                         fst3 (fromJust res) == altNum alt &&
                         length args == length (altMatch alt)
@@ -77,7 +77,7 @@ inline (Prog funcs) = Prog $ Map.map f funcs
 
         g 0 (FuncAlt i lhs rhs) = FuncAlt i lhs (simplify rhs)
 
-        g n (FuncAlt i lhs (Case (Apply (Fun call) args) alts)) =
+        g n (FuncAlt i lhs (Case (Apply (Fun call _) args) alts)) =
             g (n-1) (FuncAlt i lhs (Case (inlineExpr funcs call args) alts))
         g _ x = g 0 x
 
@@ -86,7 +86,7 @@ inline (Prog funcs) = Prog $ Map.map f funcs
 inlineExpr :: FuncMap -> String -> [Expr] -> Expr
 inlineExpr funcs call args =
     case findBestRhs (fromJust $ Map.lookup call funcs) args of
-        Nothing -> Apply (Fun call) args
+        Nothing -> Apply (Fun call 0) args
         Just x -> thd3 x
 
 

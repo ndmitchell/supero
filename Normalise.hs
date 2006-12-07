@@ -33,7 +33,8 @@ import General
 
 
 call_eval :: Prog -> Prog
-call_eval (Prog funcs) = Prog $ use $ create (required funcs) funcs
+call_eval (Prog funcs) = Prog $ removeEval $ create (required funcs2) funcs2
+    where funcs2 = insertEval funcs
 
 
 -- use the calls that were just created
@@ -42,7 +43,7 @@ use funcs = Map.map f funcs
     where
         f func = func{funcAlts = map (\alt -> alt{altBody = mapOver g (altBody alt)}) (funcAlts func)}
         
-        g (Apply (Fun x i) xs) | any isEval xs && isJust rhs = Apply (Fun x i2) xs2
+        g (Apply (FunAlt x i) xs) | any isEval xs && isJust rhs = Apply (FunAlt x i2) xs2
             where
                 xs2 = map (mapUnder fromEval) xs
                 rhs = findExactRhs (fromJust $ Map.lookup x funcs) xs2
@@ -59,8 +60,8 @@ create req funcs = Map.map f funcs
             where
                 oldalt = altNum $ head $ funcAlts func
                 newalts2 = reverse $ zipWith (\n x -> x{altNum=n}) [oldalt+1..] $ reverse newalts
-                newalts = [FuncAlt 0 args (simplifyExpr $ insertEval $ inlineExpr funcs call args)
-                          | Apply (Fun call n) args <- req, call == funcName func]
+                newalts = [FuncAlt 0 args (simplifyExpr $ inlineExpr funcs call (map (mapUnder toFunAlt) args))
+                          | Apply (Fun call) args <- req, call == funcName func]
 
 
 -- figure out which calls are required
@@ -68,41 +69,43 @@ required :: FuncMap -> [Expr]
 required funcs = nub $ concat [f func alt expr
                | func <- Map.elems funcs, alt <- funcAlts func, expr <- allOver (altBody alt)]
     where
-        f func alt (Apply (Fun call n) args)
-            | any isEval args = [Apply (Fun call n) (map (mapUnder fromEval) args)]
+        f func alt (Apply (FunAlt call n) args)
+            | any isEval args = [Apply (Fun call) (map (mapUnder (fromEval . remFunAlt)) args)]
         f _ _ _ = []
 
 
-
--- | Put together a list of function calls which need special instances generating
---   Need to do this if:
---   * The best one is not that close
---   * Will not result in it calling itself
-collect :: FuncMap -> [Expr]
-collect funcs = nub $ concat [f func alt expr
-              | func <- Map.elems funcs, alt <- funcAlts func, expr <- allOver (altBody alt)]
+-- make all Fun -> FunAlt
+-- insert Eval where required
+insertEval :: FuncMap -> FuncMap
+insertEval funcs = Map.map (onBody_Func f) funcs
     where
-        f func alt (Apply (Fun call n) args)
-            | (isNothing $ findExactRhs func args) &&
-              (isJust unfold) && noSelf
-            = [Apply (Fun call n) args2]
+        f (Apply (Fun x) args) | isJust res = Apply (FunAlt x n) (map (replaceBinding bind2) alt ++ extraArgs)
             where
-                args2 = args -- should be blurring here! map (blur 3) args
+                extraArgs = map Eval $ drop (length alt) args
             
-                func = fromJust $ Map.lookup call funcs
-                unfold = findBestRhs func args
+                func = fromJust $ Map.lookup x funcs
+
+                res = findBestRhs func args
+                Just (n,bind,rep) = res
+                alt = altMatch $ getFuncAlt func n
                 
-                noSelf = not $ any isSelf $ allOver $ thd3 $ fromJust unfold
-                isSelf (Apply (Fun call n) args) =
-                        call == funcName func && isJust res &&
-                        fst3 (fromJust res) == altNum alt &&
-                        length args == length (altMatch alt)
-                    where res = findBestRhs func args
-                isSelf _ = False
+                vars = [i | Var i <- map snd bind]
+                goodvar = nub vars \\ (vars \\ nub vars)
+                bind2 = [(a, g b) | (a,b) <- bind]
+                
+                g (Var i) | i `elem` goodvar = Var i
+                g x = Eval $ f x
 
-        f _ _ _ = []
+        f x = generate (map f children)
+            where (children,generate) = replaceChildren x
 
 
+removeEval :: FuncMap -> FuncMap
+removeEval = onBody_Funcs (mapUnder f)
+    where
+        f (FunAlt x i) = Fun x
+        f (Eval x) = x
+        f x = x
 
 ---------------------------------------------------------------------
 -- CASE CALL
@@ -112,19 +115,14 @@ collect funcs = nub $ concat [f func alt expr
 
 
 case_call :: Prog -> Prog
-case_call (Prog funcs) = Prog $ Map.map f funcs
+case_call (Prog funcs) = simplify $ Prog $ Map.map f funcs
     where
-        f func = func{funcAlts = map (g 5) (funcAlts func)}
-
-        g 0 (FuncAlt i lhs rhs) = FuncAlt i lhs (simplifyExpr rhs)
-
-        g n (FuncAlt i lhs (Case (Apply (Fun call _) args) alts)) =
-            g (n-1) (FuncAlt i lhs (Case (inlineExpr funcs call args) alts))
-        g _ x = g 0 x
-
-
-
-
+        f func = func{funcAlts = map g (funcAlts func)}
+        g (FuncAlt i lhs rhs) = FuncAlt i lhs (mapUnder h rhs)
+        
+        h (Case (Apply (Fun call) args) alts) =
+            (Case (inlineExpr funcs call args) alts)
+        h x = x
 
 
 
@@ -173,6 +171,7 @@ blur n x = generate (map (blur (n-1)) children)
 inlineExpr :: FuncMap -> String -> [Expr] -> Expr
 inlineExpr funcs call args =
     case findBestRhs (fromJust $ Map.lookup call funcs) args of
-        Nothing -> Apply (Fun call 0) args
+        Nothing -> Apply (Fun call) args
         Just x -> thd3 x
 
+        

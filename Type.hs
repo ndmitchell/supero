@@ -23,7 +23,8 @@ data FuncAlt = FuncAlt {altNum :: Int, altMatch :: [Expr], altBody :: Expr}
 data Expr = Var Int
           | Case Expr [(Expr, Expr)]
           | Apply Expr [Expr]
-          | Fun String Int
+          | Fun String
+          | FunAlt String Int
           | Ctr String
           | Prim String
           | Const Const
@@ -45,11 +46,32 @@ instance Show Const where
     show (ConstChr x) = show x
 
 
+
+onBody_Funcs :: (Expr -> Expr) -> (FuncMap -> FuncMap)
+onBody_Funcs f = Map.map (onBody_Func f)
+
+onBody_Func :: (Expr -> Expr) -> (Func -> Func)
+onBody_Func f func = func{funcAlts = map (onBody_Alt f) (funcAlts func)}
+
+onBody_Alt :: (Expr -> Expr) -> (FuncAlt -> FuncAlt)
+onBody_Alt f alt = alt{altBody = f (altBody alt)}
+
+
+getFuncAlt :: Func -> Int -> FuncAlt
+getFuncAlt func i = head [alt | alt <- funcAlts func, altNum alt == i]
+
+
 isVar (Var{}) = True; isVar _ = False
 isEval (Eval{}) = True; isEval _ = False
 
 fromEval (Eval x) = x
 fromEval x = x
+
+remFunAlt (FunAlt x i) = Fun x
+remFunAlt x = x
+
+toFunAlt (Fun x) = (FunAlt x 0)
+toFunAlt x = x
 
 mkApply x [] = x
 mkApply x xs = Apply x xs
@@ -101,7 +123,8 @@ docExpr = f
     where
         f _ (Var i) = text $ show i
         f _ (Ctr x) = text x
-        f _ (Fun x i) = text $ x ++ "$" ++ show i
+        f _ (Fun x) = text x
+        f _ (FunAlt x i) = text $ x ++ "$" ++ show i
         f _ (Eval x) = braces $ f False x
         f _ (Prim x) = text (x ++ "#")
         f _ (Const x) = text $ show x

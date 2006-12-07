@@ -18,7 +18,7 @@ main = do
 
 
 optimise :: Int -> Prog -> Prog
-optimise n = f n . normalise
+optimise n = f n . simplify
     where
         f 0 = id
         f n = pipe . f (n-1)

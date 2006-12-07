@@ -11,13 +11,6 @@ import Data.Maybe
 import General
 
 
-normalise :: Prog -> Prog
-normalise prog = prog{funcs = Map.map normaliseFunc (funcs prog)}
-
-
-normaliseFunc :: Func -> Func
-normaliseFunc (Func name body) = Func name [alt{altBody = simplify (altBody alt)} | alt <- body]
-
 
 
 populate :: Prog -> Prog
@@ -29,7 +22,7 @@ populate (Prog funcs) = Prog $ Map.map insert funcs
             where
                 oldalt = altNum $ head $ funcAlts func
                 newalts2 = reverse $ zipWith (\n x -> x{altNum=n}) [oldalt+1..] $ reverse newalts
-                newalts = [FuncAlt 0 args (simplify $ inlineExpr funcs call args)
+                newalts = [FuncAlt 0 args (simplifyExpr $ inlineExpr funcs call args)
                           | Apply (Fun call n) args <- news, call == funcName func]
 
 
@@ -75,7 +68,7 @@ inline (Prog funcs) = Prog $ Map.map f funcs
     where
         f func = func{funcAlts = map (g 5) (funcAlts func)}
 
-        g 0 (FuncAlt i lhs rhs) = FuncAlt i lhs (simplify rhs)
+        g 0 (FuncAlt i lhs rhs) = FuncAlt i lhs (simplifyExpr rhs)
 
         g n (FuncAlt i lhs (Case (Apply (Fun call _) args) alts)) =
             g (n-1) (FuncAlt i lhs (Case (inlineExpr funcs call args) alts))
@@ -90,8 +83,24 @@ inlineExpr funcs call args =
         Just x -> thd3 x
 
 
-simplify :: Expr -> Expr
-simplify = mapUnder f
+
+---------------------------------------------------------------------
+-- SIMPLIFICATION
+--
+-- Take a program and make it simpler by applying localised rules
+-- such as case (case ..) etc
+
+
+simplify :: Prog -> Prog
+simplify (Prog funcs) = Prog $ Map.map simplifyFunc funcs
+
+
+simplifyFunc :: Func -> Func
+simplifyFunc (Func name body) = Func name [alt{altBody = simplifyExpr (altBody alt)} | alt <- body]
+
+
+simplifyExpr :: Expr -> Expr
+simplifyExpr = mapUnder f
     where
         f (Apply (Apply x xs) ys) = f $ Apply x (xs++ys)
     

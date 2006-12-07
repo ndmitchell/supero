@@ -70,7 +70,7 @@ create req funcs = Map.map f funcs
             where
                 oldalt = altNum $ head $ funcAlts func
                 newalts2 = reverse $ zipWith (\n x -> x{altNum=n}) [oldalt+1..] $ reverse newalts
-                newalts = [FuncAlt 0 args (simplifyExpr $ inlineExpr funcs call (map (mapUnder toFunAlt) args))
+                newalts = [FuncAlt 0 args (simplifyExpr $ case_call_expr funcs $ inlineExpr funcs call (map (mapUnder toFunAlt) args))
                           | Apply (Fun call) args <- req, call == funcName func]
 
 
@@ -137,14 +137,15 @@ removeEvalExpr = mapUnder f
 
 
 case_call :: Prog -> Prog
-case_call (Prog funcs) = simplify $ Prog $ Map.map f funcs
+case_call (Prog funcs) = Prog $ onBody_Funcs (case_call_expr funcs) funcs
+
+
+case_call_expr :: FuncMap -> Expr -> Expr
+case_call_expr funcs = mapUnder f
     where
-        f func = func{funcAlts = map g (funcAlts func)}
-        g (FuncAlt i lhs rhs) = FuncAlt i lhs (mapUnder h rhs)
-        
-        h (Case (Apply (Fun call) args) alts) =
+        f (Case (Apply (Fun call) args) alts) =
             (Case (inlineExpr funcs call args) alts)
-        h x = x
+        f x = x
 
 
 

@@ -30,4 +30,4 @@ optimise n prog = f n $ simplify prog
         f 0 = id
         f n = pipe . f (n-1)
     
-        pipe = case_call . call_eval analysis
+        pipe = call_eval analysis

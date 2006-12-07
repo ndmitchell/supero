@@ -48,6 +48,9 @@ instance Show Const where
 
 
 
+onBody_Prog :: (Expr -> Expr) -> (Prog -> Prog)
+onBody_Prog f (Prog x) = Prog $ onBody_Funcs f x
+
 onBody_Funcs :: (Expr -> Expr) -> (FuncMap -> FuncMap)
 onBody_Funcs f = Map.map (onBody_Func f)
 

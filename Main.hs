@@ -23,4 +23,4 @@ optimise n = f n . simplify
         f 0 = id
         f n = pipe . f (n-1)
     
-        pipe = inline . populate
+        pipe = case_call . call_eval

@@ -1,6 +1,19 @@
 
 module Normalise where
 
+{-
+There are two types of "knowledge loosing" operations in this language:
+
+[CALL_EVAL] Apply (Fun x) (... (Eval ...) ....)
+[CASE_CALL] Case (Apply (Fun x) ...)
+
+The aim is to eliminate both types.
+
+The first is eliminated by collecting specialised versions that are being asked for.
+
+The second is eliminated by inlining.
+-}
+
 import Type
 import Match
 
@@ -11,10 +24,15 @@ import Data.Maybe
 import General
 
 
+---------------------------------------------------------------------
+-- CALL EVAL
+--
+-- Detect where calls are being made with an embedded eval
+-- generate new versions based on this.
 
 
-populate :: Prog -> Prog
-populate (Prog funcs) = Prog $ Map.map insert funcs
+call_eval :: Prog -> Prog
+call_eval (Prog funcs) = Prog $ Map.map insert funcs
     where
         news = collect funcs
         
@@ -56,15 +74,15 @@ collect funcs = nub $ concat [f func alt expr
 
 
 
-blur :: Int -> Expr -> Expr
-blur 0 _ = Var 0 -- needs to be a unique variable!
-blur n x = generate (map (blur (n-1)) children)
-    where (children,generate) = replaceChildren x
+---------------------------------------------------------------------
+-- CASE CALL
+--
+-- Detect where calls are being made inside a case.
+-- Do inline expansion if possible.
 
 
-
-inline :: Prog -> Prog
-inline (Prog funcs) = Prog $ Map.map f funcs
+case_call :: Prog -> Prog
+case_call (Prog funcs) = Prog $ Map.map f funcs
     where
         f func = func{funcAlts = map (g 5) (funcAlts func)}
 
@@ -76,11 +94,7 @@ inline (Prog funcs) = Prog $ Map.map f funcs
 
 
 
-inlineExpr :: FuncMap -> String -> [Expr] -> Expr
-inlineExpr funcs call args =
-    case findBestRhs (fromJust $ Map.lookup call funcs) args of
-        Nothing -> Apply (Fun call 0) args
-        Just x -> thd3 x
+
 
 
 
@@ -112,4 +126,23 @@ simplifyExpr = mapUnder f
                 (bind,rhs) = head [(bind,rhs) | (lhs,rhs) <- alts, Just bind <- [matchBinding [lhs] [on]]]
 
         f x = x
+
+
+
+---------------------------------------------------------------------
+-- UTILITIES
+
+
+blur :: Int -> Expr -> Expr
+blur 0 _ = Var 0 -- needs to be a unique variable!
+blur n x = generate (map (blur (n-1)) children)
+    where (children,generate) = replaceChildren x
+
+
+
+inlineExpr :: FuncMap -> String -> [Expr] -> Expr
+inlineExpr funcs call args =
+    case findBestRhs (fromJust $ Map.lookup call funcs) args of
+        Nothing -> Apply (Fun call 0) args
+        Just x -> thd3 x
 

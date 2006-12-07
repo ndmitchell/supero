@@ -5,6 +5,7 @@ import Type
 import Safe
 import Yhc.Core
 import Data.List
+import Data.Play
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -52,7 +53,7 @@ drop1mod (Core name imports datas funcs) = Core name imports (map g datas) (conc
 
 
 convertFunc :: Int -> CoreFunc -> (Int, Func)
-convertFunc n x = (n2, Func (coreFuncName x) [FuncAlt 0 (map Var args2) (convertExpr expr2)])
+convertFunc n x = (n2, Func (coreFuncName x) [FuncAlt 0 (map Var args2) (insertEval $ convertExpr expr2)])
     where
         (n2,args2,expr2) = freshFree (coreFuncArgs x) (coreFuncBody x) n
     
@@ -75,7 +76,20 @@ convertExpr x = case x of
     where
         f = convertExpr
         fs = map f
-        
+
+
+insertEval :: Expr -> Expr
+insertEval = mapUnder f
+    where
+        f (Apply (Fun x n) xs) = Apply (Fun x n) (map g xs)
+            where
+                vars = [i | Var i <- xs]
+                badvars = nub $ vars \\ nub vars
+                
+                g (Var i) = if i `elem` badvars then Eval (Var i) else Var i
+                g x = Eval x
+
+        f x = x
 
 
 -- number the variables as appropriate

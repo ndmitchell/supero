@@ -37,12 +37,14 @@ type Call_Eval = Map.Map String [Int]
 
 
 call_eval_analysis :: Prog -> Call_Eval
-call_eval_analysis prog = Map.fromList [("foldl",[2])]
+call_eval_analysis prog = Map.fromList [("foldl",[1])]
 
 
 call_eval :: Call_Eval -> Prog -> Prog
-call_eval analysis (Prog funcs) = Prog $ removeEval $ create (required funcs2) funcs2
-    where funcs2 = insertEval funcs
+call_eval analysis (Prog funcs) = Prog $ removeEval $ create reqs funcs2
+    where
+        funcs2 = insertEval funcs
+        reqs = required analysis funcs2
 
 
 -- use the calls that were just created
@@ -73,12 +75,20 @@ create req funcs = Map.map f funcs
 
 
 -- figure out which calls are required
-required :: FuncMap -> [Expr]
-required funcs = nub $ concat [f func alt expr
+required :: Call_Eval -> FuncMap -> [Expr]
+required analysis funcs = nub $ concat [f func alt expr
                | func <- Map.elems funcs, alt <- funcAlts func, expr <- allOver (altBody alt)]
     where
         f func alt (Apply (FunAlt call n) args)
-            | any isEval args = [Apply (Fun call) (map (mapUnder (fromEval . remFunAlt)) args)]
+            | any isEval args2 = [Apply (Fun call) (map removeEvalExpr args2)]
+            where
+                args2 = zipWith3 g [0..] args free
+                free = [1..] \\ [i | Var i <- args]
+                res = Map.findWithDefault [] call analysis
+                
+                g i arg fre | i `elem` res = Var fre
+                            | otherwise = arg
+            
         f _ _ _ = []
 
 
@@ -109,7 +119,11 @@ insertEval funcs = Map.map (onBody_Func f) funcs
 
 
 removeEval :: FuncMap -> FuncMap
-removeEval = onBody_Funcs (mapUnder f)
+removeEval = onBody_Funcs removeEvalExpr
+
+
+removeEvalExpr :: Expr -> Expr
+removeEvalExpr = mapUnder f
     where
         f (FunAlt x i) = Fun x
         f (Eval x) = x

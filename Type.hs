@@ -27,6 +27,7 @@ data Expr = Var Int
           | Ctr String
           | Prim String
           | Const Const
+          | Eval Expr
           deriving (Eq,Show)
 
 
@@ -62,6 +63,8 @@ instance Play Expr where
             
             Apply x xs -> (x:xs, \(x:xs) -> Apply x xs)
             
+            Eval x -> playOne Eval x
+            
             _ -> playDefault x
 
 
@@ -95,6 +98,7 @@ docExpr = f
         f _ (Var i) = text $ show i
         f _ (Ctr x) = text x
         f _ (Fun x) = text x
+        f _ (Eval x) = braces $ f False x
         f _ (Prim x) = text (x ++ "#")
         f _ (Const x) = text $ show x
         

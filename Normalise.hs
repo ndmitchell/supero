@@ -15,6 +15,7 @@ The second is eliminated by inlining.
 -}
 
 import Type
+import Convert
 import Match
 
 import qualified Data.Map as Map
@@ -32,16 +33,45 @@ import General
 
 
 call_eval :: Prog -> Prog
-call_eval (Prog funcs) = Prog $ Map.map insert funcs
+call_eval (Prog funcs) = Prog $ use $ create (required funcs) funcs
+
+
+-- use the calls that were just created
+use :: FuncMap -> FuncMap
+use funcs = Map.map f funcs
     where
-        news = collect funcs
+        f func = func{funcAlts = map (\alt -> alt{altBody = mapOver g (altBody alt)}) (funcAlts func)}
         
-        insert func = func{funcAlts = newalts2 ++ funcAlts func}
+        g (Apply (Fun x i) xs) | any isEval xs && isJust rhs = Apply (Fun x i2) xs2
+            where
+                xs2 = map (mapUnder fromEval) xs
+                rhs = findExactRhs (fromJust $ Map.lookup x funcs) xs2
+                Just (i2,_,_) = rhs
+
+        g x = x
+
+
+-- create all the required calls
+create :: [Expr] -> FuncMap -> FuncMap
+create req funcs = Map.map f funcs
+    where
+        f func = func{funcAlts = newalts2 ++ funcAlts func}
             where
                 oldalt = altNum $ head $ funcAlts func
                 newalts2 = reverse $ zipWith (\n x -> x{altNum=n}) [oldalt+1..] $ reverse newalts
-                newalts = [FuncAlt 0 args (simplifyExpr $ inlineExpr funcs call args)
-                          | Apply (Fun call n) args <- news, call == funcName func]
+                newalts = [FuncAlt 0 args (simplifyExpr $ insertEval $ inlineExpr funcs call args)
+                          | Apply (Fun call n) args <- req, call == funcName func]
+
+
+-- figure out which calls are required
+required :: FuncMap -> [Expr]
+required funcs = nub $ concat [f func alt expr
+               | func <- Map.elems funcs, alt <- funcAlts func, expr <- allOver (altBody alt)]
+    where
+        f func alt (Apply (Fun call n) args)
+            | any isEval args = [Apply (Fun call n) (map (mapUnder fromEval) args)]
+        f _ _ _ = []
+
 
 
 -- | Put together a list of function calls which need special instances generating

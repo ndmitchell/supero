@@ -46,6 +46,10 @@ instance Show Const where
 
 
 isVar (Var{}) = True; isVar _ = False
+isEval (Eval{}) = True; isEval _ = False
+
+fromEval (Eval x) = x
+fromEval x = x
 
 mkApply x [] = x
 mkApply x xs = Apply x xs

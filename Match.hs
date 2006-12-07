@@ -63,6 +63,7 @@ matchBinding xs ys = fs xs ys >>= check
         
         f (Var x) y = Just [(x,y)]
         f (Apply x xs) (Apply y ys) = fs (x:xs) (y:ys)
+        f (Fun x _) (Fun y _) = if x == y then Just [] else Nothing
         f x y = if x == y then Just [] else Nothing
         
         

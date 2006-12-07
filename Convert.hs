@@ -1,5 +1,5 @@
 
-module Convert(convert, drop1mod) where
+module Convert(convert, drop1mod, insertEval) where
 
 import Type
 import Safe

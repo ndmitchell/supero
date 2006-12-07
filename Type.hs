@@ -29,6 +29,7 @@ data Expr = Var Int
           | Prim String
           | Const Const
           | Eval Expr
+          | Jail Expr
           deriving (Eq,Show)
 
 
@@ -90,7 +91,7 @@ instance Play Expr where
             Apply x xs -> (x:xs, \(x:xs) -> Apply x xs)
             
             Eval x -> playOne Eval x
-            
+            Jail x -> playOne Jail x
             _ -> playDefault x
 
 
@@ -126,6 +127,7 @@ docExpr = f
         f _ (Fun x) = text x
         f _ (FunAlt x i) = text $ x ++ "$" ++ show i
         f _ (Eval x) = braces $ f False x
+        f _ (Jail x) = brackets $ f False x
         f _ (Prim x) = text (x ++ "#")
         f _ (Const x) = text $ show x
         

@@ -21,8 +21,8 @@ import Match
 import qualified Data.Map as Map
 import Data.Play
 import Data.List
+import Data.Tuple.Utils
 import Data.Maybe
-import General
 
 
 ---------------------------------------------------------------------

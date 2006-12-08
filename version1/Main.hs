@@ -23,7 +23,7 @@ coreInlin = coreInline Basic
 
 
 optimise :: Int -> Prog -> Prog
-optimise n prog = f n $ simplify prog
+optimise n prog = f n $ case_call $ simplify prog
     where
         analysis = call_eval_analysis prog
     

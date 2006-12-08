@@ -175,9 +175,10 @@ simplifyExpr = mapUnder f
         f (Case (Case on alts1) alts2) = f $ Case on (map g alts1)
             where g (lhs,rhs) = (lhs, f $ Case rhs alts2)
 
-        f (Case on@(Apply (Ctr x) xs) alts) = f $ replaceBinding bind rhs
+        f (Case on@(Apply (Ctr x) xs) alts) | not (null matches) = f $ replaceBinding bind rhs
             where
-                (bind,rhs) = head [(bind,rhs) | (lhs,rhs) <- alts, Just bind <- [matchBinding [lhs] [on]]]
+                matches = [(bind,rhs) | (lhs,rhs) <- alts, Just bind <- [matchBinding [lhs] [on]]]
+                (bind,rhs) = head matches
 
         f (Apply (Case on alts) xs) = f $ Case on [(lhs, f $ Apply rhs xs) | (lhs,rhs) <- alts]
 

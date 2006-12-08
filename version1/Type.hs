@@ -81,6 +81,13 @@ mkApply x [] = x
 mkApply x xs = Apply x xs
 
 
+isFunAny (Fun x) = True
+isFunAny (FunAlt x _) = True
+isFunAny _ = False
+
+fromFunAny (Fun x) = x
+fromFunAny (FunAlt x _) = x
+
 
 instance Play Expr where
     replaceChildren x =

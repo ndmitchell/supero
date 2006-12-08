@@ -145,9 +145,9 @@ case_call_expr :: FuncMap -> Expr -> Expr
 case_call_expr funcs = mapUnder (f 3)
     where
         f 0 x = x
-        f n (Case (Apply (FunAlt call _) args) alts) = f n (Case (Apply (Fun call) args) alts)
-        f n (Case (Apply (Fun call) args) alts) =
-             f (n-1) $ (Case (inlineExpr funcs call args) alts)
+        f n (Case x alts) | isFunAny x = f n (Case (Apply x []) alts)
+        f n (Case (Apply x args) alts) | isFunAny x =
+             f (n-1) $ (Case (inlineExpr funcs (fromFunAny x) args) alts)
         f n x = x
 
 

@@ -70,8 +70,9 @@ create req funcs = Map.map f funcs
             where
                 oldalt = altNum $ head $ funcAlts func
                 newalts2 = reverse $ zipWith (\n x -> x{altNum=n}) [oldalt+1..] $ reverse newalts
-                newalts = [FuncAlt 0 args (simplifyExpr $ case_call_expr funcs $ inlineExpr funcs call (map (mapUnder toFunAlt) args))
-                          | Apply (Fun call) args <- req, call == funcName func]
+                newalts = [FuncAlt 0 args (simplifyExpr $ case_call_expr funcs expr)
+                          | Apply (Fun call) args <- req, call == funcName func
+                          , let expr = inlineExpr funcs call (map (mapUnder toFunAlt) args)]
 
 
 -- figure out which calls are required

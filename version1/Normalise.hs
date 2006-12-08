@@ -138,7 +138,7 @@ removeEvalExpr = mapUnder f
 
 
 case_call :: Prog -> Prog
-case_call (Prog funcs) = Prog $ onBody_Funcs (case_call_expr funcs) funcs
+case_call (Prog funcs) = simplify $ Prog $ onBody_Funcs (case_call_expr funcs) funcs
 
 
 case_call_expr :: FuncMap -> Expr -> Expr
@@ -178,6 +178,8 @@ simplifyExpr = mapUnder f
         f (Case on@(Apply (Ctr x) xs) alts) = replaceBinding bind rhs
             where
                 (bind,rhs) = head [(bind,rhs) | (lhs,rhs) <- alts, Just bind <- [matchBinding [lhs] [on]]]
+
+        f (Apply (Case on alts) xs) = f $ Case on [(lhs, f $ Apply rhs xs) | (lhs,rhs) <- alts]
 
         f x = x
 

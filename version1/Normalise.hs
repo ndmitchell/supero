@@ -142,12 +142,12 @@ case_call (Prog funcs) = simplify $ Prog $ onBody_Funcs (case_call_expr funcs) f
 
 
 case_call_expr :: FuncMap -> Expr -> Expr
-case_call_expr funcs = mapUnder (f 3)
+case_call_expr funcs = mapUnder (f 5)
     where
         f 0 x = x
         f n (Case x alts) | isFunAny x = f n (Case (Apply x []) alts)
         f n (Case (Apply x args) alts) | isFunAny x =
-             f (n-1) $ (Case (inlineExpr funcs (fromFunAny x) args) alts)
+             f (n-1) $ (Case (mapUnder (f (n-1)) $ inlineExpr funcs (fromFunAny x) args) alts)
         f n x = x
 
 
@@ -175,7 +175,7 @@ simplifyExpr = mapUnder f
         f (Case (Case on alts1) alts2) = f $ Case on (map g alts1)
             where g (lhs,rhs) = (lhs, f $ Case rhs alts2)
 
-        f (Case on@(Apply (Ctr x) xs) alts) = replaceBinding bind rhs
+        f (Case on@(Apply (Ctr x) xs) alts) = f $ replaceBinding bind rhs
             where
                 (bind,rhs) = head [(bind,rhs) | (lhs,rhs) <- alts, Just bind <- [matchBinding [lhs] [on]]]
 
@@ -200,6 +200,6 @@ inlineExpr :: FuncMap -> String -> [Expr] -> Expr
 inlineExpr funcs call args =
     case findBestRhs (fromJust $ Map.lookup call funcs) args of
         Nothing -> Apply (Fun call) args
-        Just x -> thd3 x
+        Just x -> simplifyExpr $ thd3 x
 
         

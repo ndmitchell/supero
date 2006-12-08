@@ -34,6 +34,7 @@ revertAlt funcs name (FuncAlt n lhs rhs) = newfunc : newmain
         f :: Expr -> CoreExpr
         f (Const (ConstStr x)) = CoreStr x
         f (Const (ConstInt x)) = CoreInt x
+        f (Const (ConstChr x)) = CoreChr x
         f (Ctr x) = CoreCon x
         f (Var x) = CoreVar $ toVar x
         f (Prim x) = CorePrim x

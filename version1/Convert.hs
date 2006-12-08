@@ -74,6 +74,7 @@ convertExpr x = case x of
         CoreStr x -> Const $ ConstStr x
         CoreInt x -> Const $ ConstInt x
         CoreInteger x -> Const $ ConstInteger x
+        CoreChr x -> Const $ ConstChr x
         
         _ -> error $ "Convert.convertExpr: " ++ show x
     where

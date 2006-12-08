@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 
 
 convert :: Core -> Prog
-convert core = Prog (Map.fromList [(funcName x, x) | x <- fs])
+convert core = Prog (Map.fromList [(funcName x, x) | x <- concat fs])
     where
         (n,fs) = mapAccumL convertFunc 0 $ coreFuncs $ fixPrims $ drop1mod core
 
@@ -52,10 +52,13 @@ drop1mod (Core name imports datas funcs) = Core name imports (map g datas) (conc
 
 
 
-convertFunc :: Int -> CoreFunc -> (Int, Func)
-convertFunc n x = (n2, Func (coreFuncName x) [FuncAlt 0 (map Var args2) (convertExpr expr2)])
+convertFunc :: Int -> CoreFunc -> (Int, [Func])
+convertFunc n x = (n2, map f funcs2)
     where
         (n2,args2,expr2) = freshFree (coreFuncArgs x) (coreFuncBody x) n
+        funcs2 = removeLets (CoreFunc (coreFuncName x) (map show args2) expr2)
+        
+        f (CoreFunc name args body) = Func name [FuncAlt 0 (map (Var . read) args) (convertExpr body)]
     
 
 convertExpr :: CoreExpr -> Expr
@@ -89,4 +92,47 @@ freshFree args x n = (n+nvars, map (`lookupJust` rens) args, mapOverCore f x)
         rens = zip vars [n..]
 
         f (CoreVar x) = CoreVar $ show $ lookupJust x rens
+        f (CoreLet binds x) = CoreLet [(show $ lookupJust a rens, b) | (a,b) <- binds] x
         f x = x
+
+
+
+-- algorithm:
+-- find each let, give it the number x, being its first variable
+-- pass all free variables at that point
+removeLets :: CoreFunc -> [CoreFunc]
+removeLets (CoreFunc name args body2) = res
+    where
+        body = mapOverCore g body2
+            where
+                g (CoreLet [x] y) = CoreLet [x] y
+                g (CoreLet (x:xs) y) = CoreLet [x] $ g $ CoreLet xs y
+                g x = x
+    
+        res = CoreFunc name args (use body) : map gen lets
+        lets = [x | x@(CoreLet{}) <- allCore body]
+        
+        gen (CoreLet binds body) = CoreFunc (name ++ "#" ++ fst (head binds)) free (use body)
+            where free = freeVars body
+            
+        use x = mapOverCore f x
+            where
+                f (CoreLet binds body) = CoreApp (CoreFun (name ++ "#" ++ fst (head binds))) (map g free)
+                    where
+                        free = freeVars body
+                        
+                        g x = case lookup x binds of
+                                  Just y -> y
+                                  Nothing -> CoreVar x
+                f x = x
+
+
+freeVars :: CoreExpr -> [String]
+freeVars x = nub $ f x
+    where
+        f (CoreLet bind x) = (f x ++ concatMap (f . snd) bind) \\ map fst bind
+        f (CoreCase on alts) = f on ++ concatMap g alts
+        f (CoreVar x) = [x]
+        f x = concatMap f $ getChildrenCore x
+        
+        g (lhs,rhs) = f rhs \\ f lhs

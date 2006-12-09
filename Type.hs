@@ -7,7 +7,10 @@ import Data.List
 
 data CoreEx = CoreEx [CoreFuncEx]
 
-data CoreFuncEx = CoreFuncEx String [CoreExpr] CoreExpr
+data CoreFuncEx = CoreFuncEx {coreFuncExName :: String
+                             ,coreFuncExArgs :: [CoreExpr]
+                             ,coreFuncExBody :: CoreExpr
+                             }
 
 
 instance Show CoreEx where
@@ -35,3 +38,9 @@ drop1module (Core name imports datas funcs) = Core name imports (map g datas) (c
         h2 (CoreFun x) = CoreFun $ f x
         h2 (CoreCon x) = CoreCon $ f x
         h2 x = x
+
+
+isPrimitive (CorePos _ x) = isPrimitive x
+isPrimitive (CoreApp x []) = isPrimitive x
+isPrimitive (CoreVar x) = x == "primitive"
+isPrimitive _ = False

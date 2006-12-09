@@ -36,7 +36,7 @@ basicConvert (CoreFunc name args body) = CoreFuncEx name (map CoreVar args) body
 
 -- take an application to the body
 createFunc :: Core -> Ask -> CoreFuncEx
-createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name args $ mapUnderCore (f 5) body
+createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map CoreVar newargs) $ mapUnderCore (f 5) body
     where
         (newargs,body) = inlineFunc core name args
         
@@ -115,7 +115,7 @@ analyseCore core = (prims,accs)
 inlineFunc :: Core -> String -> [CoreExpr] -> ([String], CoreExpr)
 inlineFunc core name args
         | null underArgs = ([], coreApp (replaceFreeVars (zip params args) body2) overArgs)
-        | otherwise = error "Convert.inlineFunc, todo"
+        | otherwise = (underArgs, replaceFreeVars (zip params (args ++ map CoreVar underArgs)) body2)
     where
         overArgs = drop nparams args
         underArgs = drop nargs params

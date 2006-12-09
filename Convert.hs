@@ -21,7 +21,7 @@ convert core = CoreEx $ prims ++ f [] (normaliseAsk core mainApp)
         f done (p@(CoreApp (CoreFun name) args):ending) = func : f (req++done) (req++ending)
             where
                 func = createFunc core p
-                req = concatMap (normaliseAsk core) (collectAsk $ coreFuncExBody func) \\ done
+                req = nub (concatMap (normaliseAsk core) (collectAsk $ coreFuncExBody func)) \\ done
 
 
 

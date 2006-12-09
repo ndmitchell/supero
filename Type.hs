@@ -16,3 +16,22 @@ instance Show CoreEx where
 
 instance Show CoreFuncEx where
     show (CoreFuncEx name args body) = name ++ concatMap ((' ':) . showCoreExprGroup) args ++ " = " ++ show body
+
+
+
+drop1module :: Core -> Core
+drop1module (Core name imports datas funcs) = Core name imports (map g datas) (concatMap h funcs)
+    where
+        f x = case break (== '.') x of
+                   (_,"") -> x
+                   (_,_:xs) -> xs
+    
+        g (CoreData name free args) = CoreData (f name) free (map g2 args)
+        g2 (CoreCtor name items) = CoreCtor (f name) items
+        
+        h (CoreFunc name args body) 
+            | name == "main" = []
+            | otherwise = [CoreFunc (f name) args (mapOverCore h2 body)]
+        h2 (CoreFun x) = CoreFun $ f x
+        h2 (CoreCon x) = CoreCon $ f x
+        h2 x = x

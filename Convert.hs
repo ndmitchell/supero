@@ -75,20 +75,38 @@ type Analysis = ([String] -- primitive functions
 
 
 normaliseAsk :: Analysis -> Ask -> [Ask]
-normaliseAsk (prims,accs) x@(CoreApp (CoreFun name) _) = [x3 | name `notElem` prims]
+normaliseAsk (prims,accs) orig@(CoreApp (CoreFun name) args) = [normaliseFree res | name `notElem` prims]
+    where
+        acc = fromMaybe [] (lookup name accs)
+        res = CoreApp (CoreFun name) (zipWith3 f [0..] args vars)
+        vars = freeVars 'v' \\ collectFreeVars orig
+
+        f n arg free | n `elem` acc = CoreVar free
+                     | otherwise = arg
+
+
+freeVars :: Char -> [String]        
+freeVars c = [c:show i | i <- [1..]]
+
+
+-- make sure all functions with the same free variable layout
+-- have the same free variable information
+normaliseFree :: CoreExpr -> CoreExpr
+normaliseFree x = x3
     where
         vars1 = collectFreeVars x
-        x2 = replaceFreeVars (zip vars1 (map CoreVar $ varsWith 'w' \\ vars1)) x
+        x2 = replaceFreeVars (zip vars1 (map CoreVar $ freeVars 'w' \\ vars1)) x
         vars2 = collectFreeVars x2
-        x3 = replaceFreeVars (zip vars2 (map CoreVar $ varsWith 'v')) x2
+        x3 = replaceFreeVars (zip vars2 (map CoreVar $ freeVars 'v')) x2
 
-        varsWith c = [c:show i | i <- [1..]]
+
 
 
 analyseCore :: Core -> Analysis
-analyseCore core = ([coreFuncName x | x <- coreFuncs core,  isPrimitive $ coreFuncBody x], [])
-
-
+analyseCore core = (prims,accs)
+    where
+        prims = [coreFuncName x | x <- coreFuncs core,  isPrimitive $ coreFuncBody x]
+        accs = [("foldl",[1])]
 
 
 

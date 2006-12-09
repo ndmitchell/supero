@@ -5,4 +5,4 @@ import Type
 
 
 revert :: Core -> CoreEx -> Core
-revert x y = y
+revert x y = x

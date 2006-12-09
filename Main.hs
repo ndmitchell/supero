@@ -10,7 +10,7 @@ main = do
     pm <- loadCore "Primitive.ycr"
     cr <- loadCore x
 
-    let core = removeRecursiveLet $ uniqueFreeVarsCore $ drop1module $ coreReach $ coreOverlay cr pm
+    let core = mapUnderCore remCorePos $ removeRecursiveLet $ uniqueFreeVarsCore $ drop1module $ coreReach $ coreOverlay cr pm
         prog = convert core
         core2 = coreReach $ coreInlin $ coreReach $ revert core prog
     print prog

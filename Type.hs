@@ -31,7 +31,7 @@ drop1module (Core name imports datas funcs) = Core name imports (map g datas) (c
         
         h (CoreFunc name args body) 
             | name == "main" = []
-            | otherwise = [CoreFunc (f name) args (mapOverCore h2 body)]
+            | otherwise = [CoreFunc (f name) args (mapUnderCore h2 body)]
         h2 (CoreFun x) = CoreFun $ f x
         h2 (CoreCon x) = CoreCon $ f x
         h2 x = x

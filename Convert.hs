@@ -3,7 +3,7 @@ module Convert(convert) where
 
 import Type
 import Data.List
-
+import Data.Maybe
 
 type Ask = CoreExpr
 
@@ -34,7 +34,28 @@ basicConvert (CoreFunc name args body) = CoreFuncEx name (map CoreVar args) body
 
 -- take an application to the body
 createFunc :: Core -> Ask -> CoreExpr
-createFunc core (CoreApp (CoreFun name) args) = inlineFunc core name args
+createFunc core (CoreApp (CoreFun name) args) = mapUnderCore (f 5) body
+    where
+        body = inlineFunc core name args
+        
+        f n orig@(CoreCase (CoreApp (CoreFun name) args) alts) | n > 0 =
+            mapUnderCore (f (n-1)) $ CoreCase expand alts
+            where
+                expand = inlineFunc core name args
+                expand2 = uniqueFreeVarsWithout (collectAllVars expand) expand
+        
+        f n (CoreCase (CoreCase on alts1) alts2) = f n $ CoreCase on (map g alts1)
+            where g (lhs,rhs) = (lhs, f n $ CoreCase rhs alts2)
+        
+        f n (CoreCase on@(CoreApp (CoreCon con) fields) alts) | not $ null matches = head matches
+            where
+                matches = mapMaybe g alts
+                
+                g (CoreApp (CoreCon x) xs, rhs) | x == con = Just $ replaceFreeVars (zip (map fromCoreVar xs) fields) rhs
+                g (CoreVar x,rhs) = Just $ replaceFreeVars [(x,on)] rhs
+                g _ = Nothing
+
+        f n x = x
 
 
 -- decide which functions look useful
@@ -56,5 +77,5 @@ normaliseAsk x = x3
 inlineFunc :: Core -> String -> [CoreExpr] -> CoreExpr
 inlineFunc core name args = replaceFreeVars (zip params args) body2
     where
-        body2 = uniqueFreeVarsWithout (concatMap collectAllVars args) body
+        body2 = uniqueFreeVarsWithout (params ++ concatMap collectAllVars args) body
         CoreFunc _ params body = coreFunc core name

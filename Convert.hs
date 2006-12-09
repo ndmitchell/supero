@@ -38,8 +38,9 @@ createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name args $ mapUnderC
     where
         (newargs,body) = inlineFunc core name args
         
+        -- may only recursively inline if case f x of => case g x of
         f n orig@(CoreCase (CoreApp (CoreFun name) args) alts) | n > 0 =
-            mapUnderCore (f (n-1)) $ CoreCase expand alts
+            f (n-1) $ mapUnderCore (f 0) $ CoreCase expand alts
             where
                 ([],expand) = inlineFunc core name args
                 expand2 = uniqueFreeVarsWithout (collectAllVars expand) expand

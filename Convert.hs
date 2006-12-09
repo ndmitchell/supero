@@ -69,11 +69,13 @@ collectAsk x = [y | y@(CoreApp (CoreFun _) _) <- allCore x]
 
 
 
-type Analysis = Core
+type Analysis = ([String] -- primitive functions
+                ,[(String,[Int])] -- accumulators
+                )
 
 
 normaliseAsk :: Analysis -> Ask -> [Ask]
-normaliseAsk core x@(CoreApp (CoreFun name) _) = [x3 | not $ isPrimitive $ coreFuncBody $ coreFunc core name]
+normaliseAsk (prims,accs) x@(CoreApp (CoreFun name) _) = [x3 | name `notElem` prims]
     where
         vars1 = collectFreeVars x
         x2 = replaceFreeVars (zip vars1 (map CoreVar $ varsWith 'w' \\ vars1)) x
@@ -84,7 +86,7 @@ normaliseAsk core x@(CoreApp (CoreFun name) _) = [x3 | not $ isPrimitive $ coreF
 
 
 analyseCore :: Core -> Analysis
-analyseCore core = core
+analyseCore core = ([coreFuncName x | x <- coreFuncs core,  isPrimitive $ coreFuncBody x], [])
 
 
 

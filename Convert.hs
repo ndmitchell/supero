@@ -9,19 +9,21 @@ type Ask = CoreExpr
 
 
 convert :: Core -> CoreEx
-convert core = CoreEx $ prims ++ f [] (normaliseAsk core mainApp)
+convert core = CoreEx $ prims ++ f [] (normaliseAsk analysis mainApp)
     where
         mainApp = CoreApp (CoreFun "main") [CoreVar ('v':show i) | i <- [1..length (coreFuncArgs main)]]
         main = coreFunc core "main"
         
         prims = [CoreFuncEx name (map CoreVar args) body | CoreFunc name args body <- coreFuncs core, isPrimitive body]
         
+        analysis = analyseCore core
+        
         f :: [Ask] -> [Ask] -> [CoreFuncEx]
         f done [] = []
         f done (p@(CoreApp (CoreFun name) args):ending) = func : f (req++done) (req++ending)
             where
                 func = createFunc core p
-                req = nub (concatMap (normaliseAsk core) (collectAsk $ coreFuncExBody func)) \\ done
+                req = nub (concatMap (normaliseAsk analysis) (collectAsk $ coreFuncExBody func)) \\ done
 
 
 
@@ -66,7 +68,11 @@ collectAsk :: CoreExpr -> [Ask]
 collectAsk x = [y | y@(CoreApp (CoreFun _) _) <- allCore x]
 
 
-normaliseAsk :: Core -> Ask -> [Ask]
+
+type Analysis = Core
+
+
+normaliseAsk :: Analysis -> Ask -> [Ask]
 normaliseAsk core x@(CoreApp (CoreFun name) _) = [x3 | not $ isPrimitive $ coreFuncBody $ coreFunc core name]
     where
         vars1 = collectFreeVars x
@@ -75,6 +81,13 @@ normaliseAsk core x@(CoreApp (CoreFun name) _) = [x3 | not $ isPrimitive $ coreF
         x3 = replaceFreeVars (zip vars2 (map CoreVar $ varsWith 'v')) x2
 
         varsWith c = [c:show i | i <- [1..]]
+
+
+analyseCore :: Core -> Analysis
+analyseCore core = core
+
+
+
 
 
 -- if you oversaturate, pass the extra arguments as an Apply

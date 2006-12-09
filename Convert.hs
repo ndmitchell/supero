@@ -47,8 +47,20 @@ createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map Cor
                 ([],expand) = inlineFunc core name args
                 expand2 = uniqueFreeVarsWithout (collectAllVars expand) expand
         
+        f n (CoreApp (CoreCase on alts) args) = f n $ CoreCase on (map g alts)
+            where g (lhs,rhs) = (lhs, f n $ CoreApp rhs args)
+        
         f n (CoreCase (CoreCase on alts1) alts2) = f n $ CoreCase on (map g alts1)
-            where g (lhs,rhs) = (lhs, f n $ CoreCase rhs alts2)
+            where
+                g (lhs,rhs) = (h lhs, f n $ CoreCase (h rhs) alts2)
+                    where
+                        h x = replaceFreeVars (zip vs (map CoreVar vars)) x
+                        vs = allCoreVar lhs
+                        vars = freeVars 'v' \\ (collectAllVars lhs ++ collectAllVars rhs)
+        
+        f n (CoreLet binds (CoreCase on alts1))
+            | disjoint [i | CoreVar i <- allCore on] (map fst binds) = CoreCase on (map g alts1)
+            where g (lhs,rhs) = (lhs,coreLet (filter ((`notElem` allCoreVar lhs) . fst) binds) rhs)
         
         f n (CoreCase on@(CoreApp (CoreCon con) fields) alts) | not $ null matches = head matches
             where

@@ -62,11 +62,11 @@ matchCall mapping orig@(CoreApp (CoreFun name) args)
 -- return the score as the first item
 -- lower is better
 matchArgs :: [CoreExpr] -> [CoreExpr] -> Maybe (Int,[CoreExpr])
-matchArgs lhs call
-        | length lhs /= length call || isNothing bind = Nothing
-        | otherwise = Just (0, map (fromJust . (`lookup` fromJust bind)) (argListArgs lhs))
+matchArgs define caller
+        | length define /= length caller || isNothing bind = Nothing
+        | otherwise = Just (0, map (fromJust . (`lookup` fromJust bind)) (argListArgs define))
     where
-        bind = match lhs call
+        bind = match define caller
 
 
 -- try doing a unification

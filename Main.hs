@@ -14,7 +14,7 @@ main = do
     let core = prepare $ coreReach $ coreOverlay cr pm
         prog = convert core
         core2 = coreReach $ coreInlin $ coreReach $ revert core prog
-    print prog
+    print core2
 
 
 coreReach = coreReachable ["main"]

@@ -47,6 +47,8 @@ createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map Cor
                 ([],expand) = inlineFunc core name args
                 expand2 = uniqueFreeVarsWithout (collectAllVars expand) expand
         
+        f n (CoreCase (CoreFun x) alts) = f n (CoreCase (CoreApp (CoreFun x) []) alts)
+        
         f n (CoreApp (CoreCase on alts) args) = f n $ CoreCase on (map g alts)
             where g (lhs,rhs) = (lhs, f n $ CoreApp rhs args)
         

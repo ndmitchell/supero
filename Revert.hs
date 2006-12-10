@@ -2,6 +2,7 @@
 module Revert(revert) where
 
 import Type
+import Safe
 import Data.List
 import Data.Maybe
 
@@ -63,10 +64,19 @@ matchCall mapping orig@(CoreApp (CoreFun name) args)
 -- lower is better
 matchArgs :: [CoreExpr] -> [CoreExpr] -> Maybe (Int,[CoreExpr])
 matchArgs define caller
-        | length define /= length caller || isNothing bind = Nothing
-        | otherwise = Just (0, map (fromJust . (`lookup` fromJust bind)) (argListArgs define))
+        | ncaller > ndefine || isNothing bind = Nothing
+        | otherwise = Just (nextra, map (`lookupJust` fromJust bind) args)
     where
-        bind = match define caller
+        (ndefine, ncaller) = (length define, length caller)
+        nextra = ndefine - ncaller
+        args = reverse $ drop nextra $ reverse $ argListArgs define
+
+        fresh = take nextra $ ['v':show i | i <- [1..]] \\ concatMap collectAllVars (define ++ caller)
+        bind = match define (caller ++ map CoreVar fresh)
+
+
+validMatch :: Binding -> Bool
+validMatch = unique . map fst . nub
 
 
 -- try doing a unification
@@ -82,3 +92,7 @@ match (x:xs) (y:ys) = do
 
 match [] [] = Just []
 match _ _ = Nothing
+
+
+
+unique x = length x == length (nub x)

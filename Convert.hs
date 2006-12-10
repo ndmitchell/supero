@@ -42,7 +42,7 @@ createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map Cor
         (newargs,body) = inlineFunc core name args
         
         -- may only recursively inline if case f x of => case g x of
-        f n orig@(CoreCase (CoreApp (CoreFun name) args) alts) | null extra && n > 0 =
+        f n orig@(CoreCase (CoreApp (CoreFun name) args) alts) | not (isPrim name) && null extra && n > 0 =
             f (n-1) $ mapUnderCore (f 0) $ CoreCase (uniqueExpr expand) alts
             where
                 (extra,expand) = inlineFunc core name args
@@ -80,6 +80,9 @@ createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map Cor
         f n (CoreApp (CoreApp x xs) ys) = f n $ CoreApp x (xs++ys)
 
         f n x = x
+        
+        
+        isPrim name = isPrimitive $ coreFuncBody $ coreFunc core name
 
 
 

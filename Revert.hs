@@ -5,6 +5,8 @@ import Type
 import Data.List
 import Data.Maybe
 
+type Binding = [(String,CoreExpr)]
+
 
 revert :: Core -> CoreEx -> Core
 revert core (CoreEx funcs) = core{coreFuncs = main3 : map (revertFunc fs) fs}
@@ -25,7 +27,10 @@ revertFunc mapping (n,func) =
 
 
 argList :: CoreFuncEx -> [String]
-argList func = nub [i | CoreVar i <- concatMap allCore (coreFuncExArgs func)]
+argList = argListArgs . coreFuncExArgs
+
+argListArgs :: [CoreExpr] -> [String]
+argListArgs args = nub [i | CoreVar i <- concatMap allCore args]
 
 
 -- for each expression, pick the best call sequence
@@ -46,8 +51,33 @@ revertExpr mapping x = f x
 
 
 
+
+matchCall :: [(Int,CoreFuncEx)] -> CoreExpr -> CoreExpr
+matchCall mapping orig@(CoreApp (CoreFun name) args)
+        = if null res then error $ "Failed to find a match: " ++ show orig else best
+    where
+        lown = minimum (map fst res)
+        best = head [b | (a,b) <- res, a == lown]
+        
+        res = [(n,call) | (n,fun) <- mapping, coreFuncExName fun == name
+                        , Just (p,params) <- [matchArgs (coreFuncExArgs fun) args]
+                        , let call = CoreApp (CoreFun $ name ++ "_" ++ show n) params]
+
+
+-- lhs is the left of a function
+-- call is the caller
+-- return the score as the first item
+-- lower is better
+matchArgs :: [CoreExpr] -> [CoreExpr] -> Maybe (Int,[CoreExpr])
+matchArgs lhs call
+        | length lhs /= length call || isNothing bind = Nothing
+        | otherwise = Just (0, map (fromJust . (`lookup` b)) (argListArgs lhs))
+    where
+        bind@(Just b) = match lhs call
+
+
 -- try doing a unification
-match :: [CoreExpr] -> [CoreExpr] -> Maybe [(String,CoreExpr)]
+match :: [CoreExpr] -> [CoreExpr] -> Maybe Binding
 match (x:xs) (y:ys) = do
         r1 <- f x y
         r2 <- match xs ys

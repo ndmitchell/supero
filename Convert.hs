@@ -4,6 +4,7 @@ module Convert(convert) where
 import Type
 import Data.List
 import Data.Maybe
+import Control.Monad.State
 
 type Ask = CoreExpr
 
@@ -92,14 +93,20 @@ type Analysis = ([String] -- primitive functions
 
 
 normaliseAsk :: Analysis -> Ask -> [Ask]
-normaliseAsk (prims,accs) orig@(CoreApp (CoreFun name) args) = [normaliseFree res | name `notElem` prims]
+normaliseAsk (prims,accs) orig@(CoreApp (CoreFun name) _) = [normaliseFree res | name `notElem` prims]
     where
-        acc = fromMaybe [] (lookup name accs)
-        res = CoreApp (CoreFun name) (zipWith3 f [0..] args vars)
-        vars = freeVars 'v' \\ collectFreeVars orig
-
-        f n arg free | n `elem` acc = CoreVar free
-                     | otherwise = arg
+        res = evalState (mapUnderCoreM f orig) (freeVars 'v' \\ collectFreeVars orig)
+        
+        f (CoreApp (CoreFun name) args) = do
+                args2 <- zipWithM g [0..] args
+                return $ CoreApp (CoreFun name) args2
+            where
+                acc = fromMaybe [] (lookup name accs)
+                
+                g n arg | n `elem` acc = do (s:ss) <- get ; put ss ; return (CoreVar s)
+                        | otherwise = return arg
+        
+        f x = return x
 
 
 freeVars :: Char -> [String]        
@@ -123,7 +130,8 @@ analyseCore :: Core -> Analysis
 analyseCore core = (prims,accs)
     where
         prims = [coreFuncName x | x <- coreFuncs core,  isPrimitive $ coreFuncBody x]
-        accs = [("foldl",[1])]
+        accs = [("foldl",[1]),("iterate",[1]),
+                ("Prelude.Prelude.1054.showPosInt",[1]),("Prelude.Prelude.877.walk",[1])]
 
 
 

@@ -43,15 +43,16 @@ createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map Cor
         
         -- may only recursively inline if case f x of => case g x of
         f n orig@(CoreCase (CoreApp (CoreFun name) args) alts) | null extra && n > 0 =
-            f (n-1) $ mapUnderCore (f 0) $ CoreCase expand2 alts
+            f (n-1) $ mapUnderCore (f 0) $ CoreCase (uniqueExpr expand) alts
             where
                 (extra,expand) = inlineFunc core name args
-                expand2 = uniqueFreeVarsWithout (collectAllVars expand) expand
         
         f n (CoreCase (CoreFun x) alts) = f n (CoreCase (CoreApp (CoreFun x) []) alts)
         
-        f n (CoreApp (CoreCase on alts) args) = f n $ CoreCase on (map g alts)
-            where g (lhs,rhs) = (lhs, f n $ CoreApp rhs args)
+        f n orig@(CoreApp (CoreCase _ _) _) = f n $ CoreCase on (map g alts)
+            where
+                CoreApp (CoreCase on alts) args = uniqueExpr orig
+                g (lhs,rhs) = (lhs, f n $ CoreApp rhs args)
         
         f n (CoreCase (CoreCase on alts1) alts2) = f n $ CoreCase on (map g alts1)
             where
@@ -79,6 +80,12 @@ createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map Cor
         f n (CoreApp (CoreApp x xs) ys) = f n $ CoreApp x (xs++ys)
 
         f n x = x
+
+
+
+uniqueExpr :: CoreExpr -> CoreExpr
+uniqueExpr x = uniqueFreeVarsWithout (collectAllVars x) x
+
 
 
 -- decide which functions look useful

@@ -37,15 +37,8 @@ argListArgs args = nub [i | CoreVar i <- concatMap allCore args]
 revertExpr :: [(Int,CoreFuncEx)] -> CoreExpr -> CoreExpr
 revertExpr mapping x = f x
     where
-        f orig@(CoreApp (CoreFun name) args)
-                | null funs = error $ "Failed to find a match: " ++ show orig
-                | otherwise = res
-            where
-                res = CoreApp (CoreFun $ name ++ "_" ++ show n) (map (f . fromJust . (`lookup` m)) (argList fun))
-                (n,fun,m) = head funs
-            
-                funs = [(n,fun,m) | (n,fun) <- mapping, coreFuncExName fun == name
-                                  , Just m <- [match (coreFuncExArgs fun) args]]
+        f orig@(CoreApp (CoreFun name) args) = CoreApp (CoreFun name2) (map f args2)
+            where CoreApp (CoreFun name2) args2 = matchCall mapping orig
         
         f x = setChildrenCore x $ map f $ getChildrenCore x
 
@@ -71,9 +64,9 @@ matchCall mapping orig@(CoreApp (CoreFun name) args)
 matchArgs :: [CoreExpr] -> [CoreExpr] -> Maybe (Int,[CoreExpr])
 matchArgs lhs call
         | length lhs /= length call || isNothing bind = Nothing
-        | otherwise = Just (0, map (fromJust . (`lookup` b)) (argListArgs lhs))
+        | otherwise = Just (0, map (fromJust . (`lookup` fromJust bind)) (argListArgs lhs))
     where
-        bind@(Just b) = match lhs call
+        bind = match lhs call
 
 
 -- try doing a unification

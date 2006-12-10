@@ -58,11 +58,14 @@ createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map Cor
                         vs = allCoreVar lhs
                         vars = freeVars 'v' \\ (collectAllVars lhs ++ collectAllVars rhs)
         
-        f n (CoreLet binds (CoreCase on alts1))
-            | disjoint [i | CoreVar i <- allCore on] (map fst binds) = CoreCase on (map g alts1)
-            where g (lhs,rhs) = (lhs,coreLet (filter ((`notElem` allCoreVar lhs) . fst) binds) rhs)
+        f n (CoreCase (CoreLet bind on) alts) = f n $ CoreLet bind (f n $ CoreCase on alts)
         
-        f n (CoreCase on@(CoreApp (CoreCon con) fields) alts) | not $ null matches = head matches
+        f n (CoreLet binds (CoreCase on alts1))
+            | disjoint [i | CoreVar i <- allCore on] (map fst binds) = f n $ CoreCase on (map g alts1)
+            where g (lhs,rhs) = (lhs,f n $ coreLet (filter ((`notElem` allCoreVar lhs) . fst) binds) $ f n rhs)
+        
+        f n (CoreCase on@(CoreApp (CoreCon con) fields) alts)
+                | not $ null matches = head matches
             where
                 matches = mapMaybe g alts
                 

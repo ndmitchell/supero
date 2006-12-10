@@ -25,8 +25,10 @@ prepare = primCheck . mapUnderCore remCorePos . letReduction . removeRecursiveLe
 
 
 
-primCheck core = mapUnderCore f core
+primCheck core = core2{coreFuncs = filter (not . isPrimitive . coreFuncBody) (coreFuncs core2)}
     where
+        core2 = mapUnderCore f core
+    
         f (CoreFun x) | isPrimitive $ coreFuncBody $ coreFunc core x = (CorePrim x)
         f x = x
 

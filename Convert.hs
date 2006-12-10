@@ -10,12 +10,10 @@ type Ask = CoreExpr
 
 
 convert :: Core -> CoreEx
-convert core = CoreEx $ prims ++ f [] (normaliseAsk analysis mainApp)
+convert core = CoreEx $ f [] (normaliseAsk analysis mainApp)
     where
         mainApp = CoreApp (CoreFun "main") [CoreVar ('v':show i) | i <- [1..length (coreFuncArgs main)]]
         main = coreFunc core "main"
-        
-        prims = [CoreFuncEx name (map CoreVar args) body | CoreFunc name args body <- coreFuncs core, isPrimitive body]
         
         analysis = analyseCore core
         
@@ -94,13 +92,11 @@ collectAsk x = [y | y@(CoreApp (CoreFun _) _) <- allCore x]
 
 
 
-type Analysis = ([String] -- primitive functions
-                ,[(String,[Int])] -- accumulators
-                )
+type Analysis = [(String,[Int])] -- accumulators
 
 
 normaliseAsk :: Analysis -> Ask -> [Ask]
-normaliseAsk (prims,accs) orig@(CoreApp (CoreFun name) _) = [normaliseFree res | name `notElem` prims]
+normaliseAsk accs orig@(CoreApp (CoreFun name) _) = [normaliseFree res]
     where
         res = evalState (mapUnderCoreM f orig) (freeVars 'v' \\ collectFreeVars orig)
         
@@ -134,9 +130,8 @@ normaliseFree x = x3
 
 
 analyseCore :: Core -> Analysis
-analyseCore core = (prims,accs)
+analyseCore core = accs
     where
-        prims = [coreFuncName x | x <- coreFuncs core,  isPrimitive $ coreFuncBody x]
         accs = [("foldl",[1]),("iterate",[1]),
                 ("Prelude.Prelude.1054.showPosInt",[1]),("Prelude.Prelude.877.walk",[1])]
 

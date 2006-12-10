@@ -27,7 +27,7 @@ prepare = primCheck . mapUnderCore remCorePos . letReduction . removeRecursiveLe
 
 primCheck core = mapUnderCore f core
     where
-        f (CoreApp (CoreFun x) xs) | isPrimitive $ coreFuncBody $ coreFunc core x = CoreApp (CorePrim x) xs
+        f (CoreFun x) | isPrimitive $ coreFuncBody $ coreFunc core x = (CorePrim x)
         f x = x
 
 

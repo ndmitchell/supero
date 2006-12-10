@@ -21,7 +21,14 @@ coreReach = coreReachable ["main"]
 coreInlin = coreInline InlineAlias
 
 
-prepare = mapUnderCore remCorePos . letReduction . removeRecursiveLet . uniqueFreeVarsCore . drop1module
+prepare = primCheck . mapUnderCore remCorePos . letReduction . removeRecursiveLet . uniqueFreeVarsCore . drop1module
+
+
+
+primCheck core = mapUnderCore f core
+    where
+        f (CoreApp (CoreFun x) xs) | isPrimitive $ coreFuncBody $ coreFunc core x = CoreApp (CorePrim x) xs
+        f x = x
 
 
 

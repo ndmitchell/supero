@@ -100,9 +100,9 @@ type Analysis = [(String,[Int])] -- accumulators
 
 
 normaliseAsk :: Analysis -> Ask -> [Ask]
-normaliseAsk accs orig@(CoreApp (CoreFun name) _) = [normaliseFree res]
+normaliseAsk accs orig@(CoreApp (CoreFun name) _) = normaliseFree res : extra
     where
-        res = evalState (mapUnderCoreM f orig) (freeVars 'v' \\ collectFreeVars orig)
+        (res,(_,extra)) = runState (mapUnderCoreM f orig) (freeVars 'v' \\ collectFreeVars orig, [])
         
         f (CoreApp (CoreFun name) args) = do
                 args2 <- zipWithM g [0..] args
@@ -111,9 +111,16 @@ normaliseAsk accs orig@(CoreApp (CoreFun name) _) = [normaliseFree res]
                 acc = fromMaybe [] (lookup name accs)
                 
                 g n arg | n `notElem` acc = return arg
-                        | otherwise = do (s:ss) <- get ; put ss ; return (CoreVar s)
+                        | otherwise = do
+                            (s:ss,extra) <- get
+                            put (ss, normaliseAsk accs arg ++ extra)
+                            return (CoreVar s)
         
         f x = return x
+
+-- only ever reached by inner call inside normaliseAsk
+-- otherwise an Ask is guaranteed to be a CoreApp (CoreFun ...)
+normaliseAsk _ _ = []
 
 
 freeVars :: Char -> [String]        

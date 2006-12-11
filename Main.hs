@@ -4,6 +4,7 @@ import Revert
 import Type
 import System.Environment
 import Data.List
+import Data.Char
 
 
 main = do
@@ -70,4 +71,6 @@ fixPrims :: Core -> Core
 fixPrims = mapUnderCore f
     where
         f (CorePrim xs) = CorePrim $ "prim_" ++ map (\x -> if x == '.' then '_' else x) xs
+        f (CoreStr x) = CoreApp (CorePrim "prim_STRING") [CoreStr x]
+        f (CoreChr x) = CoreInt (ord x)
         f x = x

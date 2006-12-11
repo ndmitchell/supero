@@ -149,6 +149,7 @@ analyseCore core = accs
         accs = [("foldl",[1]),("iterate",[1]),("showIntAtBase",[4])
                ,("Prelude.Prelude.1054.showPosInt",[1]),("Prelude.Prelude.877.walk",[1])
                ,("Prelude.Prelude.1055.showPosInt",[1])
+               ,("Prelude.Prelude.1058.showPosInt",[1])
                ,("Prelude.Enum.Prelude.Integer.enumFrom",[0])
                ,("Prelude.Enum.Prelude.Integer.enumFromThen",[0,1])
                ,("Prelude.Enum.Prelude.Integer.toEnum",[0])

@@ -136,8 +136,15 @@ normaliseFree x = x3
 analyseCore :: Core -> Analysis
 analyseCore core = accs
     where
-        accs = [("foldl",[1]),("iterate",[1]),
-                ("Prelude.Prelude.1054.showPosInt",[1]),("Prelude.Prelude.877.walk",[1])]
+        accs = [("foldl",[1]),("iterate",[1]),("showIntAtBase",[4])
+               ,("Prelude.Prelude.1054.showPosInt",[1]),("Prelude.Prelude.877.walk",[1])
+               ,("Prelude.Enum.Prelude.Integer.enumFrom",[0])
+               ,("Prelude.Enum.Prelude.Integer.enumFromThen",[0,1])
+               ,("Prelude.Enum.Prelude.Integer.toEnum",[0])
+               ,("<=",[1]),("_enumFromToIncC",[1]),("_enumFromToDecC",[1])
+               ,("Prelude.Enum.Prelude.Int.enumFrom",[0])
+               ,("Prelude.Enum.Prelude.Int.enumFromThen",[0,1])
+               ]
 
 
 

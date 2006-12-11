@@ -41,6 +41,8 @@ revertExpr mapping x = f x
         f orig@(CoreApp (CoreFun name) args) = CoreApp (CoreFun name2) (map f args2)
             where CoreApp (CoreFun name2) args2 = matchCall mapping orig
         
+        f (CoreFun name) = f (CoreApp (CoreFun name) [])
+        
         f x = setChildrenCore x $ map f $ getChildrenCore x
 
 

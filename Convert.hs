@@ -110,8 +110,8 @@ normaliseAsk accs orig@(CoreApp (CoreFun name) _) = [normaliseFree res]
             where
                 acc = fromMaybe [] (lookup name accs)
                 
-                g n arg | n `elem` acc = do (s:ss) <- get ; put ss ; return (CoreVar s)
-                        | otherwise = return arg
+                g n arg | n `notElem` acc = return arg
+                        | otherwise = do (s:ss) <- get ; put ss ; return (CoreVar s)
         
         f x = return x
 

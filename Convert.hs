@@ -88,7 +88,11 @@ uniqueExpr x = uniqueFreeVarsWithout (collectAllVars x) x
 
 -- decide which functions look useful
 collectAsk :: CoreExpr -> [Ask]
-collectAsk x = [y | y@(CoreApp (CoreFun _) _) <- allCore x]
+collectAsk x = f x
+    where
+        f org@(CoreApp (CoreFun _) args) = org : concatMap f args
+        f (CoreFun x) = [CoreApp (CoreFun x) []]
+        f x = concatMap f $ getChildrenCore x
 
 
 

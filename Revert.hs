@@ -55,7 +55,7 @@ matchCall mapping orig@(CoreApp (CoreFun name) args)
         lown = minimum (map fst res)
         best = head [b | (a,b) <- res, a == lown]
         
-        res = [(n,call) | (n,fun) <- mapping, coreFuncExName fun == name
+        res = [(p,call) | (n,fun) <- mapping, coreFuncExName fun == name
                         , Just (p,params) <- [matchArgs (coreFuncExArgs fun) args]
                         , let call = CoreApp (CoreFun $ name ++ "_" ++ show n) params]
 
@@ -67,7 +67,7 @@ matchCall mapping orig@(CoreApp (CoreFun name) args)
 matchArgs :: [CoreExpr] -> [CoreExpr] -> Maybe (Int,[CoreExpr])
 matchArgs define caller
         | ncaller > ndefine || isNothing bind = Nothing
-        | otherwise = Just (nextra, map (`lookupJust` fromJust bind) args)
+        | otherwise = Just (nextra - score, map (`lookupJust` fromJust bind) args)
     where
         (ndefine, ncaller) = (length define, length caller)
         nextra = ndefine - ncaller
@@ -75,6 +75,8 @@ matchArgs define caller
 
         fresh = take nextra $ ['v':show i | i <- [1..]] \\ concatMap collectAllVars (define ++ caller)
         bind = match define (caller ++ map CoreVar fresh)
+        
+        score = sum $ map (length . allCore) define
 
 
 validMatch :: Binding -> Bool

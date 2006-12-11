@@ -7,14 +7,21 @@ import Data.List
 
 
 main = do
-    [x] <- getArgs
+    [file] <- getArgs
     pm <- loadCore "Primitive.ycr"
-    cr <- loadCore x
+    cr <- loadCore file
 
     let core = prepare $ coreReach $ coreOverlay cr pm
         prog = convert core
         core2 = coreReach $ coreInlin $ coreReach $ revert core prog
+        hask = coreToHaskell $ fixPrims core2
+    
     print core2
+    
+    prefix <- readFile "Prefix.txt"
+    writeFile (file ++ ".hs") (prefix ++ coreToHaskell (fixPrims core2))
+    putStrLn "-- Haskell written out"
+    
 
 
 coreReach = coreReachable ["main"]
@@ -56,3 +63,11 @@ countUses s (CoreLet bind x) | s `elem` map fst bind = 0
                              | otherwise = sum $ map (countUses s) (x : map snd bind)
 
 countUses s x = sum $ map (countUses s) (getChildrenCore x)
+
+
+
+fixPrims :: Core -> Core
+fixPrims = mapUnderCore f
+    where
+        f (CorePrim xs) = CorePrim $ "prim_" ++ map (\x -> if x == '.' then '_' else x) xs
+        f x = x

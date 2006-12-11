@@ -1,0 +1,35 @@
+-- HAND WRITTEN AS PREFIX.TXT
+
+import System.IO
+import Foreign
+import Data.Char
+
+main :: IO ()
+main = case fmain (CRight C_40_41) of
+            CLeft x -> error $ show x
+            CRight y -> return ()
+
+
+prim_error = error . fromString
+prim_IO_stdout = System.IO.stdout
+
+prim_IO_hPutChar x y (CLeft z) = CLeft x
+prim_IO_hPutChar x y (CRight z) = unsafePerformIO (System.IO.hPutChar x (chr y) >> return (CRight C_40_41))
+
+prim_LT_W x y = (x::Int) <  y
+prim_GT_W x y = (x::Int) >  y
+prim_EQ_W x y = (x::Int) == y
+prim_NE_W x y = (x::Int) /= y
+prim_QUOT x y = quot x y :: Int
+prim_REM x y = rem x y :: Int
+prim_ADD_W x y = x + y :: Int
+prim_SUB_W x y = x - y :: Int
+prim_NEG_W x = negate x :: Int
+
+prim_Primitive_primIntSignum x = signum x :: Int
+
+prim_STRING x = map ord x
+fromString x = map chr x
+
+-- END HAND WRITTEN
+

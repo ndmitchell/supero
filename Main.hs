@@ -26,7 +26,7 @@ main = do
 
 
 coreReach = coreReachable ["main"]
-coreInlin = coreInline InlineAlias
+coreInlin = coreInline InlineFull
 
 
 prepare = primCheck . mapUnderCore remCorePos . letReduction . removeRecursiveLet . uniqueFreeVarsCore . drop1module

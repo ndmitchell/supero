@@ -176,3 +176,11 @@ inlineFunc core name args
     
         body2 = uniqueFreeVarsWithout (params ++ concatMap collectAllVars args) body
         CoreFunc _ params body = coreFunc core name
+
+
+{-
+-- if you oversaturate, pass the extra arguments as an Apply
+-- if you undersaturate, return the extra arguments as the first of the tuple
+inlineFunc :: Core -> String -> [CoreExpr] -> ([String], CoreExpr)
+inlineFunc core name = coreInlineFuncLambda (coreFunc core name)
+-}

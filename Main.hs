@@ -46,25 +46,9 @@ letReduction :: Core -> Core
 letReduction = mapUnderCore f
     where
         f (CoreLet bind x) = coreLet many (replaceFreeVars once x)
-            where (once,many) = partition (\(lhs,rhs) -> countUses lhs x <= 1) bind
+            where (once,many) = partition (\(lhs,rhs) -> countVar lhs x <= 1) bind
         
         f x = x
-        
-
--- Count the number of uses of a free variable        
-countUses :: String -> CoreExpr -> Int
-countUses s (CoreVar x) = if x == s then 1 else 0
-
-countUses s (CoreCase on alts) = countUses s on + maximum (map g alts)
-    where
-        g (lhs,rhs) | s `elem` allCoreVar lhs = 0
-                    | otherwise = countUses s rhs
-
-countUses s (CoreLet bind x) | s `elem` map fst bind = 0
-                             | otherwise = sum $ map (countUses s) (x : map snd bind)
-
-countUses s x = sum $ map (countUses s) (getChildrenCore x)
-
 
 
 fixPrims :: Core -> Core

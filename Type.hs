@@ -46,9 +46,6 @@ isPrimitive (CoreVar x) = x == "primitive"
 isPrimitive _ = False
 
 
-allCoreVar :: CoreExpr -> [String]
-allCoreVar x = [i | CoreVar i <- allCore x]
-
 
 disjoint :: Eq a => [a] -> [a] -> Bool
 disjoint x y = not $ any (`elem` x) y

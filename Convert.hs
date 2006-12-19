@@ -2,6 +2,7 @@
 module Convert(convert) where
 
 import Type
+import Analysis
 import Data.List
 import Data.Maybe
 import Control.Monad.State
@@ -10,19 +11,19 @@ type Ask = CoreExpr
 
 
 convert :: Core -> CoreEx
-convert core = CoreEx $ f [] (normaliseAsk analysis mainApp)
+convert core = CoreEx $ f [] (normaliseAsk ares mainApp)
     where
         mainApp = CoreApp (CoreFun "main") [CoreVar ('v':show i) | i <- [1..length (coreFuncArgs main)]]
         main = coreFunc core "main"
         
-        analysis = analyseCore core
+        ares = analysis core
         
         f :: [Ask] -> [Ask] -> [CoreFuncEx]
         f done [] = []
         f done (p@(CoreApp (CoreFun name) args):ending) = func : f (req++done) (req++ending)
             where
                 func = createFunc core p
-                req = nub (concatMap (normaliseAsk analysis) (collectAsk $ coreFuncExBody func)) \\ done
+                req = nub (concatMap (normaliseAsk ares) (collectAsk $ coreFuncExBody func)) \\ done
 
 
 
@@ -99,11 +100,8 @@ collectAsk x = f x
 
 
 
-type Analysis = [(String,[Int])] -- accumulators
-
-
 normaliseAsk :: Analysis -> Ask -> [Ask]
-normaliseAsk accs orig@(CoreApp (CoreFun name) _) = normaliseFree res : extra
+normaliseAsk ares orig@(CoreApp (CoreFun name) _) = normaliseFree res : extra
     where
         (res,(_,extra)) = runState (mapUnderCoreM f orig) (freeVars 'v' \\ collectFreeVars orig, [])
         
@@ -111,12 +109,12 @@ normaliseAsk accs orig@(CoreApp (CoreFun name) _) = normaliseFree res : extra
                 args2 <- zipWithM g [0..] args
                 return $ CoreApp (CoreFun name) args2
             where
-                acc = fromMaybe [] (lookup name accs)
+                acc = analysisSpecialise ares name
                 
                 g n arg | n `notElem` acc = return arg
                         | otherwise = do
                             (s:ss,extra) <- get
-                            put (ss, normaliseAsk accs arg ++ extra)
+                            put (ss, normaliseAsk ares arg ++ extra)
                             return (CoreVar s)
         
         f x = return x
@@ -140,23 +138,6 @@ normaliseFree x = x3
         vars2 = collectFreeVars x2
         x3 = replaceFreeVars (zip vars2 (map CoreVar $ freeVars 'v')) x2
 
-
-
-
-analyseCore :: Core -> Analysis
-analyseCore core = accs
-    where
-        accs = [("foldl",[1]),("iterate",[1]),("showIntAtBase",[4])
-               ,("Prelude.Prelude.1054.showPosInt",[1]),("Prelude.Prelude.877.walk",[1])
-               ,("Prelude.Prelude.1055.showPosInt",[1])
-               ,("Prelude.Prelude.1058.showPosInt",[1])
-               ,("Prelude.Enum.Prelude.Integer.enumFrom",[0])
-               ,("Prelude.Enum.Prelude.Integer.enumFromThen",[0,1])
-               ,("Prelude.Enum.Prelude.Integer.toEnum",[0])
-               ,("<=",[1]),("_enumFromToIncC",[1]),("_enumFromToDecC",[1])
-               ,("Prelude.Enum.Prelude.Int.enumFrom",[0])
-               ,("Prelude.Enum.Prelude.Int.enumFromThen",[0,1])
-               ]
 
 
 

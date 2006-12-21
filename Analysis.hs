@@ -20,11 +20,14 @@ analysisSpecialise (Analysis _ x) n = Map.findWithDefault [] n x
 
 
 analysis :: Core -> Analysis
-analysis core = Analysis (Set.fromList recursers) (Map.fromList accumulators)
+analysis core = Analysis (Set.fromList $ recursers core) (Map.fromList accumulators)
 
 
+recursers :: Core -> [String]
+recursers core = const_recursers ++ [coreFuncName func | func <- coreFuncs core, isRecurser core func]
 
-recursers = ["foldl","Prelude.Prelude.1728.primBind2","Prelude.Prelude.1718.primBind1","report","dif","subset","dropWhile","foldr"]
+const_recursers = []
+
 
 
 accumulators :: [(String,[Int])]
@@ -39,4 +42,18 @@ accumulators = [("foldl",[1]),("iterate",[1]),("showIntAtBase",[4])
                ,("<=",[1]),("_enumFromToIncC",[1]),("_enumFromToDecC",[1])
                ,("Prelude.Enum.Prelude.Int.enumFrom",[0])
                ,("Prelude.Enum.Prelude.Int.enumFromThen",[0,1])
+               ,("Clausify.Prelude.324.split'",[1])
                ]
+
+
+isRecurser :: Core -> CoreFunc -> Bool
+isRecurser core func = f [] (coreFuncBody func)
+    where
+        orig = coreFuncName  func
+    
+        f seen (CoreCase on alts) = any (f seen . snd) alts
+        f seen (CoreFun x) | x == orig = True
+                           | x `elem` seen = False
+                           | otherwise = f (x:seen) (coreFuncBody $ coreFunc core x)
+        f seen (CoreApp x xs) = f seen x
+        f seen _ = False

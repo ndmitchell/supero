@@ -29,7 +29,7 @@ coreReach = coreReachable ["main"]
 coreInlin = coreInline InlineFull
 
 
-prepare = primCheck . mapUnderCore remCorePos . letReduction . removeRecursiveLet . uniqueFreeVarsCore . drop1module
+prepare = primCheck . mapUnderCore remCorePos . removeRecursiveLet . uniqueFreeVarsCore . drop1module
 
 
 
@@ -38,16 +38,6 @@ primCheck core = core2{coreFuncs = filter (not . isPrimitive . coreFuncBody) (co
         core2 = mapUnderCore f core
     
         f (CoreFun x) | isPrimitive $ coreFuncBody $ coreFunc core x = (CorePrim x)
-        f x = x
-
-
-
-letReduction :: Core -> Core
-letReduction = mapUnderCore f
-    where
-        f (CoreLet bind x) = coreLet many (replaceFreeVars once x)
-            where (once,many) = partition (\(lhs,rhs) -> countVar lhs x <= 1) bind
-        
         f x = x
 
 

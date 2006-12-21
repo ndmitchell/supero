@@ -29,13 +29,6 @@ convert core = CoreEx $ f [] (normaliseAsk ares mainApp)
 
 
 
-
--- convert functions in a very basic manner
-basicConvert :: CoreFunc -> CoreFuncEx
-basicConvert (CoreFunc name args body) = CoreFuncEx name (map CoreVar args) body
-
-
-
 -- take an application to the body
 createFunc :: Core -> Ask -> CoreFuncEx
 createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map CoreVar newargs) $ mapUnderCore (f 5) body

@@ -49,26 +49,40 @@ createFunc core ares orig@(CoreApp (CoreFun name) args) = traceMsg ("specialise:
 
 
 createBody :: Core -> Analysis -> String -> CoreExpr -> CoreExpr
-createBody core ares fname x = fixp x
+createBody core ares fname x = mapUnderCore remCorePos $ fixp $ newContext "" x
     where
         fixp x = if x2 == x3 then x2 else fixp x3
             where
                 x2 = simplify core x
                 x3 = mapUnderCore f x2
     
-        f (CoreCase (CoreApp (CoreFun name) args) alts) | analysisInline ares name && null extra =
-                traceMsg ("case-inline(" ++ fname ++ "): " ++ name) $ CoreCase uexpand alts
+        f (CoreCase (CoreApp (CorePos ctx (CoreFun name)) args) alts)
+                | name `notElem` words ctx && analysisInline ares name && null extra
+                = traceMsg ("case-inline(" ++ fname ++ "): " ++ name) $ CoreCase uexpand alts
             where
                 uexpand = uniqueFreeVarsWithout (concatMap collectAllVars sources) expand
                 sources = expand : concat [[a,b] | (a,b) <- alts]
                 
-                (extra,expand) = coreInlineFuncLambda (coreFunc core name) args
+                (extra,expand) = coreInlineFuncLambda func{coreFuncBody = body} args
+                body = newContext (name ++ " " ++ ctx) (coreFuncBody func)
+                func = coreFunc core name
         
-        f (CoreCase (CoreFun name) alts) = f (CoreCase (CoreApp (CoreFun name) []) alts)
+        f (CoreCase inner@(CorePos ctx (CoreFun name)) alts) = f (CoreCase (CoreApp inner []) alts)
         
         f x = x
 
 
+
+newContext :: String -> CoreExpr -> CoreExpr
+newContext msg = mapUnderCore $ \x -> case x of
+    CoreFun x -> CorePos msg (CoreFun x)
+    x -> x
+        
+        
+addContext :: String -> CoreExpr -> CoreExpr
+addContext msg = mapUnderCore $ \x -> case x of
+    CorePos x y -> CorePos (msg ++ " " ++ x) y
+    x -> x
 
 
 -- decide which functions look useful

@@ -33,7 +33,9 @@ simplify core = mapUnderCore f
                 
                 isSimple (CoreApp x []) = isSimple x
                 isSimple (CoreFun x) = True
+                isSimple (CorePos x y) = isSimple y
                 isSimple (CoreVar x) = True
+                isSimple (CoreApp (CorePos _ (CoreFun name)) args) = isSimple (CoreApp (CoreFun name) args)
                 isSimple (CoreApp (CoreFun name) args) = all isSimple args && length args < nfunc
                     where nfunc = length $ coreFuncArgs $ coreFunc core name
                 isSimple _ = False

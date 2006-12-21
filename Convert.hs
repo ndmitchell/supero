@@ -33,7 +33,7 @@ convert core = CoreEx $ f [] (normaliseAsk ares mainApp)
 createFunc :: Core -> Analysis -> Ask -> CoreFuncEx
 createFunc core ares (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map CoreVar newargs) body2
     where
-        (newargs,body) = inlineFunc core name args
+        (newargs,body) = coreInlineFuncLambda (coreFunc core name) args
         body2 = createBody core ares body
 
 
@@ -48,7 +48,7 @@ createBody core ares x = fixp x
         f (CoreCase (CoreApp (CoreFun name) args) alts) | analysisInline ares name && null extra =
                 CoreCase (uniqueExpr expand) alts
             where
-                (extra,expand) = inlineFunc core name args
+                (extra,expand) = coreInlineFuncLambda (coreFunc core name) args
         
         f (CoreCase (CoreFun name) alts) = f (CoreCase (CoreApp (CoreFun name) []) alts)
         
@@ -109,11 +109,3 @@ normaliseFree x = x3
         x2 = replaceFreeVars (zip vars1 (map CoreVar $ freeVars 'w' \\ vars1)) x
         vars2 = collectFreeVars x2
         x3 = replaceFreeVars (zip vars2 (map CoreVar $ freeVars 'v')) x2
-
-
-
-
--- if you oversaturate, pass the extra arguments as an Apply
--- if you undersaturate, return the extra arguments as the first of the tuple
-inlineFunc :: Core -> String -> [CoreExpr] -> ([String], CoreExpr)
-inlineFunc core name args = coreInlineFuncLambda (coreFunc core name) args

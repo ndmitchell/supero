@@ -9,7 +9,15 @@ import Data.List
 import Data.Maybe
 import Control.Monad.State
 
+import Debug.Trace
+
 type Ask = CoreExpr
+
+
+traced = False
+
+traceMsg msg x | traced = trace msg x
+               | otherwise = x
 
 
 convert :: Core -> CoreEx
@@ -31,7 +39,8 @@ convert core = CoreEx $ f [] (normaliseAsk ares mainApp)
 
 -- take an application to the body
 createFunc :: Core -> Analysis -> Ask -> CoreFuncEx
-createFunc core ares (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map CoreVar newargs) body2
+createFunc core ares orig@(CoreApp (CoreFun name) args) = traceMsg ("specialise: " ++ show orig) $
+        CoreFuncEx name (args ++ map CoreVar newargs) body2
     where
         (newargs,body) = coreInlineFuncLambda (coreFunc core name) args
         body2 = createBody core ares body
@@ -46,7 +55,7 @@ createBody core ares x = fixp x
                 x3 = mapUnderCore f x2
     
         f (CoreCase (CoreApp (CoreFun name) args) alts) | analysisInline ares name && null extra =
-                CoreCase (uniqueExpr expand) alts
+                traceMsg ("case-inline: " ++ name) $ CoreCase (uniqueExpr expand) alts
             where
                 (extra,expand) = coreInlineFuncLambda (coreFunc core name) args
         

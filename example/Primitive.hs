@@ -8,3 +8,5 @@ foreign import primitive global_System'_IO'_stdout :: a
 foreign import primitive global_System'_IO'_stdin :: a
 foreign import primitive global_System'_IO'_stderr :: a
 foreign import primitive global_System'_IO'_hPutChar :: a -> b -> c
+foreign import primitive global_System'_IO'_hGetContents :: a -> b
+

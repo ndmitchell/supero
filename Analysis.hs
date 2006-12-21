@@ -24,7 +24,7 @@ analysis core = Analysis (Set.fromList recursers) (Map.fromList accumulators)
 
 
 
-recursers = ["foldl","Prelude.Prelude.1728.primBind2"]
+recursers = ["foldl","Prelude.Prelude.1728.primBind2","Prelude.Prelude.1718.primBind1","report","dif","subset","dropWhile","foldr"]
 
 
 accumulators :: [(String,[Int])]

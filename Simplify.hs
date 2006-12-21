@@ -27,6 +27,9 @@ simplify = mapUnderCore f
         
         f (CoreCase (CoreLet bind on) alts) = f $ CoreLet bind (f $ CoreCase on alts)
         
+        f (CoreLet bind x) = coreLet many (mapUnderCore f $ replaceFreeVars once x)
+            where (once,many) = partition (\(lhs,rhs) -> countVar lhs x <= 1) bind
+        
         f (CoreLet binds (CoreCase on alts1))
             | disjoint [i | CoreVar i <- allCore on] (map fst binds) = f $ CoreCase on (map g alts1)
             where g (lhs,rhs) = (lhs,f $ coreLet (filter ((`notElem` allCoreVar lhs) . fst) binds) $ f rhs)

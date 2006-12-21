@@ -45,13 +45,12 @@ createBody core ares x = fixp x
                 x2 = simplify x
                 x3 = mapUnderCore f x2
     
-        -- may only recursively inline if case f x of => case g x of
         f (CoreCase (CoreApp (CoreFun name) args) alts) | analysisInline ares name && null extra =
                 CoreCase (uniqueExpr expand) alts
             where
                 (extra,expand) = inlineFunc core name args
         
-        f (CoreCase (CoreFun x) alts) = f (CoreCase (CoreApp (CoreFun x) []) alts)
+        f (CoreCase (CoreFun name) alts) = f (CoreCase (CoreApp (CoreFun name) []) alts)
         
         f x = x
 

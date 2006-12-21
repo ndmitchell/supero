@@ -7,8 +7,8 @@ import Data.Maybe
 import Type(disjoint)
 
 
-simplify :: CoreExpr -> CoreExpr
-simplify = mapUnderCore f
+simplify :: Core -> CoreExpr -> CoreExpr
+simplify core = mapUnderCore f
     where
         f (CoreCase (CoreFun x) alts) = f (CoreCase (CoreApp (CoreFun x) []) alts)
         
@@ -28,7 +28,16 @@ simplify = mapUnderCore f
         f (CoreCase (CoreLet bind on) alts) = f $ CoreLet bind (f $ CoreCase on alts)
         
         f (CoreLet bind x) = coreLet many (mapUnderCore f $ replaceFreeVars once x)
-            where (once,many) = partition (\(lhs,rhs) -> countVar lhs x <= 1) bind
+            where
+                (once,many) = partition (\(lhs,rhs) -> isSimple rhs || countVar lhs x <= 1) bind
+                
+                isSimple (CoreApp x []) = isSimple x
+                isSimple (CoreFun x) = True
+                isSimple (CoreVar x) = True
+                isSimple (CoreApp (CoreFun name) args) = all isSimple args && length args < nfunc
+                    where nfunc = length $ coreFuncArgs $ coreFunc core name
+                isSimple _ = False
+                
         
         f (CoreLet binds (CoreCase on alts1))
             | disjoint [i | CoreVar i <- allCore on] (map fst binds) = f $ CoreCase on (map g alts1)

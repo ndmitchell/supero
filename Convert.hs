@@ -42,7 +42,7 @@ createBody core ares x = fixp x
     where
         fixp x = if x2 == x3 then x2 else fixp x3
             where
-                x2 = simplify x
+                x2 = simplify core x
                 x3 = mapUnderCore f x2
     
         f (CoreCase (CoreApp (CoreFun name) args) alts) | analysisInline ares name && null extra =

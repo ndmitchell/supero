@@ -24,22 +24,24 @@ convert core = CoreEx $ f [] (normaliseAsk ares mainApp)
         f done [] = []
         f done (p@(CoreApp (CoreFun name) args):ending) = func : f (req++done) (req++ending)
             where
-                func = createFunc core p
+                func = createFunc core ares p
                 req = nub (concatMap (normaliseAsk ares) (collectAsk $ coreFuncExBody func)) \\ done
 
 
 
 -- take an application to the body
-createFunc :: Core -> Ask -> CoreFuncEx
-createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map CoreVar newargs) $ createBody core body
-    where (newargs,body) = inlineFunc core name args
+createFunc :: Core -> Analysis -> Ask -> CoreFuncEx
+createFunc core ares (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map CoreVar newargs) body2
+    where
+    	(newargs,body) = inlineFunc core name args
+    	body2 = createBody core ares body
 
 
-createBody :: Core -> CoreExpr -> CoreExpr
-createBody core x = mapUnderCore (f 5) x
+createBody :: Core -> Analysis -> CoreExpr -> CoreExpr
+createBody core ares x = mapUnderCore (f 5) x
 	where
         -- may only recursively inline if case f x of => case g x of
-        f n orig@(CoreCase (CoreApp (CoreFun name) args) alts) | null extra && n > 0 =
+        f n orig@(CoreCase (CoreApp (CoreFun name) args) alts) | analysisInline ares name && null extra =
             f (n-1) $ mapUnderCore (f 0) $ CoreCase (uniqueExpr expand) alts
             where
                 (extra,expand) = inlineFunc core name args

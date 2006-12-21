@@ -11,7 +11,7 @@ data Analysis = Analysis (Set.Set String) (Map.Map String [Int])
 
 -- | Can a function be inlined inside a case statement
 analysisInline :: Analysis -> String -> Bool
-analysisInline (Analysis x _) n = Set.member n x
+analysisInline (Analysis x _) n = not $ Set.member n x
 
 
 -- | Return the 0-based indexes of elements on which you can't specialise

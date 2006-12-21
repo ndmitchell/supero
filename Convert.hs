@@ -33,55 +33,28 @@ convert core = CoreEx $ f [] (normaliseAsk ares mainApp)
 createFunc :: Core -> Analysis -> Ask -> CoreFuncEx
 createFunc core ares (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map CoreVar newargs) body2
     where
-    	(newargs,body) = inlineFunc core name args
-    	body2 = createBody core ares body
+        (newargs,body) = inlineFunc core name args
+        body2 = createBody core ares body
 
 
 createBody :: Core -> Analysis -> CoreExpr -> CoreExpr
-createBody core ares x = mapUnderCore (f 5) x
-	where
+createBody core ares x = fixp x
+    where
+        fixp x = if x2 == x3 then x2 else fixp x3
+            where
+                x2 = simplify x
+                x3 = mapUnderCore f x2
+    
         -- may only recursively inline if case f x of => case g x of
-        f n orig@(CoreCase (CoreApp (CoreFun name) args) alts) | analysisInline ares name && null extra =
-            f (n-1) $ mapUnderCore (f 0) $ CoreCase (uniqueExpr expand) alts
+        f (CoreCase (CoreApp (CoreFun name) args) alts) | analysisInline ares name && null extra =
+                CoreCase (uniqueExpr expand) alts
             where
                 (extra,expand) = inlineFunc core name args
         
-        f n (CoreCase (CoreFun x) alts) = f n (CoreCase (CoreApp (CoreFun x) []) alts)
+        f (CoreCase (CoreFun x) alts) = f (CoreCase (CoreApp (CoreFun x) []) alts)
         
-        f n orig@(CoreApp (CoreCase _ _) _) = f n $ CoreCase on (map g alts)
-            where
-                CoreApp (CoreCase on alts) args = uniqueExpr orig
-                g (lhs,rhs) = (lhs, f n $ CoreApp rhs args)
-        
-        f n (CoreCase (CoreCase on alts1) alts2) = f n $ CoreCase on (map g alts1)
-            where
-                g (lhs,rhs) = (h lhs, f n $ CoreCase (h rhs) alts2)
-                    where
-                        h x = replaceFreeVars (zip vs (map CoreVar vars)) x
-                        vs = allCoreVar lhs
-                        vars = freeVars 'v' \\ (collectAllVars lhs ++ collectAllVars rhs)
-        
-        f n (CoreCase (CoreLet bind on) alts) = f n $ CoreLet bind (f n $ CoreCase on alts)
-        
-        f n (CoreLet binds (CoreCase on alts1))
-            | disjoint [i | CoreVar i <- allCore on] (map fst binds) = f n $ CoreCase on (map g alts1)
-            where g (lhs,rhs) = (lhs,f n $ coreLet (filter ((`notElem` allCoreVar lhs) . fst) binds) $ f n rhs)
-        
-        f n (CoreCase (CoreCon con) alts) = f n $ CoreCase (CoreApp (CoreCon con) []) alts
-        
-        f n (CoreCase on@(CoreApp (CoreCon con) fields) alts)
-                | not $ null matches = head matches
-            where
-                matches = mapMaybe g alts
-        
-                g (CoreCon x, rhs) | x == con = Just rhs
-                g (CoreApp (CoreCon x) xs, rhs) | x == con = Just $ replaceFreeVars (zip (map fromCoreVar xs) fields) rhs
-                g (CoreVar x,rhs) = Just $ replaceFreeVars [(x,on)] rhs
-                g _ = Nothing
+        f x = x
 
-        f n (CoreApp (CoreApp x xs) ys) = f n $ CoreApp x (xs++ys)
-
-        f n x = x
 
 
 

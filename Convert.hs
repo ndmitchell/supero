@@ -31,10 +31,13 @@ convert core = CoreEx $ f [] (normaliseAsk ares mainApp)
 
 -- take an application to the body
 createFunc :: Core -> Ask -> CoreFuncEx
-createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map CoreVar newargs) $ mapUnderCore (f 5) body
-    where
-        (newargs,body) = inlineFunc core name args
-        
+createFunc core (CoreApp (CoreFun name) args) = CoreFuncEx name (args ++ map CoreVar newargs) $ createBody core body
+    where (newargs,body) = inlineFunc core name args
+
+
+createBody :: Core -> CoreExpr -> CoreExpr
+createBody core x = mapUnderCore (f 5) x
+	where
         -- may only recursively inline if case f x of => case g x of
         f n orig@(CoreCase (CoreApp (CoreFun name) args) alts) | null extra && n > 0 =
             f (n-1) $ mapUnderCore (f 0) $ CoreCase (uniqueExpr expand) alts

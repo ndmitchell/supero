@@ -24,7 +24,7 @@ analysis core = Analysis (Set.fromList recursers) (Map.fromList accumulators)
 
 
 
-recursers = ["foldl"]
+recursers = ["foldl","Prelude.Prelude.1728.primBind2"]
 
 
 accumulators :: [(String,[Int])]
@@ -32,6 +32,7 @@ accumulators = [("foldl",[1]),("iterate",[1]),("showIntAtBase",[4])
                ,("Prelude.Prelude.1054.showPosInt",[1]),("Prelude.Prelude.877.walk",[1])
                ,("Prelude.Prelude.1055.showPosInt",[1])
                ,("Prelude.Prelude.1058.showPosInt",[1])
+               ,("Prelude.Prelude.1059.showPosInt",[1])
                ,("Prelude.Enum.Prelude.Integer.enumFrom",[0])
                ,("Prelude.Enum.Prelude.Integer.enumFromThen",[0,1])
                ,("Prelude.Enum.Prelude.Integer.toEnum",[0])

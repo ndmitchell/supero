@@ -14,13 +14,14 @@ main = do
 
     let core = prepare $ coreReach $ coreOverlay cr pm
         prog = convert core
-        core2 = coreReach $ coreInlin $ coreReach $ revert core prog
+        core2 = coreReach $ revert core prog
+        core3 = coreReach $ coreInlin core3
         hask = coreToHaskell $ fixPrims core2
     
-    print core2
+    print $ coreReach $ coreInline InlineForward $ core2
     
     prefix <- readFile "Prefix.txt"
-    writeFile (file ++ ".hs") (prefix ++ coreToHaskell (fixPrims core2))
+    writeFile (file ++ ".hs") (prefix ++ hask)
     putStrLn "-- Haskell written out"
     
 

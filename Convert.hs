@@ -55,19 +55,17 @@ createBody core ares x = fixp x
                 x3 = mapUnderCore f x2
     
         f (CoreCase (CoreApp (CoreFun name) args) alts) | analysisInline ares name && null extra =
-                traceMsg ("case-inline: " ++ name) $ CoreCase (uniqueExpr expand) alts
+                traceMsg ("case-inline: " ++ name) $ CoreCase uexpand alts
             where
+                uexpand = uniqueFreeVarsWithout (concatMap collectAllVars sources) expand
+                sources = expand : concat [[a,b] | (a,b) <- alts]
+                
                 (extra,expand) = coreInlineFuncLambda (coreFunc core name) args
         
         f (CoreCase (CoreFun name) alts) = f (CoreCase (CoreApp (CoreFun name) []) alts)
         
         f x = x
 
-
-
-
-uniqueExpr :: CoreExpr -> CoreExpr
-uniqueExpr x = uniqueFreeVarsWithout (collectAllVars x) x
 
 
 

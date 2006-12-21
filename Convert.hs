@@ -16,8 +16,10 @@ type Ask = CoreExpr
 
 traced = False
 
-traceMsg msg x | traced = trace msg x
-               | otherwise = x
+traceMsg = traceIf traced
+
+traceIf True msg x = trace msg x
+traceIf False msg x = x
 
 
 convert :: Core -> CoreEx
@@ -43,11 +45,11 @@ createFunc core ares orig@(CoreApp (CoreFun name) args) = traceMsg ("specialise:
         CoreFuncEx name (args ++ map CoreVar newargs) body2
     where
         (newargs,body) = coreInlineFuncLambda (coreFunc core name) args
-        body2 = createBody core ares body
+        body2 = createBody core ares name body
 
 
-createBody :: Core -> Analysis -> CoreExpr -> CoreExpr
-createBody core ares x = fixp x
+createBody :: Core -> Analysis -> String -> CoreExpr -> CoreExpr
+createBody core ares fname x = fixp x
     where
         fixp x = if x2 == x3 then x2 else fixp x3
             where
@@ -55,7 +57,7 @@ createBody core ares x = fixp x
                 x3 = mapUnderCore f x2
     
         f (CoreCase (CoreApp (CoreFun name) args) alts) | analysisInline ares name && null extra =
-                traceMsg ("case-inline: " ++ name) $ CoreCase uexpand alts
+                traceMsg ("case-inline(" ++ fname ++ "): " ++ name) $ CoreCase uexpand alts
             where
                 uexpand = uniqueFreeVarsWithout (concatMap collectAllVars sources) expand
                 sources = expand : concat [[a,b] | (a,b) <- alts]

@@ -12,6 +12,7 @@ import Control.Monad.State
 import Debug.Trace
 
 type Ask = CoreExpr
+type DepAsk = ([Ask],Ask)
 
 
 traced = False
@@ -23,19 +24,33 @@ traceIf False msg x = x
 
 
 convert :: Core -> CoreEx
-convert core = CoreEx $ f [] (normaliseAsk ares mainApp)
+convert core = CoreEx $ f [] [([],mainApp)]
     where
         mainApp = CoreApp (CoreFun "main") [CoreVar ('v':show i) | i <- [1..length (coreFuncArgs main)]]
         main = coreFunc core "main"
         
         ares = analysis core
         
-        f :: [Ask] -> [Ask] -> [CoreFuncEx]
+        f :: [Ask] -> [DepAsk] -> [CoreFuncEx]
         f done [] = []
-        f done (p@(CoreApp (CoreFun name) args):ending) = func : f (req++done) (req++ending)
+        f done todo
+            | now `elem` done = f done todo2
+            | otherwise = case normaliseAsk ares (deps,now) of
+                              Nothing -> func : f (now:done) (map (\a -> (now:deps,a)) addition ++ todo2)
+                              Just extra -> f done (extra ++ todo2)
             where
-                func = createFunc core ares p
-                req = nub (concatMap (normaliseAsk ares) (collectAsk $ coreFuncExBody func)) \\ done
+                now@(CoreApp (CoreFun name) args) = snd (head todo)
+                (match,todo2) = partition ((==) now . snd) todo
+                deps = nub $ concatMap fst match
+                
+                (func,addition) = g now
+        
+        
+        g :: Ask -> (CoreFuncEx, [Ask])
+        g ask = (func, req)
+            where
+                func = createFunc core ares ask
+                req = nub $ map normaliseFree $ collectAsk $ coreFuncExBody func
 
 
 
@@ -94,10 +109,16 @@ collectAsk x = f x
         f x = concatMap f $ getChildrenCore x
 
 
+-- RULES
+-- Return Nothing to say that the current normalisation is valid
+--                means that there are no bad dependancies in there
+-- Return Just xs to give a new list of dependancies
 
-normaliseAsk :: Analysis -> Ask -> [Ask]
-normaliseAsk ares orig@(CoreApp (CoreFun name) _) = normaliseFree res : extra
+normaliseAsk :: Analysis -> DepAsk -> Maybe [DepAsk]
+normaliseAsk ares (deps, orig@(CoreApp (CoreFun name) _)) =
+        if null extra && res2 == orig then Nothing else Just $ (deps,res2) : extra
     where
+        res2 = normaliseFree res
         (res,(_,extra)) = runState (mapUnderCoreM f orig) (freeVars 'v' \\ collectFreeVars orig, [])
         
         f (CoreApp (CoreFun name) args) = do
@@ -109,14 +130,16 @@ normaliseAsk ares orig@(CoreApp (CoreFun name) _) = normaliseFree res : extra
                 g n arg | n `notElem` acc = return arg
                         | otherwise = do
                             (s:ss,extra) <- get
-                            put (ss, normaliseAsk ares arg ++ extra)
+                            put (ss, normAsk ares (deps,arg) ++ extra)
                             return (CoreVar s)
         
         f x = return x
+        
+        normAsk a b = fromMaybe [b] (normaliseAsk a b)
 
 -- only ever reached by inner call inside normaliseAsk
 -- otherwise an Ask is guaranteed to be a CoreApp (CoreFun ...)
-normaliseAsk _ _ = []
+normaliseAsk _ _ = Just []
 
 
 freeVars :: Char -> [String]        

@@ -104,7 +104,7 @@ addContext msg = mapUnderCore $ \x -> case x of
 collectAsk :: CoreExpr -> [Ask]
 collectAsk x = f x
     where
-        f org@(CoreApp (CoreFun _) args) = org : concatMap f args
+        f org@(CoreApp (CoreFun _) args) = [org]
         f (CoreFun x) = [CoreApp (CoreFun x) []]
         f x = concatMap f $ getChildrenCore x
 

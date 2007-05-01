@@ -63,13 +63,15 @@ lowerName x | x == "Prelude.." = "o"
                               cs -> 'l' : cs
 
 
-escapes = [">gt","<lt","!ex","=eq","+p"]
+escapes = [">gt","<lt","!ex","=eq","+p","$d"]
+boring = ["Prelude","YHC","Internal"]
 
 
 fixName :: String -> String
-fixName = map (rep ' ' '_') . unwords . map (concatMap f) . words . map (rep '.' ' ')
+fixName = map (rep ' ' '_') . unwords . f . words . map (rep '.' ' ')
     where
-        f :: Char -> String
-        f x = case [ys | y:ys <- escapes, y == x] of
+        f (x:xs) = map (concatMap g) $ x : filter (`notElem` boring) xs
+
+        g x = case [ys | y:ys <- escapes, y == x] of
                    (y:_) -> '\'' : y
                    _ -> [x]

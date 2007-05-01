@@ -4,6 +4,7 @@ module Main where
 import Yhc.Core
 import Generate
 import Firstify
+import Church
 
 
 main = do
@@ -16,3 +17,7 @@ main = do
     core <- return $ firstify core
     writeFile "__generated.txt" $ show core
     generate "__generated.hs" core
+
+    core <- return $ church core
+    writeFile "___generated.txt" $ show core
+    generate "___generated.hs" core

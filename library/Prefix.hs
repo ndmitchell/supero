@@ -12,7 +12,7 @@ wrapIO x = unsafePerformIO (x >>= return . Overlay_IO)
 p_System_IO_hPutChar h c = wrapIO (hPutChar h (toEnum c))
 p_System_IO_hGetChar h   = wrapIO (getCharIO h)
 
-foreign import ccall "stdio.h getchar" getchar :: IO Word8
+foreign import ccall safe "stdio.h getchar" getchar :: IO Word8
 
 {-# NOINLINE getCharIO #-}
 getCharIO h = do

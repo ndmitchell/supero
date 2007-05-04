@@ -26,6 +26,7 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
 
         fCtor (CoreCtor name fields) = CoreCtor (upperName name) fields
 
+        fFunc (CorePrim{}) = []
         fFunc (CoreFunc name args body)
             | name == "main" = []
             | otherwise = [CoreFunc (lowerName name) args (mapUnderCore fExpr body)]
@@ -38,8 +39,6 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
         fExpr (CoreInt x) = CoreApp (CoreFun "int_") [CoreInt x]
         fExpr (CoreChr x) = CoreApp (CoreFun "chr_") [CoreChr x]
         fExpr (CoreStr x) = CoreApp (CoreFun "str_") [CoreStr x]
-
-        fExpr (CorePrim x) = coreApp (CoreFun (primName x)) [CoreCon "()" | x == "Prelude.getChar"]
 
         fExpr x = x
 

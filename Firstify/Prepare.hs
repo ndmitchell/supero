@@ -35,5 +35,5 @@ zeroApp = Map.map $ applyBodyFunc $ mapUnderCore f
 
 
 arity :: CoreFuncMap -> CoreFuncName -> Int
-arity fm = coreFuncArity . fromMaybe (error "arity") . coreFuncMapMaybe fm
+arity fm x = coreFuncArity . fromMaybe (error $ "arity: " ++ x) . coreFuncMapMaybe fm $ x
 

@@ -1,3 +1,13 @@
+{-
+We want to church encode everything but Int/Integer
+
+Primitives such as EQ_W return Bool though, so we introduce:
+
+bool_ True = True
+bool_ x = case x of
+                 True -> true
+                 False -> false
+-}
 
 module Church(church) where
 
@@ -5,10 +15,13 @@ import Yhc.Core
 
 
 church :: Core -> Core
-church core = core{coreDatas = [], coreFuncs = dataFuncs core ++ mapUnderCore f (coreFuncs core)}
+church core = core{coreDatas = [], coreFuncs = boolFunc : dataFuncs core ++ mapUnderCore f (coreFuncs core)}
     where
         f (CoreCase on alts) = expandCase core on alts
         f (CoreCon x) = CoreFun x
+        f o@(CoreApp (CoreFun x) xs) = case corePrimMaybe x of
+            Just x | last (primType x) == PrimBool -> CoreApp (CoreFun "bool_") [o]
+            _ -> o
         f x = x
 
 
@@ -22,6 +35,12 @@ expandCase core on alts = CoreApp on (map f ctors)
                        , (CoreFun c,args) <- [fromCoreApp lhs], c == coreCtorName ctr] ++
                        [coreLam vrc (snd $ last alts)]
             where vrc = map (var 'c') [1..length (coreCtorFields ctr)]
+
+
+boolFunc = CoreFunc "bool_" ["x","f","t"] $
+    CoreCase (CoreVar "x")
+        [(CoreCon "Prelude.True" , CoreVar "f")
+        ,(CoreCon "Prelude.False", CoreVar "t")]
 
 
 dataFuncs :: Core -> [CoreFunc]

@@ -56,7 +56,7 @@ data Template = Template [CoreExpr]
 -- given a call to this function, with the given arguments
 -- return Just (Template, [Args]) if you want to make it a new call
 useTemplate :: CoreFunc -> [CoreExpr] -> Maybe (Template, [CoreExpr])
-useTemplate func xs | nxs >= ar && (nxs > ar || any isHO xs)
+useTemplate func xs | isCoreFunc func && nxs >= ar && (nxs > ar || any isHO xs)
         = Just (Template ts, concat xs2)
     where
         nxs = length xs

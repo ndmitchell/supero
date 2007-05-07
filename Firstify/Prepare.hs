@@ -30,11 +30,10 @@ zeroApp :: CoreFuncMap -> CoreFuncMap
 zeroApp = Map.map $ applyBodyFunc $ mapUnderCore f
     where
         f (CoreFun  x) = CoreApp (CoreFun  x) []
-        f (CorePrim x) = CoreApp (CorePrim x) []
         f (CoreApp (CoreApp x ys) zs) = CoreApp x (ys++zs)
         f x = x
 
 
 arity :: CoreFuncMap -> CoreFuncName -> Int
-arity fm = length . coreFuncArgs . fromMaybe (error "arity") . coreFuncMapMaybe fm
+arity fm = coreFuncArity . fromMaybe (error "arity") . coreFuncMapMaybe fm
 

@@ -61,17 +61,26 @@ transform fm = evalState f newSpec
         
         mainArgs = take (length $ coreFuncArgs $ coreFuncMap fm "main") $ freeVars 'v'
         
-        f = do lam (CoreApp (CoreFun "main") (map CoreVar mainArgs))
+        prims = [x | CorePrim x _ <- Map.elems fm]
+        
+        f = do lam prims (CoreApp (CoreFun "main") (map CoreVar mainArgs))
                s <- get
                if any (isHO . coreFuncBody . coreFuncMap (specCore s)) $ Set.toList (specMissed s)
                    then put s{specActive=Set.empty, specDone=Set.empty, specMissed=Set.empty} >> f
                    else return $ specCore s
 
 
+coreFuncBody2 (CoreFunc _ _ x) = x
 
-lam :: CoreExpr -> SpecM CoreExpr
-lam (CoreApp (CoreFun f) xs) = do
-    xs <- mapM lam xs
+
+
+-- should look at the CoreFunc to see if its a primitive
+lam :: [CoreFuncName] -> CoreExpr -> SpecM CoreExpr
+lam prims (CoreApp (CoreFun f) xs)
+    | f `elem` ["Prelude.error","error"] = liftM (CoreApp (CoreFun f)) (mapM (lam prims) $ take 1 xs)
+    | f `elem` prims = liftM (CoreApp (CoreFun f)) (mapM (lam prims) xs)
+    | otherwise = do
+    xs <- mapM (lam prims) xs
     s <- get
     let func = coreFuncMap (specCore s) f
 
@@ -94,7 +103,7 @@ lam (CoreApp (CoreFun f) xs) = do
         s <- get
         put s{specActive = Set.insert f (specActive s)}
         let func = coreFuncMap (specCore s) f
-        res <- lam (coreFuncBody func)
+        res <- lam prims (coreFuncBody func)
         modify $ \s -> s{specCore = Map.insert f func{coreFuncBody = res} (specCore s)
                         ,specActive = Set.delete f (specActive s)
                         ,specDone = Set.insert f (specDone s)}
@@ -113,50 +122,47 @@ lam (CoreApp (CoreFun f) xs) = do
      else
         return $ CoreApp (CoreFun f) xs
 
-lam (CoreApp (CoreVar x) xs)  = liftM (CoreApp (CoreVar  x)) (mapM lam xs)
-lam (CoreApp (CoreCon  x) xs) = liftM (CoreApp (CoreCon  x)) (mapM lam xs)
-lam (CoreApp (CorePrim x) xs)
-    | x `elem` ["Prelude.error","error"] = liftM (CoreApp (CorePrim x)) (mapM lam $ take 1 xs)
-    | otherwise = liftM (CoreApp (CorePrim x)) (mapM lam xs)
+lam prims (CoreApp (CoreVar x) xs)  = liftM (CoreApp (CoreVar  x)) (mapM (lam prims) xs)
+lam prims (CoreApp (CoreCon  x) xs) = liftM (CoreApp (CoreCon  x)) (mapM (lam prims) xs)
 
-lam (CoreApp (CoreLam xs body) ys) =
-        lam $ coreApp (coreLam (drop n xs) (replaceFreeVars (zip xs ys) body)) (drop n ys)
+lam prims (CoreApp (CoreLam xs body) ys) =
+        lam prims $ coreApp (coreLam (drop n xs) (replaceFreeVars (zip xs ys) body)) (drop n ys)
     where n = min (length xs) (length ys)
 
-lam (CoreApp (CoreCase on alts) xs) = lam $ CoreCase on [(a, CoreApp b xs) | (a,b) <- alts]
+lam prims (CoreApp (CoreCase on alts) xs) = lam prims $ CoreCase on [(a, CoreApp b xs) | (a,b) <- alts]
 
-lam (CoreApp (CoreApp x ys) zs) = lam $ CoreApp x (ys++zs)
+lam prims (CoreApp (CoreApp x ys) zs) = lam prims $ CoreApp x (ys++zs)
 
-lam (CoreApp (CoreLet bind x) xs)
-    | null (map fst bind `intersect` vxs) = lam $ CoreLet bind (CoreApp x xs)
-    | otherwise = lam $ CoreLet (zip fresh (map snd bind)) (CoreApp x2 xs)
+lam prims (CoreApp (CoreLet bind x) xs)
+    | null (map fst bind `intersect` vxs) = lam prims $ CoreLet bind (CoreApp x xs)
+    | otherwise = lam prims $ CoreLet (zip fresh (map snd bind)) (CoreApp x2 xs)
         where
             x2 = replaceFreeVars (zip (map fst bind) (map CoreVar fresh)) x
             fresh = freeVars 'v' \\ (vl ++ vxs)
             vl = collectAllVars (CoreLet bind x)
             vxs = nub $ concatMap collectAllVars xs
 
-lam (CoreLet binds x) = do
-    rhs <- mapM (lam . snd) binds
+lam prims (CoreLet binds x) = do
+    rhs <- mapM (lam prims . snd) binds
     let (ho,fo) = partition (isHO . snd) (zip (map fst binds) rhs)
-    x2 <- lam $ replaceFreeVars ho x
+    x2 <- lam prims $ replaceFreeVars ho x
     return $ coreLet fo x2
 
-lam (CoreCase on alts) = do
-    on2 <- lam on
+lam prims (CoreCase on alts) = do
+    on2 <- lam prims on
     case on2 of
         CoreApp (CoreCon c) xs ->
-            lam $ head $ 
+            lam prims $ head $ 
                  [replaceFreeVars (zip (map fromCoreVar xs2) xs) rhs
                     | (CoreApp (CoreCon c2) xs2, rhs) <- alts, c2 == c] ++
                  [replaceFreeVars [(lhs,on2)] rhs | (CoreVar lhs,rhs) <- alts]
         _ -> do
-            rhs <- mapM (lam . snd) alts
+            rhs <- mapM (lam prims . snd) alts
             return $ CoreCase on2 (zip (map fst alts) rhs)
 
-lam x | isCoreLam x || isCoreVar x || isCoreConst x = return x
+lam prims x | isCoreLam x || isCoreVar x || isCoreConst x = return x
 
-lam x = error $ show x
+lam prims x = error $ show x
 
 
 

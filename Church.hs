@@ -3,10 +3,9 @@ We want to church encode everything but Int/Integer
 
 Primitives such as EQ_W return Bool though, so we introduce:
 
-bool_ True = True
-bool_ x = case x of
-                 True -> true
-                 False -> false
+bool_ x f t = case x of
+                 True  -> t
+                 False -> f
 -}
 
 module Church(church) where
@@ -37,10 +36,10 @@ expandCase core on alts = CoreApp on (map f ctors)
             where vrc = map (var 'c') [1..length (coreCtorFields ctr)]
 
 
-boolFunc = CoreFunc "bool_" ["x","f","t"] $
+boolFunc = CoreFunc "bool_" ["x","t","f"] $
     CoreCase (CoreVar "x")
-        [(CoreCon "Prelude.True" , CoreVar "f")
-        ,(CoreCon "Prelude.False", CoreVar "t")]
+        [(CoreCon "Prelude.True" , CoreVar "t")
+        ,(CoreCon "Prelude.False", CoreVar "f")]
 
 
 dataFuncs :: Core -> [CoreFunc]

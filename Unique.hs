@@ -1,6 +1,9 @@
 
 -- This module should be added to Yhc.Core
 
+-- NOTE:
+-- primitives should not end with numbers at the end
+
 module Unique(uniqueFuncs, uniqueName) where
 
 import Yhc.Core.Type
@@ -16,7 +19,9 @@ import qualified Data.Map as Map
 uniqueFuncs :: Core -> Core
 uniqueFuncs core = core{coreFuncs = zipWith f names (coreFuncs core)}
     where
-        f new func = func{coreFuncName=new, coreFuncBody=traverseCore g $ coreFuncBody func}
+        f new (CoreFunc _ args body) = CoreFunc new args (traverseCore g body)
+        f new (CorePrim _ arity) = CorePrim new arity
+        
         g (CoreFun x) = CoreFun $ rep x
         g x = x
 

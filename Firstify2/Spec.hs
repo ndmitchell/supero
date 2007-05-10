@@ -66,13 +66,7 @@ getArity name =
             specFunc name
             answer
     where
-        answer = return . coreArity . fromJust . Map.lookup name . info =<< get
-
-
-coreArity x = length (coreFuncArgs x) + f (coreFuncBody x)
-    where
-        f (CoreLam x y) = length x + f y
-        f _ = 0
+        answer = return . coreFuncArity . fromJust . Map.lookup name . info =<< get
 
 
 getTemplate :: Template -> Spec CoreFuncName

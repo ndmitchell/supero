@@ -51,6 +51,9 @@ addDone :: CoreFuncName -> Spec ()
 addDone name = modify $ \s -> s{done = Set.insert name (done s)}
 
 
+-- it is possible that getArity will ONLY ever be called after specFunc
+-- in which case one or isDone or isPending MUST be true
+-- not sure if this is correct though
 getArity :: CoreFuncName -> Spec Int
 getArity name =
     do
@@ -119,14 +122,16 @@ allocateVars vars tmp = runFreeVars $ putVars vars >> mapM f tmp
 
 specFunc :: CoreFuncName -> Spec ()
 specFunc name = do
-    addPending name
-    s <- get
-    let func = fromJust $ Map.lookup name (info s)
-        f = localSpecExpr s
-    bod <- f $ coreFuncBody func
-    modify $ \s -> s{info = Map.insert name (func{coreFuncBody=bod}) (info s)}
-    delPending name
-    addDone name
+    b <- isDone name
+    when (not b) $ do
+        addPending name
+        s <- get
+        let func = fromJust $ Map.lookup name (info s)
+            f = localSpecExpr s
+        bod <- f $ coreFuncBody func
+        modify $ \s -> s{info = Map.insert name (func{coreFuncBody=bod}) (info s)}
+        delPending name
+        addDone name
 
 
 specMain :: (CoreExpr -> Spec CoreExpr) -> CoreFuncMap -> CoreFuncMap

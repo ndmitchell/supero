@@ -2,8 +2,10 @@
 module Main where
 
 import Yhc.Core
+import Yhc.Core.Play2
 import Generate
 import Firstify
+import qualified Firstify2.Firstify as F2
 import Church
 import LambdaLift
 
@@ -11,10 +13,10 @@ import LambdaLift
 main = do
     core <- loadCore "Example.yca"
     over <- loadCore "library/Overlay.ycr"
-    core <- return $ coreReachable ["main"] $ coreOverlay core over
+    core <- return $ traverseCore remCorePos $ coreReachable ["main"] $ coreOverlay core over
     output 1 core
 
-    core <- return $ firstify core
+    core <- return $ F2.firstify core
     output 2 core
 
     core <- return $ coreLambdaLift $ church core

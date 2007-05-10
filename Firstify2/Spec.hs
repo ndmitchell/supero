@@ -2,7 +2,8 @@
 module Firstify2.Spec where
 
 import Unique
-import Yhc.Core
+import Yhc.Core hiding (collectAllVars)
+import Yhc.Core.FreeVar2
 import Control.Monad.State
 import Data.Maybe
 import qualified Data.Map as Map
@@ -16,16 +17,23 @@ data SpecState = SpecState
     ,info :: CoreFuncMap -- information about functions
     ,pending :: Set.Set CoreFuncName -- those on the stack
     ,done :: Set.Set CoreFuncName -- those which have been done
-    ,template :: Map.Map (CoreFuncName,Template) CoreFuncName -- templates created
+    ,template :: Map.Map Template CoreFuncName -- templates created
     ,uid :: Int
     ,localSpecExpr :: CoreExpr -> Spec CoreExpr
     }
 
 
-data Template = Template [Maybe (Int,CoreFuncName)]
+-- the function being called, along with the arguments being passed
+-- Nothing means the argument is simple (first-order)
+data Template = Template CoreFuncName [Maybe TemplateArg]
                 deriving (Show,Eq,Ord)
 
+-- an argument, and the number of extra variables it is given
+data TemplateArg = TemplateArg CoreFuncName Int
+                   deriving (Show,Eq,Ord)
 
+-- map (+1) xs = Template "map" [Just (TemplateArg "+" 1), Nothing]
+-- map id xs = Template "map" [Just (TemplateArg "id" 0), Nothing]
 
 isPending :: CoreFuncName -> Spec Bool
 isPending name = get >>= return . Set.member name . pending
@@ -67,26 +75,52 @@ coreArity x = length (coreFuncArgs x) + f (coreFuncBody x)
         f _ = 0
 
 
-getTemplate :: CoreFuncName -> Template -> Spec CoreFuncName
-getTemplate name temp = do
+getTemplate :: Template -> Spec CoreFuncName
+getTemplate t@(Template name args) = do
     s <- get
-    case Map.lookup (name,temp) (template s) of
+    case Map.lookup t (template s) of
         Just y -> return y
         Nothing -> do
-            let newfunc = genTemplate (uid s) (fromJust $ Map.lookup name (info s)) temp
+            let newfunc = genTemplate (uid s) (fromJust $ Map.lookup name (info s)) args
                 newname = coreFuncName newfunc
             put $ s{uid = uid s + 1
                    ,info = Map.insert newname newfunc (info s)
-                   ,template = Map.insert (name,temp) newname (template s)
+                   ,template = Map.insert t newname (template s)
                    }
             return newname
 
 -- generate a modified CoreFunc with a new name
-genTemplate :: Int -> CoreFunc -> Template -> CoreFunc
-genTemplate uid func temp = CoreFunc newname todo todo
+genTemplate :: Int -> CoreFunc -> [Maybe TemplateArg] -> CoreFunc
+genTemplate uid (CoreFunc oldname oldargs oldbody) tempargs =
+        let noldargs = length oldargs
+            ntempargs = length tempargs
+        in case noldargs `compare` ntempargs of
+            EQ -> f freevars oldargs oldbody tempargs
+            GT -> f freevars oldargs oldbody (take noldargs $ tempargs ++ repeat Nothing)
+            LT -> f left (oldargs ++ used) (coreApp oldbody (map CoreVar used)) tempargs
+                where (used,left) = splitAt (ntempargs - noldargs) freevars
     where
-        todo = error "genTemplate: todo"
-        newname = uniqueName (coreFuncName func) uid
+        freevars = runFreeVars $ deleteVars oldargs >> deleteVars (collectAllVars oldbody) >> getVars
+        newname = uniqueName oldname uid
+
+        f free oldargs oldbody tempargs = CoreFunc newname newargs newbody
+            where
+                lst = zip oldargs $ allocateVars free tempargs
+
+                newargs = concatMap arg lst
+                arg (x,(Nothing,_)) = [x]
+                arg (_,(Just _ ,x)) = x
+            
+                newbody = coreLet (concatMap bind lst) oldbody
+                bind (_,(Nothing,_)) = []
+                bind (v,(Just (TemplateArg name _),vars)) = [(v,coreApp (CoreFun name) (map CoreVar vars))]
+
+
+allocateVars :: [CoreVarName] -> [Maybe TemplateArg] -> [(Maybe TemplateArg, [CoreVarName])]
+allocateVars vars tmp = runFreeVars $ putVars vars >> mapM f tmp
+    where
+        f Nothing = return (Nothing,[])
+        f x@(Just (TemplateArg _ i)) = liftM ((,) x) (replicateM i getVar)
 
 
 specFunc :: CoreFuncName -> Spec ()

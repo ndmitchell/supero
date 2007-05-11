@@ -15,7 +15,7 @@ import Debug.Trace
 type Spec a = State SpecState a
 
 data SpecState = SpecState
-    {arities :: [(CoreFuncName,Int)] -- those arities given when in Pending
+    {guess :: [Guess] -- information given when in Pending
     ,info :: CoreFuncMap -- information about functions
     ,pending :: Set.Set CoreFuncName -- those on the stack
     ,done :: Set.Set CoreFuncName -- those which have been done
@@ -23,6 +23,9 @@ data SpecState = SpecState
     ,uid :: Int
     ,localSpecExpr :: CoreExpr -> Spec CoreExpr
     }
+
+-- given the function, and what you expected, do you get it
+data Guess = Guess CoreFuncName String (CoreFunc -> Spec Bool)
 
 
 -- the function being called, along with the arguments being passed
@@ -53,25 +56,28 @@ addDone :: CoreFuncName -> Spec ()
 addDone name = modify $ \s -> s{done = Set.insert name (done s)}
 
 
+retrieve :: (Eq i, Show i) => (CoreFunc -> Spec i) -> CoreFuncName -> Spec i
+retrieve generate name = do
+    pending <- isPending name
+    if pending then do
+        res <- answer
+        let newguess = Guess name (show res) (liftM (== res) . generate)
+        modify $ \s -> s{guess = newguess : guess s}
+        return res
+     else do
+        done <- isDone name
+        when (not done) $ specFunc name
+        answer
+    where
+        answer = generate . fromJust . Map.lookup name . info =<< get
+
+
+
 -- it is possible that getArity will ONLY ever be called after specFunc
 -- in which case one or isDone or isPending MUST be true
 -- not sure if this is correct though
 getArity :: CoreFuncName -> Spec Int
-getArity name =
-    do
-        don <- isDone name
-        pen <- isPending name
-        if don then
-            answer
-         else if pen then do
-            i <- answer
-            modify $ \s -> s{arities = (name,i) : arities s}
-            return i
-         else do
-            specFunc name
-            answer
-    where
-        answer = return . coreFuncArity . fromJust . Map.lookup name . info =<< get
+getArity = retrieve (return . coreFuncArity)
 
 
 getTemplate :: Template -> Spec CoreFuncName

@@ -36,6 +36,7 @@ data Template = Template CoreFuncName [TempArg]
 -- an argument, and the number of extra variables it is given
 data TempArg = TempApp CoreFuncName Int
              | TempNone
+             | TempCon CoreCtorName [TempArg]
                deriving (Show,Eq,Ord)
 
 isTempNone = (==) TempNone

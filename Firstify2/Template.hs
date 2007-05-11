@@ -22,13 +22,17 @@ createTemplate name args = do
                  then Nothing
                  else Just $ Template name t
     where
+        f (CoreFun x) = f (CoreApp (CoreFun x) [])
         f (CoreApp (CoreFun x) xs) = do
             i <- getArity x
             return $ if i <= length xs
                 then TempNone
                 else TempApp x (length xs)
 
-        f (CoreFun x) = f (CoreApp (CoreFun x) [])
+        f (CoreApp (CoreCon x) xs) = do
+            xs2 <- mapM f xs
+            return $ if all isTempNone xs2 then TempNone else TempCon x xs2
+
         f x = return TempNone
 
 
@@ -44,6 +48,7 @@ useTemplate t@(Template name args) xs = do
         f TempNone x = [x]
         f (TempApp a b) (CoreApp (CoreFun x) xs) | a == x && length xs == b = xs
         f ab (CoreFun x) = f ab (CoreApp (CoreFun x) [])
+        f (TempCon a b) (CoreApp (CoreCon x) xs) | a == x = concat $ fs b xs
 
 
 

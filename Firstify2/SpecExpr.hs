@@ -73,12 +73,12 @@ shouldInlineLet (lhs,rhs) =
 
 
 -- the template representing it, and how you would invoke the templated version
-templateArg :: CoreExpr -> Spec (Maybe TemplateArg, [CoreExpr])
+templateArg :: CoreExpr -> Spec (Maybe TempArg, [CoreExpr])
 templateArg o@(CoreApp (CoreFun x) xs) = do
     i <- getArity x
     if i <= length xs
         then return (Nothing,[o])
-        else return (Just (TemplateArg x (length xs)), xs)
+        else return (Just (TempArg x (length xs)), xs)
 
 templateArg (CoreFun x) = templateArg (CoreApp (CoreFun x) [])
 templateArg x = return (Nothing,[x])

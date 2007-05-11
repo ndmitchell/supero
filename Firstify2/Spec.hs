@@ -39,7 +39,7 @@ getTemplate t@(Template name args) = do
             return newname
 
 -- generate a modified CoreFunc with a new name
-genTemplate :: Int -> CoreFunc -> [Maybe TemplateArg] -> CoreFunc
+genTemplate :: Int -> CoreFunc -> [Maybe TempArg] -> CoreFunc
 genTemplate uid (CoreFunc oldname oldargs oldbody) tempargs =
         let noldargs = length oldargs
             ntempargs = length tempargs
@@ -62,16 +62,16 @@ genTemplate uid (CoreFunc oldname oldargs oldbody) tempargs =
             
                 newbody = coreLet (concatMap bind lst) oldbody
                 bind (_,(Nothing,_)) = []
-                bind (v,(Just (TemplateArg name _),vars)) = [(v,coreApp (CoreFun name) (map CoreVar vars))]
+                bind (v,(Just (TempArg name _),vars)) = [(v,coreApp (CoreFun name) (map CoreVar vars))]
 
 genTemplate _ x y = error $ "Cannot generate template for primitive: " ++ show x ++ ", with " ++ show y
 
 
-allocateVars :: [CoreVarName] -> [Maybe TemplateArg] -> [(Maybe TemplateArg, [CoreVarName])]
+allocateVars :: [CoreVarName] -> [Maybe TempArg] -> [(Maybe TempArg, [CoreVarName])]
 allocateVars vars tmp = runFreeVars $ putVars vars >> mapM f tmp
     where
         f Nothing = return (Nothing,[])
-        f x@(Just (TemplateArg _ i)) = liftM ((,) x) (replicateM i getVar)
+        f x@(Just (TempArg _ i)) = liftM ((,) x) (replicateM i getVar)
 
 
 

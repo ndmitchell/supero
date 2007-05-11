@@ -29,7 +29,7 @@ spec o@(CoreFun x) = spec (CoreApp o [])
 spec o@(CoreApp (CoreFun x) xs) = do
         i <- getArity x
         (t,u) <- mapAndUnzipM templateArg xs
-        if all isNothing t && length xs <= i
+        if all isTempNone t && length xs <= i
             then checkInline x xs
             else do
                 name <- getTemplate (Template x t)
@@ -73,15 +73,15 @@ shouldInlineLet (lhs,rhs) =
 
 
 -- the template representing it, and how you would invoke the templated version
-templateArg :: CoreExpr -> Spec (Maybe TempArg, [CoreExpr])
+templateArg :: CoreExpr -> Spec (TempArg, [CoreExpr])
 templateArg o@(CoreApp (CoreFun x) xs) = do
     i <- getArity x
     if i <= length xs
-        then return (Nothing,[o])
-        else return (Just (TempArg x (length xs)), xs)
+        then return (TempNone, [o])
+        else return (TempApp x (length xs), xs)
 
 templateArg (CoreFun x) = templateArg (CoreApp (CoreFun x) [])
-templateArg x = return (Nothing,[x])
+templateArg x = return (TempNone,[x])
 
 
 

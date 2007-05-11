@@ -39,13 +39,13 @@ getTemplate t@(Template name args) = do
             return newname
 
 -- generate a modified CoreFunc with a new name
-genTemplate :: Int -> CoreFunc -> [Maybe TempArg] -> CoreFunc
+genTemplate :: Int -> CoreFunc -> [TempArg] -> CoreFunc
 genTemplate uid (CoreFunc oldname oldargs oldbody) tempargs =
         let noldargs = length oldargs
             ntempargs = length tempargs
         in case noldargs `compare` ntempargs of
             EQ -> f freevars oldargs oldbody tempargs
-            GT -> f freevars oldargs oldbody (take noldargs $ tempargs ++ repeat Nothing)
+            GT -> f freevars oldargs oldbody (take noldargs $ tempargs ++ repeat TempNone)
             LT -> f left (oldargs ++ used) (coreApp oldbody (map CoreVar used)) tempargs
                 where (used,left) = splitAt (ntempargs - noldargs) freevars
     where
@@ -57,21 +57,21 @@ genTemplate uid (CoreFunc oldname oldargs oldbody) tempargs =
                 lst = zip oldargs $ allocateVars free tempargs
 
                 newargs = concatMap arg lst
-                arg (x,(Nothing,_)) = [x]
-                arg (_,(Just _ ,x)) = x
-            
+                arg (_,(TempApp{},x)) = x
+                arg (x,(TempNone,_)) = [x]
+
                 newbody = coreLet (concatMap bind lst) oldbody
-                bind (_,(Nothing,_)) = []
-                bind (v,(Just (TempArg name _),vars)) = [(v,coreApp (CoreFun name) (map CoreVar vars))]
+                bind (v,(TempApp name _,vars)) = [(v,coreApp (CoreFun name) (map CoreVar vars))]
+                bind (_,(TempNone,_)) = []
 
 genTemplate _ x y = error $ "Cannot generate template for primitive: " ++ show x ++ ", with " ++ show y
 
 
-allocateVars :: [CoreVarName] -> [Maybe TempArg] -> [(Maybe TempArg, [CoreVarName])]
-allocateVars vars tmp = runFreeVars $ putVars vars >> mapM f tmp
+allocateVars :: [CoreVarName] -> [TempArg] -> [(TempArg, [CoreVarName])]
+allocateVars vars tmp = runFreeVars $ putVars vars >> mapM (\x -> liftM ((,) x) (f x)) tmp
     where
-        f Nothing = return (Nothing,[])
-        f x@(Just (TempArg _ i)) = liftM ((,) x) (replicateM i getVar)
+        f TempNone = return []
+        f (TempApp _ i) = replicateM i getVar
 
 
 

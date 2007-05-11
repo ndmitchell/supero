@@ -30,12 +30,15 @@ data Guess = Guess CoreFuncName String (CoreFunc -> Spec Bool)
 
 -- the function being called, along with the arguments being passed
 -- Nothing means the argument is simple (first-order)
-data Template = Template CoreFuncName [Maybe TempArg]
+data Template = Template CoreFuncName [TempArg]
                 deriving (Show,Eq,Ord)
 
 -- an argument, and the number of extra variables it is given
-data TempArg = TempArg CoreFuncName Int
+data TempArg = TempApp CoreFuncName Int
+             | TempNone
                deriving (Show,Eq,Ord)
+
+isTempNone = (==) TempNone
 
 -- map (+1) xs = Template "map" [Just (TemplateArg "+" 1), Nothing]
 -- map id xs = Template "map" [Just (TemplateArg "id" 0), Nothing]

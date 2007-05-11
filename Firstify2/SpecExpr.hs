@@ -15,13 +15,10 @@ specExpr :: CoreExpr -> Spec CoreExpr
 specExpr = traverseCoreM spec
 
 
-isDull x = isCoreVar x || isCoreCon x || isCoreCase x || isCorePos x
+isDull x = isCoreVar x || isCoreCon x || isCorePos x
 
 
 spec :: CoreExpr -> Spec CoreExpr
-spec x | isDull x || isCoreConst x = return x
-spec (CoreApp x xs) | isDull x = return $ CoreApp x xs
-
 spec (CoreApp (CoreFun err) xs) | err == "Prelude.error"
     = return $ CoreApp (CoreFun err) (take 1 xs)
 
@@ -45,8 +42,13 @@ spec o@(CoreApp (CoreFun x) xs) = do
              else
                 return $ coreApp (CoreFun name) args
 
+spec x@(CoreCase on _) | isCoreCon $ fst $ fromCoreApp on =
+    return $ coreSimplifyCaseCon x
 
 spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
+
+spec (CoreApp (CoreCase on alts) xs) = liftM (CoreCase on) (mapM f alts)
+    where f (lhs,rhs) = liftM ((,) lhs) $ spec $ coreApp rhs xs
 
 spec (CoreLet bind x) = do
     res <- mapM shouldInlineLet bind
@@ -55,6 +57,9 @@ spec (CoreLet bind x) = do
           then return x
           else specExpr $ replaceFreeVars inline x
     return $ coreLet keep x2
+
+spec x | isDull x || isCoreConst x || isCoreCase x = return x
+spec (CoreApp x xs) | isDull x = return $ CoreApp x xs
 
 spec x = error $ show ("spec - todo",x)
 

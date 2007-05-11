@@ -9,6 +9,8 @@ import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import Debug.Trace
+
 
 type Spec a = State SpecState a
 
@@ -124,14 +126,17 @@ allocateVars vars tmp = runFreeVars $ putVars vars >> mapM f tmp
 
 specFunc :: CoreFuncName -> Spec ()
 specFunc name = do
-    b <- isDone name
-    when (not b) $ do
+    -- () <- trace name $ return ()
+    b1 <- isDone name
+    b2 <- isPending name
+    when (not b1 && not b2) $ do
         addPending name
         s <- get
         let func = fromJust $ Map.lookup name (info s)
             f = localSpecExpr s
-        bod <- f $ coreFuncBody func
-        modify $ \s -> s{info = Map.insert name (func{coreFuncBody=bod}) (info s)}
+        when (isCoreFunc func) $ do
+            bod <- f $ coreFuncBody func
+            modify $ \s -> s{info = Map.insert name (func{coreFuncBody=bod}) (info s)}
         delPending name
         addDone name
 

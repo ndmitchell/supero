@@ -17,10 +17,13 @@ isDull x = isCoreVar x || isCoreCon x || isCoreCase x || isCorePos x
 
 
 spec :: CoreExpr -> Spec CoreExpr
-spec x | isDull x = return x
+spec x | isDull x || isCoreConst x = return x
 spec (CoreApp x xs) | isDull x = return $ CoreApp x xs
 
 spec o@(CoreFun x) = specFunc x >> return o
+
+spec (CoreApp (CoreFun err) xs) | err == "Prelude.error"
+    = return $ CoreApp (CoreFun err) (take 1 xs)
 
 spec o@(CoreApp (CoreFun x) xs) = do
     i <- getArity x
@@ -33,6 +36,12 @@ spec o@(CoreApp (CoreFun x) xs) = do
             return $ CoreApp (CoreFun name) (concat u)
 
 spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
+
+-- the choice of what to do on let is very varied. We can:
+-- 1) inline all functions
+-- 2) inline all functions which occur once
+-- 3) inline all functions which occur once per branch
+spec (CoreLet bind x) = return $ CoreLet bind x
 
 spec x = error $ show ("spec - todo",x)
 

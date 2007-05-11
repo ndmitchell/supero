@@ -7,6 +7,7 @@ import Firstify2.Spec
 
 import Control.Monad
 import Data.Maybe
+import Data.List
 
 
 specExpr :: CoreExpr -> Spec CoreExpr
@@ -37,14 +38,30 @@ spec o@(CoreApp (CoreFun x) xs) = do
 
 spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
 
+spec (CoreLet bind x) = do
+    res <- mapM shouldInlineLet bind
+    let (inline,keep) = divide res bind
+    x2 <- if null inline
+          then return x
+          else spec $ replaceFreeVars inline x
+    return $ coreLet keep x2
+
+spec x = error $ show ("spec - todo",x)
+
+
 -- the choice of what to do on let is very varied. We can:
 -- 1) inline all functions
 -- 2) inline all functions which occur once
 -- 3) inline all functions which occur once per branch
-spec (CoreLet bind x) = return $ CoreLet bind x
-
-spec x = error $ show ("spec - todo",x)
-
+--
+-- currently we pick 1
+shouldInlineLet :: (CoreVarName, CoreExpr) -> Spec Bool
+shouldInlineLet (lhs,rhs) =
+    case fromCoreApp rhs of
+        (CoreFun x, xs) -> do
+            i <- getArity x
+            return $ i /= length xs
+        _ -> return False
 
 
 -- the template representing it, and how you would invoke the templated version
@@ -55,5 +72,12 @@ templateArg o@(CoreApp (CoreFun x) xs) = do
         then return (Nothing,[o])
         else return (Just (TemplateArg x (length xs)), xs)
 
+templateArg (CoreFun x) = templateArg (CoreApp (CoreFun x) [])
 templateArg x = return (Nothing,[x])
+
+
+
+divide :: [Bool] -> [a] -> ([a],[a])
+divide res xs = (map snd x, map snd y)
+    where (x,y) = partition fst $ zip res xs
 

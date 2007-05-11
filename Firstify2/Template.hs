@@ -54,36 +54,16 @@ useTemplate t@(Template name args) xs = do
 
 genTemplate :: CoreFuncName -> Template -> Spec CoreFunc
 genTemplate newname (Template oldname tempargs) = do
-        CoreFunc _ oldargs oldbody <- getFunc oldname
-        let noldargs = length oldargs
-            ntempargs = length tempargs
-            freevars = runFreeVars $ deleteVars oldargs >> deleteVars (collectAllVars oldbody) >> getVars
-        return $ case noldargs `compare` ntempargs of
-            EQ -> f freevars oldargs oldbody tempargs
-            GT -> f freevars oldargs oldbody (take noldargs $ tempargs ++ repeat TempNone)
-            LT -> f left (oldargs ++ used) (coreApp oldbody (map CoreVar used)) tempargs
-                where (used,left) = splitAt (ntempargs - noldargs) freevars
+        func@(CoreFunc _ oldargs oldbody) <- getFunc oldname
+        let args = runFreeVars $ deleteVars (oldargs ++ collectAllVars oldbody) >> mapM f tempargs
+            vars = concatMap collectAllVars args
+            (extra,newbody) = coreInlineFuncLambda func args
+        return $ CoreFunc newname (vars ++ extra) newbody
     where
-        f free oldargs oldbody tempargs = CoreFunc newname newargs newbody
-            where
-                lst = zip oldargs $ allocateVars free tempargs
-
-                newargs = concatMap arg lst
-                arg (_,(TempApp{},x)) = x
-                arg (x,(TempNone,_)) = [x]
-
-                newbody = coreLet (concatMap bind lst) oldbody
-                bind (v,(TempApp name _,vars)) = [(v,coreApp (CoreFun name) (map CoreVar vars))]
-                bind (_,(TempNone,_)) = []
-
-genTemplate x y = error $ "Cannot generate template for primitive: " ++ show x ++ ", with " ++ show y
-
-allocateVars :: [CoreVarName] -> [TempArg] -> [(TempArg, [CoreVarName])]
-allocateVars vars tmp = runFreeVars $ putVars vars >> mapM (\x -> liftM ((,) x) (f x)) tmp
-    where
-        f TempNone = return []
-        f (TempApp _ i) = replicateM i getVar
-
+        f :: TempArg -> FreeVar CoreExpr
+        f TempNone = getVar >>= return . CoreVar
+        f (TempCon c xs) = mapM f xs >>= return . CoreApp (CoreCon c)
+        f (TempApp a i) = replicateM i (liftM CoreVar getVar) >>= return . CoreApp (CoreFun a)
 
 
 

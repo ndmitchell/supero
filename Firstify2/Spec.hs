@@ -112,6 +112,8 @@ genTemplate uid (CoreFunc oldname oldargs oldbody) tempargs =
                 bind (_,(Nothing,_)) = []
                 bind (v,(Just (TemplateArg name _),vars)) = [(v,coreApp (CoreFun name) (map CoreVar vars))]
 
+genTemplate _ x y = error $ "Cannot generate template for primitive: " ++ show x ++ ", with " ++ show y
+
 
 allocateVars :: [CoreVarName] -> [Maybe TemplateArg] -> [(Maybe TemplateArg, [CoreVarName])]
 allocateVars vars tmp = runFreeVars $ putVars vars >> mapM f tmp

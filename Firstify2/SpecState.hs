@@ -106,8 +106,9 @@ specFunc name = do
 
 
 specMain :: (CoreExpr -> Spec CoreExpr) -> CoreFuncMap -> CoreFuncMap
-specMain coreExpr fm = info $ execState (specFunc "main") s0
+specMain coreExpr fm = info s1
     where
+        s1 = execState (specFunc "main") s0
         s0 = SpecState [] fm Set.empty Set.empty Map.empty 0 coreExpr
 
 

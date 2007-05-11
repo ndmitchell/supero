@@ -1,6 +1,6 @@
 
 module Firstify2.Spec(
-    getArity, getTemplate,
+    getArity, getTemplate, isSaturated,
     module Firstify2.SpecState
     ) where
 
@@ -72,4 +72,11 @@ allocateVars vars tmp = runFreeVars $ putVars vars >> mapM f tmp
     where
         f Nothing = return (Nothing,[])
         f x@(Just (TemplateArg _ i)) = liftM ((,) x) (replicateM i getVar)
+
+
+
+isSaturated :: CoreFuncName -> [CoreExpr] -> Spec Bool
+isSaturated name args = do
+    i <- getArity name
+    return $ i > length args
 

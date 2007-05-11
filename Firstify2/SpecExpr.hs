@@ -58,9 +58,7 @@ spec x = error $ show ("spec - todo",x)
 shouldInlineLet :: (CoreVarName, CoreExpr) -> Spec Bool
 shouldInlineLet (lhs,rhs) =
     case fromCoreApp rhs of
-        (CoreFun x, xs) -> do
-            i <- getArity x
-            return $ i /= length xs
+        (CoreFun x, xs) -> liftM not $ isSaturated x xs
         _ -> return False
 
 

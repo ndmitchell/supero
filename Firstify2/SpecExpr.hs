@@ -43,7 +43,7 @@ spec o@(CoreApp (CoreFun x) xs) = do
                 return $ coreApp (CoreFun name) args
 
 spec x@(CoreCase on _) | isCoreCon $ fst $ fromCoreApp on =
-    return $ coreSimplifyCaseCon x
+    spec $ coreSimplifyCaseCon x
 
 spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
 

@@ -1,6 +1,6 @@
 
 module Firstify2.Spec(
-    getArity, getTemplate, isSaturated,
+    getArity, getTemplate, isSaturated, shouldInline,
     module Firstify2.SpecState
     ) where
 
@@ -78,5 +78,20 @@ allocateVars vars tmp = runFreeVars $ putVars vars >> mapM f tmp
 isSaturated :: CoreFuncName -> [CoreExpr] -> Spec Bool
 isSaturated name args = do
     i <- getArity name
-    return $ i > length args
+    return $ length args >= i
 
+
+shouldInline :: CoreFuncName -> Spec Bool
+shouldInline name = do
+        func <- getFunc name
+        res <- if isCoreFunc func then isCtor $ coreFuncBody func
+                                  else return False
+        return res
+    where
+        isCtor x@(CoreApp (CoreCon _) _) = isCtorApp x
+        isCtor _ = return False
+
+        isCtorApp (CoreApp (CoreCon x) xs) = liftM or $ mapM isCtorApp xs
+        isCtorApp (CoreApp (CoreFun x) xs) = liftM not $ isSaturated x xs
+        isCtorApp (CoreFun x) = isCtorApp (CoreApp (CoreFun x) [])
+        isCtorApp _ = return False

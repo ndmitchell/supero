@@ -70,7 +70,7 @@ retrieve generate name = do
         when (not done) $ specFunc name
         answer
     where
-        answer = generate . fromJust . Map.lookup name . info =<< get
+        answer = getFunc name >>= generate
 
 
 specFunc :: CoreFuncName -> Spec ()
@@ -80,11 +80,10 @@ specFunc name = do
     b2 <- isPending name
     when (not b1 && not b2) $ do
         addPending name
-        s <- get
-        let func = fromJust $ Map.lookup name (info s)
-            f = localSpecExpr s
+        func <- getFunc name
         when (isCoreFunc func) $ do
-            bod <- f $ coreFuncBody func
+            s <- get
+            bod <- localSpecExpr s $ coreFuncBody func
             modify $ \s -> s{info = Map.insert name (func{coreFuncBody=bod}) (info s)}
         delPending name
         addDone name
@@ -94,3 +93,7 @@ specMain :: (CoreExpr -> Spec CoreExpr) -> CoreFuncMap -> CoreFuncMap
 specMain coreExpr fm = info $ execState (specFunc "main") s0
     where
         s0 = SpecState [] fm Set.empty Set.empty Map.empty 0 coreExpr
+
+
+getFunc :: CoreFuncName -> Spec CoreFunc
+getFunc name = return . fromJust . Map.lookup name . info =<< get

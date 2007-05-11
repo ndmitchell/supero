@@ -27,14 +27,24 @@ spec (CoreApp (CoreFun err) xs) | err == "Prelude.error"
 spec o@(CoreFun x) = spec (CoreApp o [])
 
 spec o@(CoreApp (CoreFun x) xs) = do
-    i <- getArity x
-    (t,u) <- mapAndUnzipM templateArg xs
-    if all isNothing t && length xs <= i
-        then return o
-        else do
-            name <- getTemplate (Template x t)
-            specFunc name
-            return $ coreApp (CoreFun name) (concat u)
+        i <- getArity x
+        (t,u) <- mapAndUnzipM templateArg xs
+        if all isNothing t && length xs <= i
+            then checkInline x xs
+            else do
+                name <- getTemplate (Template x t)
+                specFunc name
+                checkInline name (concat u)
+    where
+        checkInline name args = do
+            sat <- isSaturated name args
+            inline <- shouldInline name
+            if sat && inline then do
+                func <- getFunc name
+                specExpr $ fromJust $ coreInlineFunc func args
+             else
+                return $ coreApp (CoreFun name) args
+
 
 spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
 
@@ -43,7 +53,7 @@ spec (CoreLet bind x) = do
     let (inline,keep) = divide res bind
     x2 <- if null inline
           then return x
-          else spec $ replaceFreeVars inline x
+          else specExpr $ replaceFreeVars inline x
     return $ coreLet keep x2
 
 spec x = error $ show ("spec - todo",x)

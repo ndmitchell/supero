@@ -3,7 +3,8 @@ module Firstify2.SpecExpr(specExpr) where
 
 import Yhc.Core
 import Yhc.Core.Play2
-import Firstify2.Spec
+import Firstify2.SpecState
+import Firstify2.Template
 
 import Control.Monad
 import Data.Maybe
@@ -27,14 +28,13 @@ spec (CoreApp (CoreFun err) xs) | err == "Prelude.error"
 spec o@(CoreFun x) = spec (CoreApp o [])
 
 spec o@(CoreApp (CoreFun x) xs) = do
-        i <- getArity x
-        (t,u) <- mapAndUnzipM templateArg xs
-        if all isTempNone t && length xs <= i
-            then checkInline x xs
-            else do
-                name <- getTemplate (Template x t)
-                specFunc name
-                checkInline name (concat u)
+        temp <- createTemplate x xs
+        case temp of
+            Nothing -> checkInline x xs
+            Just y -> do
+                addTemplate y
+                CoreApp (CoreFun name) args <- useTemplate y xs
+                checkInline name args
     where
         checkInline name args = do
             sat <- isSaturated name args
@@ -70,18 +70,6 @@ shouldInlineLet (lhs,rhs) =
     case fromCoreApp rhs of
         (CoreFun x, xs) -> liftM not $ isSaturated x xs
         _ -> return False
-
-
--- the template representing it, and how you would invoke the templated version
-templateArg :: CoreExpr -> Spec (TempArg, [CoreExpr])
-templateArg o@(CoreApp (CoreFun x) xs) = do
-    i <- getArity x
-    if i <= length xs
-        then return (TempNone, [o])
-        else return (TempApp x (length xs), xs)
-
-templateArg (CoreFun x) = templateArg (CoreApp (CoreFun x) [])
-templateArg x = return (TempNone,[x])
 
 
 

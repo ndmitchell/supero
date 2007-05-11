@@ -100,3 +100,31 @@ specMain coreExpr fm = info $ execState (specFunc "main") s0
 
 getFunc :: CoreFuncName -> Spec CoreFunc
 getFunc name = return . fromJust . Map.lookup name . info =<< get
+
+
+
+-- more higher level, descion operations
+
+getArity :: CoreFuncName -> Spec Int
+getArity = retrieve (return . coreFuncArity)
+
+isSaturated :: CoreFuncName -> [CoreExpr] -> Spec Bool
+isSaturated name args = do
+    i <- getArity name
+    return $ length args >= i
+
+
+shouldInline :: CoreFuncName -> Spec Bool
+shouldInline name = do
+        func <- getFunc name
+        res <- if isCoreFunc func then isCtor $ coreFuncBody func
+                                  else return False
+        return res
+    where
+        isCtor x@(CoreApp (CoreCon _) _) = isCtorApp x
+        isCtor _ = return False
+
+        isCtorApp (CoreApp (CoreCon x) xs) = liftM or $ mapM isCtorApp xs
+        isCtorApp (CoreApp (CoreFun x) xs) = liftM not $ isSaturated x xs
+        isCtorApp (CoreFun x) = isCtorApp (CoreApp (CoreFun x) [])
+        isCtorApp _ = return False

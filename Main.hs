@@ -8,6 +8,7 @@ import Firstify
 import qualified Firstify2.Firstify as F2
 import Church
 import LambdaLift
+import Report
 
 
 main = do
@@ -18,6 +19,7 @@ main = do
 
     core <- return $ F2.firstify core
     output 2 core
+    putStrLn $ unlines $ report core
 
     core <- return $ coreLambdaLift $ church core
     output 3 core

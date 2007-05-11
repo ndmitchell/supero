@@ -27,6 +27,9 @@ data SpecState = SpecState
 -- given the function, and what you expected, do you get it
 data Guess = Guess CoreFuncName String (CoreFunc -> Spec Bool)
 
+instance Show Guess where
+    show (Guess name val _) = name ++ "=" ++ val
+
 
 -- the function being called, along with the arguments being passed
 -- Nothing means the argument is simple (first-order)

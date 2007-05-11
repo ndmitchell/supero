@@ -106,10 +106,24 @@ specFunc name = do
 
 
 specMain :: (CoreExpr -> Spec CoreExpr) -> CoreFuncMap -> CoreFuncMap
-specMain coreExpr fm = info s1
+specMain coreExpr fm = info $ execState f s0
     where
-        s1 = execState (specFunc "main") s0
         s0 = SpecState [] fm Set.empty Set.empty Map.empty 0 coreExpr
+
+        f = do
+            specFunc "main"
+            b <- checkGuess
+            when (not b) $ do
+                () <- trace "A guess failed, retrying" $ return ()
+                modify $ \x -> x{guess=[]}
+                f
+
+checkGuess :: Spec Bool
+checkGuess = get >>= liftM and . mapM f . guess
+    where
+        f (Guess name value check) = do
+            res <- getFunc name >>= check
+            return res
 
 
 getFunc :: CoreFuncName -> Spec CoreFunc

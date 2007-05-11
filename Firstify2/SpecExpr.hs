@@ -21,10 +21,10 @@ spec :: CoreExpr -> Spec CoreExpr
 spec x | isDull x || isCoreConst x = return x
 spec (CoreApp x xs) | isDull x = return $ CoreApp x xs
 
-spec o@(CoreFun x) = specFunc x >> return o
-
 spec (CoreApp (CoreFun err) xs) | err == "Prelude.error"
     = return $ CoreApp (CoreFun err) (take 1 xs)
+
+spec o@(CoreFun x) = spec (CoreApp o [])
 
 spec o@(CoreApp (CoreFun x) xs) = do
     i <- getArity x
@@ -34,7 +34,7 @@ spec o@(CoreApp (CoreFun x) xs) = do
         else do
             name <- getTemplate (Template x t)
             specFunc name
-            return $ CoreApp (CoreFun name) (concat u)
+            return $ coreApp (CoreFun name) (concat u)
 
 spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
 

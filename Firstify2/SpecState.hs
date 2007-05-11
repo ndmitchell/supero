@@ -1,7 +1,8 @@
 
 module Firstify2.SpecState where
 
-import Yhc.Core
+import Yhc.Core hiding (collectAllVars)
+import Yhc.Core.FreeVar2
 import Control.Monad.State
 import Data.Maybe
 import qualified Data.Map as Map
@@ -90,10 +91,18 @@ specFunc name = do
         func <- getFunc name
         when (isCoreFunc func) $ do
             s <- get
-            bod <- localSpecExpr s $ coreFuncBody func
-            modify $ \s -> s{info = Map.insert name (func{coreFuncBody=bod}) (info s)}
+            func <- fix (localSpecExpr s) func
+            modify $ \s -> s{info = Map.insert name func (info s)}
         delPending name
         addDone name
+    where
+        fix specExpr func = do
+            bod <- specExpr $ coreFuncBody func
+            func <- return $ func{coreFuncBody=bod}
+            func2 <- promoteFunc func
+            case func2 of
+                Nothing -> return func
+                Just y -> fix specExpr y
 
 
 specMain :: (CoreExpr -> Spec CoreExpr) -> CoreFuncMap -> CoreFuncMap
@@ -132,3 +141,22 @@ shouldInline name = do
         isCtorApp (CoreApp (CoreFun x) xs) = liftM not $ isSaturated x xs
         isCtorApp (CoreFun x) = isCtorApp (CoreApp (CoreFun x) [])
         isCtorApp _ = return False
+
+
+-- if the only thing you do is call onwards, then add an extra argument
+-- this breaks sharing
+promoteFunc :: CoreFunc -> Spec (Maybe CoreFunc)
+promoteFunc (CoreFunc name args body) = do
+    i <- exprArity body
+    return $ if i == 0 then Nothing else
+        let free = runFreeVars $ deleteVars (args ++ collectAllVars body) >> getVars
+            extra = take i free
+        in Just $ CoreFunc name (args++extra) (coreApp body $ map CoreVar extra)
+
+exprArity :: CoreExpr -> Spec Int
+exprArity (CoreFun x) = exprArity (CoreApp (CoreFun x) [])
+exprArity (CoreApp (CoreFun x) xs) = do
+    i <- getArity x
+    return $ i - length xs
+exprArity (CoreCase on alts) = liftM maximum $ mapM (exprArity . snd) alts
+exprArity _ = return 0

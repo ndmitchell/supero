@@ -12,7 +12,7 @@ import Foreign(unsafePerformIO)
 -- Prelude
 
 -- make error primitive
-foreign import primitive global_Prelude'_error :: a -> b
+foreign import primitive global_Prelude'_error :: string -> bottom
 global_Prelude'__patternMatchFail c = error c
 global_Prelude'__noMethodError c = error c
 
@@ -23,11 +23,11 @@ foreign import primitive global_Prelude'_seq :: a -> b -> b
 -- System.IO
 
 
-foreign import primitive global_System'_IO'_stdin  :: a
-foreign import primitive global_System'_IO'_stdout :: a
-foreign import primitive global_System'_IO'_stderr :: a
-foreign import primitive global_System'_IO'_hGetChar :: a
-foreign import primitive global_System'_IO'_hPutChar :: a
+foreign import primitive global_System'_IO'_stdin  :: handle
+foreign import primitive global_System'_IO'_stdout :: handle
+foreign import primitive global_System'_IO'_stderr :: handle
+foreign import primitive global_System'_IO'_hGetChar :: handle -> io_char
+foreign import primitive global_System'_IO'_hPutChar :: handle -> char -> io
 
 
 -- IO stuff

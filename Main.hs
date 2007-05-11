@@ -23,15 +23,15 @@ main = do
     output 2 core
     putStrLn $ unlines $ report core
 
-    --core <- return $ coreLambdaLift $ church core
-    --output 3 core
+    core <- return $ coreLambdaLift $ church core
+    output 3 core
 
-    --core <- return $ firstify core
-    --output 4 core
+    core <- return $ F2.firstify core
+    output 4 core
     
 
 output n core = do
     let sn = show n
-    writeFile ("generated/" ++ sn ++ ".txt") $ show core
-    generate  ("generated/" ++ sn ++ ".hs" ) core
+    writeFile ("generated/" ++ sn ++ "__.hs") $ show core
+    generate  ("generated/" ++ sn ++ ".hs"  ) core
 

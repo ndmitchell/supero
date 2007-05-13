@@ -11,16 +11,18 @@ import Control.Monad.State
 import qualified Data.Map as Map
 import Data.Maybe
 import Debug.Trace
+import Firstify2.Terminate
 
 
 
 createTemplate :: CoreFuncName -> [CoreExpr] -> Spec (Maybe Template)
 createTemplate name args = do
         i <- getArity name
-        t <- mapM f args
-        return $ if all isTempNone t && length args <= i
-                 then Nothing
-                 else Just $ Template name t
+        targs <- mapM f args
+        t <- weakenTemplate $ Template name targs
+        case t of
+            Just t@(Template _ targs) | not (all isTempNone targs) || length args > i -> return $ Just t
+            _ -> return Nothing
     where
         f (CoreFun x) = f (CoreApp (CoreFun x) [])
         f (CoreApp (CoreFun x) xs) = do

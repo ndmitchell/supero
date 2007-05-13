@@ -115,7 +115,7 @@ specMain coreExpr fm = info $ execState f s0
             b <- checkGuess
             when (not b) $ do
                 () <- trace "A guess failed, retrying" $ return ()
-                modify $ \x -> x{guess=[]}
+                modify $ \x -> x{guess=[], pending=Set.empty, done=Set.empty}
                 f
 
 checkGuess :: Spec Bool

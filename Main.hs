@@ -30,6 +30,7 @@ main = do
     putStrLn "Firstifying scary"
     core <- return $ F2.firstify core
     output 4 core
+    putStrLn $ unlines $ report core
     
 
 output n core = do

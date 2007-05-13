@@ -19,6 +19,7 @@ main = do
     core <- return $ traverseCore remCorePos $ coreReachable ["main"] $ coreOverlay core over
     output 1 core
 
+    putStrLn "Firstifying basic"
     core <- return $ F2.firstify core
     output 2 core
     putStrLn $ unlines $ report core
@@ -26,6 +27,7 @@ main = do
     core <- return $ coreLambdaLift $ church core
     output 3 core
 
+    putStrLn "Firstifying scary"
     core <- return $ F2.firstify core
     output 4 core
     

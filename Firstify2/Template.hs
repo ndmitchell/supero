@@ -24,7 +24,7 @@ createTemplate name args = do
         if not (valid targs)
             then return Nothing
             else do
-                t <- return $ Just $ Template name targs
+                t <- weakenTemplate $ Template name targs
                 case t of
                     Just t@(Template _ targs) | valid targs -> return $ Just t
                     _ -> return Nothing

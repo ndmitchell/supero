@@ -16,7 +16,7 @@ main = do
     createDirectoryIfMissing True "generated"
     core <- loadCore "Example.yca"
     over <- loadCore "library/Overlay.ycr"
-    core <- return $ traverseCore remCorePos $ coreReachable ["main"] $ coreOverlay core over
+    core <- return $ removeSeq $ traverseCore remCorePos $ coreReachable ["main"] $ coreOverlay core over
     output 1 core
 
     putStrLn "Firstifying basic"
@@ -38,3 +38,8 @@ output n core = do
     writeFile ("generated/" ++ sn ++ "__.hs") $ show core
     generate  ("generated/" ++ sn ++ ".hs"  ) core
 
+
+removeSeq x = traverseCore f x
+    where
+        f (CoreApp (CoreFun s) [x,y]) | s == "Prelude.seq" = CoreCase x [(CoreVar "_",y)]
+        f x = x

@@ -25,10 +25,12 @@ church core = core{coreDatas = [], coreFuncs = boolFunc : dataFuncs core ++ mapU
 
 
 expandCase :: Core -> CoreExpr -> [(CoreExpr,CoreExpr)] -> CoreExpr
-expandCase core on alts = CoreApp on (map f ctors)
+expandCase core on alts | isCoreFun root = CoreApp on (map f ctors)
+                        | otherwise = CoreCase on alts
     where
         ctors = coreDataCtors $ coreCtorData core ctor
-        ctor = fromCoreFun $ fst $ fromCoreApp $ fst $ head alts
+        ctor = fromCoreFun root
+        root = fst $ fromCoreApp $ fst $ head alts
 
         f ctr = head $ [coreLam (map fromCoreVar args) rhs | (lhs,rhs) <- alts
                        , (CoreFun c,args) <- [fromCoreApp lhs], c == coreCtorName ctr] ++

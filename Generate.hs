@@ -39,6 +39,10 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
         fExpr (CoreInt x) = CoreApp (CoreFun "int_") [CoreInt x]
         fExpr (CoreChr x) = CoreApp (CoreFun "chr_") [CoreChr x]
         fExpr (CoreStr x) = CoreApp (CoreFun "str_") [CoreStr x]
+        
+        fExpr (CoreCase on [(CoreVar lhs,rhs)]) =
+            coreLet [(lhs,on) | lhs `elem` collectFreeVars rhs]
+                    (CoreApp (CoreFun "seq") [on,rhs])
 
         fExpr x = x
 

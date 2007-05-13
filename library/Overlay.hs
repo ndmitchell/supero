@@ -26,8 +26,6 @@ foreign import primitive global_Prelude'_seq :: a -> b -> b
 foreign import primitive global_System'_IO'_stdin  :: handle
 foreign import primitive global_System'_IO'_stdout :: handle
 foreign import primitive global_System'_IO'_stderr :: handle
-foreign import primitive global_System'_IO'_hGetChar :: handle -> io_char
-foreign import primitive global_System'_IO'_hPutChar :: handle -> char -> io
 
 
 -- IO stuff
@@ -39,10 +37,20 @@ global_Prelude'_Prelude'_Monad'_YHC'_Internal'_IO'_'gt'gt'eq (IO a) f = f a
 global_YHC'_Internal'_unsafePerformIO (IO a) = a
 
 
-global_System'_IO'_hGetContents h = do
-    c <- hGetChar h
-    if c == '\0'
-        then return []
-        else do
-            let cs = unsafePerformIO (hGetContents h)
-            return (c:cs)
+global_System'_IO'_hGetContents h = IO (unsafeContents h)
+
+unsafeContents h =
+    let x = get_char h
+    in if x == (-1) then [] else x : unsafeContents h
+
+global_System'_IO'_hGetChar h = 
+    let x = get_char h
+    in x `seq` IO x
+
+global_System'_IO'_hPutChar h c =
+    let x = put_char h c
+    in x `seq` IO ()
+
+foreign import primitive get_char :: handle -> Int
+foreign import primitive put_char :: handle -> Int -> Int
+

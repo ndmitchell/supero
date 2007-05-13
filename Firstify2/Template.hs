@@ -18,11 +18,16 @@ import Firstify2.Terminate
 createTemplate :: CoreFuncName -> [CoreExpr] -> Spec (Maybe Template)
 createTemplate name args = do
         i <- getArity name
+        let valid targs = length args > i || not (all isTempNone targs)
+
         targs <- mapM f args
-        t <- weakenTemplate $ Template name targs
-        case t of
-            Just t@(Template _ targs) | not (all isTempNone targs) || length args > i -> return $ Just t
-            _ -> return Nothing
+        if not (valid targs)
+            then return Nothing
+            else do
+                t <- return $ Just $ Template name targs
+                case t of
+                    Just t@(Template _ targs) | valid targs -> return $ Just t
+                    _ -> return Nothing
     where
         f (CoreFun x) = f (CoreApp (CoreFun x) [])
         f (CoreApp (CoreFun x) xs) = do

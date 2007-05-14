@@ -174,4 +174,5 @@ exprArity (CoreApp (CoreFun x) xs) = do
     i <- getArity x
     return $ i - length xs
 exprArity (CoreCase on alts) = liftM maximum $ mapM (exprArity . snd) alts
+exprArity (CoreLet bind x) = exprArity x
 exprArity _ = return 0

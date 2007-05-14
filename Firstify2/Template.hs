@@ -83,6 +83,7 @@ useTemplate t@(TemplateApp name args) (CoreApp (CoreFun n) xs) | n == name = do
         f ab (CoreFun x) = f ab (CoreApp (CoreFun x) [])
         f (TempCon a b) (CoreApp (CoreCon x) xs) | a == x = concat $ fs b xs
 
+useTemplate t@(TemplateCase name args alts) expr = error $ "useTemplate (" ++ show t ++ ") with " ++ show expr
 
 
 genTemplate :: CoreFuncName -> Template -> Spec CoreFunc

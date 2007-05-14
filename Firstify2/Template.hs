@@ -31,7 +31,7 @@ createTemplate name args = do
     where
         f (CoreFun x) = f (CoreApp (CoreFun x) [])
         f (CoreApp (CoreFun x) xs) = do
-            Arity i <- getArity x
+            Arity i _ <- getArity x
             return $ if i <= length xs
                 then TempNone
                 else TempApp x (length xs)
@@ -81,7 +81,7 @@ addTemplate t@(Template name args) = do
         let newname = uniqueName name (uid s)
         newfunc <- genTemplate newname t
         put $ s{uid = uid s + 1
-               ,info = Map.insert newname (Arity 0,newfunc) (info s)
+               ,info = Map.insert newname (Arity 0 False,newfunc) (info s)
                ,template = Map.insert t newname (template s)
                }
 

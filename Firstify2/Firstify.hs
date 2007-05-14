@@ -8,4 +8,4 @@ import Firstify2.SpecState
 
 
 firstify :: Core -> Core
-firstify core = coreReachable ["main"] $ fromCoreFuncMap core $ specMain specExpr $ toCoreFuncMap $ uniqueFuncs core
+firstify = coreReachable ["main"] . specMain specExpr . uniqueFuncs

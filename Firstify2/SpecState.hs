@@ -22,6 +22,7 @@ data SpecState = SpecState
     ,done :: Set.Set CoreFuncName -- those which have been done
     ,template :: Map.Map Template CoreFuncName -- templates created
     ,uid :: Int
+    ,core :: Core
     
     -- methods in here to break cycles
     ,localSpecExpr :: CoreExpr -> Spec CoreExpr
@@ -50,7 +51,7 @@ isTempNone = (==) TempNone
 -- map (+1) xs = Template "map" [Just (TemplateArg "+" 1), Nothing]
 -- map id xs = Template "map" [Just (TemplateArg "id" 0), Nothing]
 
-data Arity = Arity {arity :: Int}
+data Arity = Arity {arity :: Int, isData :: Bool}
              deriving (Show,Eq,Ord)
 
 
@@ -105,12 +106,13 @@ specFunc name = do
         addDone name
 
 
-specMain :: (CoreExpr -> Spec CoreExpr) -> CoreFuncMap -> CoreFuncMap
-specMain coreExpr fm = Map.map snd $ info $ execState f s0
+specMain :: (CoreExpr -> Spec CoreExpr) -> Core -> Core
+specMain coreExpr core = fromCoreFuncMap core $ Map.map snd $ info $ execState f s0
     where
-        s0 = SpecState [] (Map.map g fm) Set.empty Set.empty Map.empty 0 coreExpr
+        fm = toCoreFuncMap core
+        s0 = SpecState [] (Map.map g fm) Set.empty Set.empty Map.empty 0 core coreExpr
         
-        g x = (Arity $ coreFuncArity x,x)
+        g x = (Arity (coreFuncArity x) False,x)
 
         f = do
             specFunc "main"
@@ -140,7 +142,7 @@ getArity = retrieve (return . fst)
 
 isSaturated :: CoreFuncName -> [CoreExpr] -> Spec Bool
 isSaturated name args = do
-    Arity i <- getArity name
+    Arity i _ <- getArity name
     return $ length args >= i
 
 
@@ -163,15 +165,22 @@ shouldInline name = do
 exprArity :: CoreExpr -> Spec Arity
 exprArity (CoreFun x) = exprArity (CoreApp (CoreFun x) [])
 exprArity (CoreApp (CoreFun x) xs) = do
-    Arity i <- getArity x
-    return $ Arity $ i - length xs
+    Arity i d <- getArity x
+    return $ Arity (i - length xs) d
 exprArity (CoreCase on alts) = liftM maximum $ mapM (exprArity . snd) alts
 exprArity (CoreLet bind x) = exprArity x
-exprArity _ = return $ Arity 0
+exprArity (CoreApp (CoreCon x) xs) = do
+    c <- liftM core get
+    let i = length $ coreCtorFields $ coreCtor c x
+    return $ case i `compare` length xs of
+        EQ -> Arity 0 True
+        GT -> Arity (i - length xs) False
+        _ -> Arity 0 False
+exprArity _ = return $ Arity 0 False
 
 
 
 calculateFuncArity :: CoreFunc -> Spec Arity
 calculateFuncArity (CoreFunc name args body) = do
-    Arity i <- exprArity body
-    return $ Arity $ i + length args
+    Arity i d <- exprArity body
+    return $ Arity (i + length args) d

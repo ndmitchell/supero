@@ -50,7 +50,8 @@ isTempNone = (==) TempNone
 -- map (+1) xs = Template "map" [Just (TemplateArg "+" 1), Nothing]
 -- map id xs = Template "map" [Just (TemplateArg "id" 0), Nothing]
 
-type Arity = Int
+data Arity = Arity {arity :: Int}
+             deriving (Show,Eq,Ord)
 
 
 isPending :: CoreFuncName -> Spec Bool
@@ -109,7 +110,7 @@ specMain coreExpr fm = Map.map snd $ info $ execState f s0
     where
         s0 = SpecState [] (Map.map g fm) Set.empty Set.empty Map.empty 0 coreExpr
         
-        g x = (coreFuncArity x,x)
+        g x = (Arity $ coreFuncArity x,x)
 
         f = do
             specFunc "main"
@@ -139,7 +140,7 @@ getArity = retrieve (return . fst)
 
 isSaturated :: CoreFuncName -> [CoreExpr] -> Spec Bool
 isSaturated name args = do
-    i <- getArity name
+    Arity i <- getArity name
     return $ length args >= i
 
 
@@ -159,18 +160,18 @@ shouldInline name = do
         isCtorApp _ = return False
 
 
-exprArity :: CoreExpr -> Spec Int
+exprArity :: CoreExpr -> Spec Arity
 exprArity (CoreFun x) = exprArity (CoreApp (CoreFun x) [])
 exprArity (CoreApp (CoreFun x) xs) = do
-    i <- getArity x
-    return $ i - length xs
+    Arity i <- getArity x
+    return $ Arity $ i - length xs
 exprArity (CoreCase on alts) = liftM maximum $ mapM (exprArity . snd) alts
 exprArity (CoreLet bind x) = exprArity x
-exprArity _ = return 0
+exprArity _ = return $ Arity 0
 
 
 
 calculateFuncArity :: CoreFunc -> Spec Arity
 calculateFuncArity (CoreFunc name args body) = do
-    i <- exprArity body
-    return $ i + length args
+    Arity i <- exprArity body
+    return $ Arity $ i + length args

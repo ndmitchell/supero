@@ -57,6 +57,9 @@ data Arity = Arity {arity :: Int, isData :: Bool}
              deriving (Show,Eq,Ord)
 
 
+isSpecData :: Spec Bool
+isSpecData = liftM specData get
+
 isPending :: CoreFuncName -> Spec Bool
 isPending name = get >>= return . Set.member name . pending
 

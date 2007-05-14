@@ -31,10 +31,11 @@ createTemplate name args = do
     where
         f (CoreFun x) = f (CoreApp (CoreFun x) [])
         f (CoreApp (CoreFun x) xs) = do
-            Arity i _ <- getArity x
-            return $ if i <= length xs
-                then TempNone
-                else TempApp x (length xs)
+            Arity i dat <- getArity x
+            b <- isSpecData
+            return $ if i > length xs || (b && dat)
+                then TempApp x (length xs)
+                else TempNone
 
         f (CoreApp (CoreCon x) xs) = do
             xs2 <- mapM f xs

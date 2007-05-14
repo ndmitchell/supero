@@ -4,7 +4,7 @@
 -- NOTE:
 -- primitives should not end with numbers at the end
 
-module Unique(uniqueFuncs, uniqueName) where
+module Unique(uniqueFuncs, uniqueName, uniqueMin) where
 
 import Yhc.Core.Type
 import Yhc.Core.Play2
@@ -49,3 +49,8 @@ uniqueNames xs = (new, \x -> fromJust $ Map.lookup x (Map.fromList $ zip xs new)
         g add seen xs
             | add `Set.member` seen = g (add ++ "_") seen xs
             | otherwise = add : f (Set.insert add seen) xs
+
+
+uniqueMin :: [String] -> Int
+uniqueMin xs = maximum (0:res) + 1
+    where res = [read y | x <- xs , let y = reverse $ takeWhile isDigit $ reverse x, not $ null y]

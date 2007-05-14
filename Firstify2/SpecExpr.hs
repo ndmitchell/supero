@@ -50,6 +50,9 @@ spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
 spec (CoreApp (CoreCase on alts) xs) = liftM (CoreCase on) (mapM f alts)
     where f (lhs,rhs) = liftM ((,) lhs) $ spec $ coreApp rhs xs
 
+-- breaks sharing and may break free variables
+spec (CoreApp (CoreLet bind x) ys) = spec . CoreLet bind =<< spec (CoreApp x ys)
+
 spec (CoreLet bind x) = do
     res <- mapM shouldInlineLet bind
     let (inline,keep) = divide res bind

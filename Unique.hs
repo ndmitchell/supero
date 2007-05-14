@@ -4,7 +4,7 @@
 -- NOTE:
 -- primitives should not end with numbers at the end
 
-module Unique(uniqueFuncs, uniqueName, uniqueMin) where
+module Unique(uniqueName, uniqueFuncs, uniqueNames, uniqueFuncsMin, uniqueNamesMin) where
 
 import Yhc.Core.Type
 import Yhc.Core.Play2
@@ -51,6 +51,10 @@ uniqueNames xs = (new, \x -> fromJust $ Map.lookup x (Map.fromList $ zip xs new)
             | otherwise = add : f (Set.insert add seen) xs
 
 
-uniqueMin :: [String] -> Int
-uniqueMin xs = maximum (0:res) + 1
+uniqueNamesMin :: [String] -> Int
+uniqueNamesMin xs = maximum (0:res) + 1
     where res = [read y | x <- xs , let y = reverse $ takeWhile isDigit $ reverse x, not $ null y]
+
+
+uniqueFuncsMin :: Core -> Int
+uniqueFuncsMin = uniqueNamesMin . map coreFuncName . coreFuncs

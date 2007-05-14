@@ -5,6 +5,7 @@ import Yhc.Core hiding (collectAllVars)
 import Yhc.Core.FreeVar2
 import Control.Monad.State
 import Data.Maybe
+import Unique
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -23,6 +24,7 @@ data SpecState = SpecState
     ,template :: Map.Map Template CoreFuncName -- templates created
     ,uid :: Int
     ,core :: Core
+    ,specData :: Bool -- should you try and specialise data
     
     -- methods in here to break cycles
     ,localSpecExpr :: CoreExpr -> Spec CoreExpr
@@ -106,12 +108,13 @@ specFunc name = do
         addDone name
 
 
-specMain :: (CoreExpr -> Spec CoreExpr) -> Core -> Core
-specMain coreExpr core = fromCoreFuncMap core $ Map.map snd $ info $ execState f s0
+specMain :: Bool -> (CoreExpr -> Spec CoreExpr) -> Core -> Core
+specMain specData coreExpr core = fromCoreFuncMap core $ Map.map snd $ info $ execState f s0
     where
         fm = toCoreFuncMap core
-        s0 = SpecState [] (Map.map g fm) Set.empty Set.empty Map.empty 0 core coreExpr
-        
+        s0 = SpecState [] (Map.map g fm) Set.empty Set.empty Map.empty
+                       (uniqueMin $ Map.keys fm) core specData coreExpr
+
         g x = (Arity (coreFuncArity x) False,x)
 
         f = do

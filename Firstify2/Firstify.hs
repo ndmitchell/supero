@@ -8,4 +8,13 @@ import Firstify2.SpecState
 
 
 firstify :: Core -> Core
-firstify = coreReachable ["main"] . specMain specExpr . uniqueFuncs
+firstify = coreReachable ["main"] . specMain False specExpr
+
+
+firstifyData :: Core -> Core
+firstifyData = coreReachable ["main"] . specMain True specExpr
+
+
+
+firstifyDataPrepare :: Core -> Core
+firstifyDataPrepare = id

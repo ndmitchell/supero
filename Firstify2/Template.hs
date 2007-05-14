@@ -17,8 +17,8 @@ import Firstify2.Terminate
 
 createTemplate :: CoreFuncName -> [CoreExpr] -> Spec (Maybe Template)
 createTemplate name args = do
-        i <- getArity name
-        let valid targs = length args > i || not (all isTempNone targs)
+        (ar,fn) <- getFunc name
+        let valid targs = length args > coreFuncArity fn || not (all isTempNone targs)
 
         targs <- mapM f args
         if not (valid targs)
@@ -61,7 +61,7 @@ useTemplate t@(Template name args) xs = do
 
 genTemplate :: CoreFuncName -> Template -> Spec CoreFunc
 genTemplate newname (Template oldname tempargs) = do
-        func@(CoreFunc _ oldargs oldbody) <- getFunc oldname
+        (_, func@(CoreFunc _ oldargs oldbody)) <- getFunc oldname
         let args = runFreeVars $ deleteVars (oldargs ++ collectAllVars oldbody) >> mapM f tempargs
             vars = concatMap collectAllVars args
             (extra,newbody) = coreInlineFuncLambda func args
@@ -81,7 +81,7 @@ addTemplate t@(Template name args) = do
         let newname = uniqueName name (uid s)
         newfunc <- genTemplate newname t
         put $ s{uid = uid s + 1
-               ,info = Map.insert newname newfunc (info s)
+               ,info = Map.insert newname (0,newfunc) (info s)
                ,template = Map.insert t newname (template s)
                }
 

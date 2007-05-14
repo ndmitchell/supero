@@ -13,9 +13,11 @@ import Debug.Trace
 
 type Spec a = State SpecState a
 
+type FuncInfo = (Arity,CoreFunc)
+
 data SpecState = SpecState
     {guess :: [Guess] -- information given when in Pending
-    ,info :: CoreFuncMap -- information about functions
+    ,info :: Map.Map CoreFuncName FuncInfo -- information about functions
     ,pending :: Set.Set CoreFuncName -- those on the stack
     ,done :: Set.Set CoreFuncName -- those which have been done
     ,template :: Map.Map Template CoreFuncName -- templates created
@@ -26,7 +28,7 @@ data SpecState = SpecState
     }
 
 -- given the function, and what you expected, do you get it
-data Guess = Guess CoreFuncName String (CoreFunc -> Spec Bool)
+data Guess = Guess CoreFuncName String (FuncInfo -> Spec Bool)
 
 instance Show Guess where
     show (Guess name val _) = name ++ "=" ++ val
@@ -48,6 +50,9 @@ isTempNone = (==) TempNone
 -- map (+1) xs = Template "map" [Just (TemplateArg "+" 1), Nothing]
 -- map id xs = Template "map" [Just (TemplateArg "id" 0), Nothing]
 
+type Arity = Int
+
+
 isPending :: CoreFuncName -> Spec Bool
 isPending name = get >>= return . Set.member name . pending
 
@@ -64,7 +69,7 @@ addDone :: CoreFuncName -> Spec ()
 addDone name = modify $ \s -> s{done = Set.insert name (done s)}
 
 
-retrieve :: (Eq i, Show i) => (CoreFunc -> Spec i) -> CoreFuncName -> Spec i
+retrieve :: (Eq i, Show i) => (FuncInfo -> Spec i) -> CoreFuncName -> Spec i
 retrieve generate name = do
     pending <- isPending name
     if pending then do
@@ -88,27 +93,23 @@ specFunc name = do
     b2 <- isPending name
     when (not b1 && not b2) $ do
         addPending name
-        func <- getFunc name
+        (_,func) <- getFunc name
         when (isCoreFunc func) $ do
             s <- get
-            func <- fix (localSpecExpr s) func
-            modify $ \s -> s{info = Map.insert name func (info s)}
+            bod <- localSpecExpr s $ coreFuncBody func
+            func <- return $ func{coreFuncBody=bod}
+            arity <- calculateFuncArity func
+            modify $ \s -> s{info = Map.insert name (arity,func) (info s)}
         delPending name
         addDone name
-    where
-        fix specExpr func = do
-            bod <- specExpr $ coreFuncBody func
-            func <- return $ func{coreFuncBody=bod}
-            func2 <- promoteFunc func
-            case func2 of
-                Nothing -> return func
-                Just y -> fix specExpr y
 
 
 specMain :: (CoreExpr -> Spec CoreExpr) -> CoreFuncMap -> CoreFuncMap
-specMain coreExpr fm = info $ execState f s0
+specMain coreExpr fm = Map.map snd $ info $ execState f s0
     where
-        s0 = SpecState [] fm Set.empty Set.empty Map.empty 0 coreExpr
+        s0 = SpecState [] (Map.map g fm) Set.empty Set.empty Map.empty 0 coreExpr
+        
+        g x = (coreFuncArity x,x)
 
         f = do
             specFunc "main"
@@ -126,15 +127,15 @@ checkGuess = get >>= liftM and . mapM f . guess
             return res
 
 
-getFunc :: CoreFuncName -> Spec CoreFunc
+getFunc :: CoreFuncName -> Spec FuncInfo
 getFunc name = return . fromJust . Map.lookup name . info =<< get
 
 
 
 -- more higher level, descion operations
 
-getArity :: CoreFuncName -> Spec Int
-getArity = retrieve (return . coreFuncArity)
+getArity :: CoreFuncName -> Spec Arity
+getArity = retrieve (return . fst)
 
 isSaturated :: CoreFuncName -> [CoreExpr] -> Spec Bool
 isSaturated name args = do
@@ -144,7 +145,7 @@ isSaturated name args = do
 
 shouldInline :: CoreFuncName -> Spec Bool
 shouldInline name = do
-        func <- getFunc name
+        (_,func) <- getFunc name
         res <- if isCoreFunc func then isCtor $ coreFuncBody func
                                   else return False
         return res
@@ -158,16 +159,6 @@ shouldInline name = do
         isCtorApp _ = return False
 
 
--- if the only thing you do is call onwards, then add an extra argument
--- this breaks sharing
-promoteFunc :: CoreFunc -> Spec (Maybe CoreFunc)
-promoteFunc (CoreFunc name args body) = do
-    i <- exprArity body
-    return $ if i == 0 then Nothing else
-        let free = runFreeVars $ deleteVars (args ++ collectAllVars body) >> getVars
-            extra = take i free
-        in Just $ CoreFunc name (args++extra) (coreApp body $ map CoreVar extra)
-
 exprArity :: CoreExpr -> Spec Int
 exprArity (CoreFun x) = exprArity (CoreApp (CoreFun x) [])
 exprArity (CoreApp (CoreFun x) xs) = do
@@ -176,3 +167,10 @@ exprArity (CoreApp (CoreFun x) xs) = do
 exprArity (CoreCase on alts) = liftM maximum $ mapM (exprArity . snd) alts
 exprArity (CoreLet bind x) = exprArity x
 exprArity _ = return 0
+
+
+
+calculateFuncArity :: CoreFunc -> Spec Arity
+calculateFuncArity (CoreFunc name args body) = do
+    i <- exprArity body
+    return $ i + length args

@@ -37,7 +37,7 @@ spec o@(CoreApp (CoreFun x) xs) = do
             sat <- isSaturated name args
             inline <- shouldInline name
             if sat && inline then do
-                func <- getFunc name
+                (_,func) <- getFunc name
                 specExpr $ fromJust $ coreInlineFunc func args
              else
                 return $ coreApp (CoreFun name) args

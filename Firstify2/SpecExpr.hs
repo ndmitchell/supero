@@ -25,25 +25,19 @@ spec (CoreApp (CoreFun err) xs) | err == "Prelude.error"
 spec o@(CoreFun x) = spec (CoreApp o [])
 
 spec o@(CoreApp (CoreFun x) xs) = do
-        temp <- createTemplate x xs
-        case temp of
-            Nothing -> checkInline x xs
-            Just y -> do
-                addTemplate y
-                CoreApp (CoreFun name) args <- useTemplate y xs
-                checkInline name args
-    where
-        checkInline name args = do
-            sat <- isSaturated name args
-            inline <- shouldInline name
-            if sat && inline then do
-                (_,func) <- getFunc name
-                specExpr $ fromJust $ coreInlineFunc func args
-             else
-                return $ coreApp (CoreFun name) args
+    CoreApp (CoreFun name) args <- applyTemplate o
+    sat <- isSaturated name args
+    inline <- shouldInline name
+    if sat && inline then do
+        (_,func) <- getFunc name
+        specExpr $ fromJust $ coreInlineFunc func args
+     else
+        return $ coreApp (CoreFun name) args
 
 spec x@(CoreCase on _) | isCoreCon $ fst $ fromCoreApp on =
     spec $ coreSimplifyCaseCon x
+
+spec x@(CoreCase on alts) | isCoreFun $ fst $ fromCoreApp on = applyTemplate x
 
 spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
 

@@ -2,22 +2,19 @@
 
 import System.IO.Unsafe
 import System.IO
-import Data.Word
+import Foreign.C.Types
 
 main = main_main `seq` (return () :: IO ())
 
-{-# NOINLINE wrapIO #-}
-wrapIO x = unsafePerformIO (x >>= return . Overlay_IO)
+overlay_put_char h c = unsafePerformIO (hPutChar h (toEnum c) >> return 0)
+overlay_get_char h   = unsafePerformIO (getCharIO h)
 
-system_IO_hPutChar h c = wrapIO (hPutChar h (toEnum c))
-system_IO_hGetChar h   = wrapIO (getCharIO h)
-
-foreign import ccall safe "stdio.h getchar" getchar :: IO Word8
+foreign import ccall safe "stdio.h getchar" getchar :: IO CInt
 
 {-# NOINLINE getCharIO #-}
 getCharIO h = do
-    c <- getchar
-    return $ if c == (-1) then 0 else chr_ c
+   c <- getchar
+   return $ if c == (-1) then h `seq` (-1) else fromIntegral c
 
 prelude_seq = seq
 

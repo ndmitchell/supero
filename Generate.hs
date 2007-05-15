@@ -27,9 +27,7 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
         fCtor (CoreCtor name fields) = CoreCtor (upperName name) fields
 
         fFunc (CorePrim{}) = []
-        fFunc (CoreFunc name args body)
-            | name == "main" = []
-            | otherwise = [CoreFunc (lowerName name) args (mapUnderCore fExpr body)]
+        fFunc (CoreFunc name args body) = [CoreFunc (lowerName name) args (mapUnderCore fExpr body)]
         
         fExpr (CoreFun x) = CoreFun (lowerName x)
         fExpr (CoreCon x) = CoreCon (upperName x)
@@ -60,7 +58,8 @@ upperName x | "Prelude." `isPrefixOf` x = drop 8 x
             | otherwise = fixName x
 
 lowerName :: String -> String
-lowerName x | x == "Prelude.." = "o"
+lowerName x | x == "main" = "main_generated"
+            | x == "Prelude.." = "o"
             | otherwise = case fixName x of
                               (c:cs) | isAlpha c -> toLower c : cs
                               cs -> 'l' : cs

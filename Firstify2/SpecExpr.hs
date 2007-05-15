@@ -37,6 +37,8 @@ spec o@(CoreApp (CoreFun x) xs) = do
 spec x@(CoreCase on _) | isCoreCon $ fst $ fromCoreApp on =
     spec $ coreSimplifyCaseCon x
 
+spec x@(CoreCase (CoreCase _ _) _) = traverseCoreM spec $ coreSimplifyCaseCase x
+
 spec x@(CoreCase on alts) | isCoreFun $ fst $ fromCoreApp on = applyTemplate x
 
 spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
@@ -47,7 +49,7 @@ spec (CoreApp (CoreCase on alts) xs) = liftM (CoreCase on) (mapM f alts)
 -- breaks sharing and may break free variables
 spec (CoreApp (CoreLet bind x) ys) = spec . CoreLet bind =<< spec (CoreApp x ys)
 
-spec (CoreCase (CoreLet bind on) alts) = spec . CoreLet bind =<< spec (CoreCase on alts)
+spec o@(CoreCase (CoreLet bind on) alts) = traverseCoreM spec $ coreSimplifyCaseLet o
 
 spec (CoreLet bind x) = do
     res <- mapM shouldInlineLet bind

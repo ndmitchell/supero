@@ -89,7 +89,7 @@ useTemplate t@(TemplateApp name args) (CoreApp (CoreFun n) xs) | n == name = do
 
 useTemplate t@(TemplateCase name args alts) (CoreCase on alt) | app == name = do
         newname <- return . fromJust . Map.lookup t . template =<< get
-        return $ CoreApp (CoreFun newname) (args ++ concat (zipWith f alts alt))
+        return $ CoreApp (CoreFun newname) (concat (zipWith f alts alt) ++ args)
     where
         (CoreFun app,args) = fromCoreApp on
 
@@ -113,8 +113,8 @@ genTemplate newname (TemplateApp oldname tempargs) = do
 genTemplate newname (TemplateCase oldname extra alts) = do
         (_, func@(CoreFunc _ oldargs oldbody)) <- getFunc oldname
         cr <- liftM core get
-        let bod@(CoreCase (CoreApp _ vars2) alts2) = runFreeVars $ deleteVars (oldargs ++ collectAllVars oldbody) >> f cr
-            vars = collectFreeVars bod
+        let (CoreCase on2@(CoreApp _ vars2) alts2) = runFreeVars $ deleteVars (oldargs ++ collectAllVars oldbody) >> f cr
+            vars = collectFreeVars (CoreCase (CoreFun "") alts2) ++ collectFreeVars on2
             bod2 = CoreCase (fromJust $ coreInlineFunc func vars2) alts2
         return $ CoreFunc newname vars bod2
     where

@@ -39,8 +39,10 @@ instance Show Guess where
 
 -- the function being called, along with the arguments being passed
 -- Nothing means the argument is simple (first-order)
-data Template = TemplateApp CoreFuncName [TempArg]
-              | TemplateCase CoreFuncName Int [(CoreCtorName, TempArg)]
+data Template = TemplateApp  {templateName :: CoreFuncName, templateAppArgs :: [TempArg]}
+              | TemplateCase {templateName :: CoreFuncName
+                             ,templateCaseExtra :: Int
+                             ,templateCaseAlts :: [(CoreCtorName, TempArg)]}
                 deriving (Show,Eq,Ord)
 
 -- an argument, and the number of extra variables it is given

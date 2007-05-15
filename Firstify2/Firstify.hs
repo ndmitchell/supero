@@ -11,11 +11,15 @@ import Data.List
 
 
 firstify :: Core -> Core
-firstify = coreReachable ["main"] . specMain False specExpr
+firstify = coreFix . specMain False specExpr
 
 
 firstifyData :: Core -> Core
-firstifyData = coreReachable ["main"] . specMain True specExpr
+firstifyData = coreFix . specMain True specExpr
+
+
+coreFix :: Core -> Core
+coreFix = coreReachable ["main"] . coreInline InlineForward
 
 
 

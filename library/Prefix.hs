@@ -1,8 +1,27 @@
-{-# OPTIONS_GHC -fffi #-}
+{-# OPTIONS_GHC -fffi -fglasgow-exts -cpp #-}
 
 import System.IO.Unsafe
 import System.IO
 import Foreign.C.Types
+
+
+-- BEGIN Stolen from Data.ByteString.Base
+#if defined(__GLASGOW_HASKELL__)
+import GHC.Base                 (realWorld#)
+import GHC.IOBase               (IO(IO), unsafePerformIO)
+#else
+import System.IO.Unsafe         (unsafePerformIO)
+#endif
+
+{-# INLINE inlinePerformIO #-}
+inlinePerformIO :: IO a -> a
+#if defined(__GLASGOW_HASKELL__)
+inlinePerformIO (IO m) = case m realWorld# of (# _, r #) -> r
+#else
+inlinePerformIO = unsafePerformIO
+#endif
+-- END
+
 
 main = main_main `seq` (return () :: IO ())
 

@@ -25,6 +25,8 @@ inlinePerformIO = unsafePerformIO
 
 main = main_generated `seq` (return () :: IO ())
 
+overlay_token = 0 :: Int
+
 overlay_put_char h c = inlinePerformIO (hPutChar h (toEnum c) >> return 0)
 overlay_get_char h   = inlinePerformIO (getCharIO h)
 

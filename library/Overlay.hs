@@ -27,6 +27,8 @@ foreign import primitive global_System'_IO'_stdin  :: handle
 foreign import primitive global_System'_IO'_stdout :: handle
 foreign import primitive global_System'_IO'_stderr :: handle
 
+foreign import primitive token :: a
+
 
 -- IO stuff
 data IO a = IO a
@@ -37,7 +39,7 @@ global_Prelude'_Prelude'_Monad'_YHC'_Internal'_IO'_'gt'gt'eq (IO a) f = f a
 global_YHC'_Internal'_unsafePerformIO (IO a) = a
 
 
-global_System'_IO'_hGetContents h = IO (unsafeContents h)
+global_Prelude'_getContents = IO (unsafeContents token)
 
 unsafeContents h =
     let x = get_char h
@@ -51,6 +53,6 @@ global_System'_IO'_hPutChar h c =
     let x = put_char h c
     in x `seq` IO ()
 
-foreign import primitive get_char :: handle -> Int
+foreign import primitive get_char :: token -> Int
 foreign import primitive put_char :: handle -> Int -> Int
 

@@ -28,7 +28,7 @@ main = main_generated `seq` (return () :: IO ())
 overlay_put_char h c = inlinePerformIO (hPutChar h (toEnum c) >> return 0)
 overlay_get_char h   = inlinePerformIO (getCharIO h)
 
-foreign import ccall safe "stdio.h getchar" getchar :: IO CInt
+foreign import ccall unsafe "stdio.h getchar" getchar :: IO CInt
 
 {-# NOINLINE getCharIO #-}
 getCharIO h = do

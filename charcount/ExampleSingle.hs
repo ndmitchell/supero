@@ -7,7 +7,7 @@ import System.IO.Unsafe
 
 main = print . length =<< getContents2
 
-foreign import ccall safe "stdio.h getchar" getchar :: IO CInt
+foreign import ccall unsafe "stdio.h getchar" getchar :: IO CInt
 
 
 getContents2 :: IO String

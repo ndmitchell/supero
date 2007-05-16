@@ -11,12 +11,9 @@ foreign import ccall safe "stdio.h getchar" getchar :: IO CInt
 
 
 getContents2 :: IO String
-getContents2 = hGetContents2 stdin
-
-hGetContents2 :: Handle -> IO String
-hGetContents2 h = do
+getContents2 = do
     c <- getchar
     if c == (-1) then return [] else do
-        cs <- unsafeInterleaveIO $ hGetContents2 h
+        cs <- unsafeInterleaveIO getContents2
         return (toEnum (fromIntegral c) :cs)
 

@@ -27,7 +27,7 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
         fCtor (CoreCtor name fields) = CoreCtor (upperName name) fields
 
         fFunc (CorePrim{}) = []
-        fFunc (CoreFunc name args body) = [CoreFunc (lowerName name) args (mapUnderCore fExpr body)]
+        fFunc (CoreFunc name args body) = [CoreFunc (lowerName name) (map lowerName args) (mapUnderCore fExpr body)]
         
         fExpr (CoreFun x) = CoreFun (lowerName x)
         fExpr (CoreCon x) = CoreCon (upperName x)
@@ -65,7 +65,7 @@ lowerName x | x == "main" = "main_generated"
                               cs -> 'l' : cs
 
 
-escapes = [">gt","<lt","!ex","=eq","+p","$d",":c","[ob","]sb"]
+escapes = [">gt","<lt","!ex","=eq","+p","$d",":c","[ob","]sb","-h"]
 boring = ["Prelude","YHC","Internal"]
 
 

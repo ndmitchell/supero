@@ -1,7 +1,8 @@
 
 module Firstify2.SpecExpr(specExpr) where
 
-import Yhc.Core
+import Yhc.Core hiding (collectAllVars, replaceFreeVars)
+import Yhc.Core.FreeVar2
 import Yhc.Core.Play2
 import Firstify2.SpecState
 import Firstify2.Template
@@ -9,6 +10,7 @@ import Firstify2.Template
 import Control.Monad
 import Data.Maybe
 import Data.List
+import Debug.Trace
 
 
 specExpr :: CoreExpr -> Spec CoreExpr
@@ -50,6 +52,36 @@ spec (CoreApp (CoreCase on alts) xs) = liftM (CoreCase on) (mapM f alts)
 spec (CoreApp (CoreLet bind x) ys) = spec . CoreLet bind =<< spec (CoreApp x ys)
 
 spec o@(CoreCase (CoreLet bind on) alts) = traverseCoreM spec $ coreSimplifyCaseLet o
+
+spec (CoreLet [] x) = return x
+spec (CoreLet (b1:b2:bs) x) = spec (CoreLet (b2:bs) x) >>= spec . (CoreLet [b1])
+
+spec o@(CoreLet [(lhs,rhs)] x) = do
+        let (fn,args) = fromCoreApp rhs
+            (newargs,newbinds) = unzip $ runFreeVars $ deleteVars (collectAllVars o) >> mapM promote args
+            newrhs = coreApp fn newargs
+        b <- isSpecData
+        unsat <- if isCoreFun fn then liftM not $ isSaturated (fromCoreFun fn) args
+                 else if isCoreCon fn then return b
+                 else return False
+
+        -- you can do two things - inline, or strength reduce
+        -- strength reduce will not duplicate expressions
+        let inline = unsat
+            reduce = False
+
+        if inline || reduce
+            then specExpr $ coreLet (concat newbinds) $
+                    if inline then
+                        replaceFreeVars [(lhs,newrhs)] x
+                    else
+                        error "reduce here"
+            else return o
+    where
+        promote (CoreVar x) = return (CoreVar x, [])
+        promote x = do i <- getVar
+                       return (CoreVar i, [(i,x)])
+
 
 spec (CoreLet bind x) = do
     res <- mapM shouldInlineLet bind

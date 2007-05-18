@@ -53,7 +53,7 @@ spec (CoreApp (CoreCase on alts) xs) = liftM (CoreCase on) (mapM f alts)
 -- breaks sharing and may break free variables
 spec (CoreApp (CoreLet bind x) ys) = spec . CoreLet bind =<< spec (CoreApp x ys)
 
-spec o@(CoreCase (CoreLet bind on) alts) = traverseCoreM spec $ coreSimplifyCaseLet o
+spec o@(CoreCase (CoreLet bind on) alts) = specExpr $ coreSimplifyCaseLet o
 
 spec (CoreLet [] x) = return x
 spec (CoreLet (b1:b2:bs) x) = spec (CoreLet (b2:bs) x) >>= spec . (CoreLet [b1])

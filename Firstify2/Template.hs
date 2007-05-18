@@ -128,7 +128,7 @@ genTemplate newname (TemplateCase oldname extra alts) = do
         g :: Core -> (CoreCtorName,TempArg) -> FreeVar (CoreExpr,CoreExpr)
         g cr (c,TempNone) = do
             i <- getVar
-            return (CoreCon c, CoreVar i)
+            return (if null c then CoreVar "_" else CoreCon c, CoreVar i)
         g cr (c,TempApp fn i) = do
             j <- replicateM i getVar
             k <- replicateM (length $ coreCtorFields $ coreCtor cr c) getVar

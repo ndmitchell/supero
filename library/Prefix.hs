@@ -1,8 +1,11 @@
 {-# OPTIONS_GHC -fffi -fglasgow-exts -cpp #-}
 
+module Main(main) where
+
 import System.IO.Unsafe
 import System.IO
 import Foreign.C.Types
+import Data.Char
 
 
 -- BEGIN Stolen from Data.ByteString.Base
@@ -58,3 +61,7 @@ str_ x = map chr_ x
 
 system_IO_stdin = stdin
 system_IO_stdout = stdout
+
+data_Char_isSpace c = isSpace (toEnum c)
+
+

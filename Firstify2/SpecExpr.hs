@@ -37,7 +37,9 @@ spec o@(CoreApp (CoreFun x) xs) = do
         return $ coreApp (CoreFun name) args
 
 spec x@(CoreCase on _) | isCoreCon $ fst $ fromCoreApp on =
-    spec $ coreSimplifyCaseCon x
+        if res == x then return x else spec res
+    where
+        res = coreSimplifyCaseCon x
 
 spec x@(CoreCase (CoreCase _ _) _) = traverseCoreM spec $ coreSimplifyCaseCase x
 

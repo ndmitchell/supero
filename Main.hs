@@ -40,6 +40,7 @@ output file n core = do
     let sn = show n
     writeFile (file ++ "/" ++ sn ++ "__.hs") $ show core
     generate  (file ++ "/" ++ sn ++ ".hs"  ) core
+    writeFile (file ++ "/" ++ sn ++ ".html") $ coreHtml core
 
 
 removeSeq x = traverseCore f x

@@ -1,7 +1,7 @@
 
 module Firstify2.SpecExpr(specExpr) where
 
-import Yhc.Core hiding (collectAllVars, replaceFreeVars)
+import Yhc.Core hiding (collectAllVars, collectFreeVars, replaceFreeVars)
 import Yhc.Core.FreeVar2
 import Yhc.Core.Play2
 import Firstify2.SpecState
@@ -80,13 +80,13 @@ spec o@(CoreLet [(lhs,rhs)] x) = do
                           return $ b && b2
                       _ -> return False
 
-        if inline || reduce
-            then specExpr $ coreLet (concat newbinds) $
-                    if inline then
-                        replaceFreeVars [(lhs,newrhs)] x
-                    else
-                        reducer lhs newrhs x
-            else return o
+        if inline then
+            specExpr $ coreLet (concat newbinds) $ replaceFreeVars [(lhs,newrhs)] x
+         else if reduce then
+            let res = coreLet (concat newbinds) $ reducer lhs newrhs x
+            in if res == x then return x else specExpr res
+         else
+            return o
     where
         promote (CoreVar x) = return (CoreVar x, [])
         promote x = do i <- getVar
@@ -108,5 +108,9 @@ divide res xs = (map snd x, map snd y)
 -- reduce the strength of the given binding
 -- but do NOT reduce the sharing
 reducer :: CoreVarName -> CoreExpr -> CoreExpr -> CoreExpr
-reducer lhs rhs x = error $ show ("reducer",lhs,rhs,x)
-
+reducer lhs rhs x
+    | length (filter (== lhs) $ collectFreeVars x) <= 1 = replaceFreeVars [(lhs,rhs)] x
+    | otherwise = reduceStrength $ deleteUnusedLets x
+    where
+        deleteUnusedLets x = x
+        reduceStrength x = CoreLet [(lhs,rhs)] x

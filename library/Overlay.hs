@@ -29,6 +29,8 @@ foreign import primitive global_System'_IO'_stderr :: handle
 
 foreign import primitive token :: a
 
+foreign import primitive global_Data'_Char'_isSpace :: char -> int
+
 
 -- IO stuff
 data IO a = IO a

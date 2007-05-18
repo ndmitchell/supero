@@ -56,6 +56,10 @@ spec o@(CoreCase (CoreLet bind on) alts) = traverseCoreM spec $ coreSimplifyCase
 spec (CoreLet [] x) = return x
 spec (CoreLet (b1:b2:bs) x) = spec (CoreLet (b2:bs) x) >>= spec . (CoreLet [b1])
 
+spec o@(CoreLet [(lhs,CoreLet bind rhs)] x) = do
+    inner <- spec $ CoreLet [(lhs,rhs)] x
+    spec $ CoreLet bind inner
+
 spec o@(CoreLet [(lhs,rhs)] x) = do
         let (fn,args) = fromCoreApp rhs
             (newargs,newbinds) = unzip $ runFreeVars $ deleteVars (collectAllVars o) >> mapM promote args

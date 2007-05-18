@@ -65,21 +65,25 @@ spec o@(CoreLet [(lhs,rhs)] x) = do
             (newargs,newbinds) = unzip $ runFreeVars $ deleteVars (collectAllVars o) >> mapM promote args
             newrhs = coreApp fn newargs
         b <- isSpecData
-        unsat <- if isCoreFun fn then liftM not $ isSaturated (fromCoreFun fn) args
-                 else if isCoreCon fn then return b
-                 else return False
 
         -- you can do two things - inline, or strength reduce
         -- strength reduce will not duplicate expressions
-        let inline = unsat
-            reduce = False
+        inline <- if isCoreFun fn then liftM not $ isSaturated (fromCoreFun fn) args
+                  else if isCoreCon fn then return b
+                  else return False
+
+        reduce <- case fn of
+                      CoreFun x -> do
+                          Arity _ b2 <- getArity (fromCoreFun fn)
+                          return $ b && b2
+                      _ -> return False
 
         if inline || reduce
             then specExpr $ coreLet (concat newbinds) $
                     if inline then
                         replaceFreeVars [(lhs,newrhs)] x
                     else
-                        error "reduce here"
+                        reducer lhs newrhs x
             else return o
     where
         promote (CoreVar x) = return (CoreVar x, [])
@@ -87,35 +91,20 @@ spec o@(CoreLet [(lhs,rhs)] x) = do
                        return (CoreVar i, [(i,x)])
 
 
-spec (CoreLet bind x) = do
-    res <- mapM shouldInlineLet bind
-    let (inline,keep) = divide res bind
-    x2 <- if null inline
-          then return x
-          else specExpr $ replaceFreeVars inline x
-    return $ coreLet keep x2
-
 spec x | isDull x || isCoreConst x || isCoreCase x = return x
 spec (CoreApp x xs) | isDull x = return $ CoreApp x xs
 
 spec x = error $ show ("spec - todo",x)
 
 
--- the choice of what to do on let is very varied. We can:
--- 1) inline all functions
--- 2) inline all functions which occur once
--- 3) inline all functions which occur once per branch
---
--- currently we pick 1
-shouldInlineLet :: (CoreVarName, CoreExpr) -> Spec Bool
-shouldInlineLet (lhs,rhs) =
-    case fromCoreApp rhs of
-        (CoreFun x, xs) -> liftM not $ isSaturated x xs
-        _ -> return False
-
-
 
 divide :: [Bool] -> [a] -> ([a],[a])
 divide res xs = (map snd x, map snd y)
     where (x,y) = partition fst $ zip res xs
+
+
+-- reduce the strength of the given binding
+-- but do NOT reduce the sharing
+reducer :: CoreVarName -> CoreExpr -> CoreExpr -> CoreExpr
+reducer lhs rhs x = error $ show ("reducer",lhs,rhs,x)
 

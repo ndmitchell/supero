@@ -7,7 +7,9 @@ import Debug.Trace
 
 
 weakenTemplate :: Template -> Spec (Maybe Template)
-weakenTemplate (TemplateApp n (x1:y:xs)) | name `isPrefixOf` n = return $ Just $ TemplateApp n (x1:TempNone:xs)
-    where name = "Prelude.Prelude.Prelude.1107.showPosInt"
+weakenTemplate (TemplateApp n xs@(_:_)) | name `isPrefixOf` n = return $ Just $ TemplateApp n xs2
+    where
+        name = "Prelude.Prelude.Prelude.1107.showPosInt"
+        xs2 = init xs ++ [TempNone]
 
 weakenTemplate x = return $ Just x

@@ -50,8 +50,9 @@ createTemplate (CoreApp (CoreFun name) args) = do
                 else TempNone
 
         f (CoreApp (CoreCon x) xs) = do
+            b <- isSpecData
             xs2 <- mapM f xs
-            return $ if all isTempNone xs2 then TempNone else TempCon x xs2
+            return $ if not b && all isTempNone xs2 then TempNone else TempCon x xs2
 
         f x = return TempNone
 

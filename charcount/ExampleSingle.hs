@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -fffi #-}
 
+module Main(main) where
+
 import Foreign.C.Types
 import System.IO
 import System.IO.Unsafe

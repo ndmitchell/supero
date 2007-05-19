@@ -9,6 +9,7 @@ import qualified Firstify2.Firstify as F2
 import Church
 import LambdaLift
 import Report
+import Data.List
 import Unique
 import System.Directory
 import System.Environment
@@ -19,7 +20,7 @@ main = do
     createDirectoryIfMissing True file
     core <- loadCore (file ++ ".yca")
     over <- loadCore "library/Overlay.ycr"
-    core <- return $ uniqueFuncs $ removeSeq $ traverseCore remCorePos $ coreReachable ["main"] $ coreOverlay core over
+    core <- return $ transform $ coreReachable ["main"] $ coreOverlay core over
     output file 1 core
 
     putStrLn "Firstifying basic"
@@ -43,7 +44,17 @@ output file n core = do
     writeFile (file ++ "/" ++ sn ++ ".html") $ coreHtml core
 
 
-removeSeq x = traverseCore f x
+transform c = uniqueFuncs $ traverseCore (trans c) c
+
+
+-- remove seq
+trans c (CoreApp (CoreFun s) [x,y]) | s == "Prelude.seq" = CoreCase x [(CoreVar "_",y)]
+
+-- remove dead default alternatives
+trans c (CoreCase on alts) | not (null found) && sort found == sort wanted =
+        CoreCase on [(lhs,rhs) | (lhs,rhs) <- alts, isCoreCon $ fst $ fromCoreApp lhs]
     where
-        f (CoreApp (CoreFun s) [x,y]) | s == "Prelude.seq" = CoreCase x [(CoreVar "_",y)]
-        f x = x
+        found = [c | (lhs,rhs) <- alts, (CoreCon c,_) <- [fromCoreApp lhs]]
+        wanted = map coreCtorName $ coreDataCtors $ coreCtorData c (head found)
+
+trans c x = remCorePos x

@@ -17,7 +17,8 @@ weakenTemplate (TemplateApp n xs@(_:_)) | name `isPrefixOf` n = return $ Just $ 
 weakenTemplate x = do
     s <- get
     if uid s > 1000 then
-        error $ unlines $ map showTemplate $ Map.toList $ template s
+        let mp = Map.fromList $ map (\(a,b) -> (b,a)) $ Map.toList $ template s in
+        error $ unlines $ map (showTemplate mp) $ Map.toList $ template s
      else
         return $ Just x
 

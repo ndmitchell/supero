@@ -1,8 +1,10 @@
 
 module Main where
 
-import Yhc.Core
+import Yhc.Core hiding (collectAllVars)
+import Yhc.Core.FreeVar2
 import Yhc.Core.Play2
+import Control.Monad
 import Generate
 import Firstify
 import qualified Firstify2.Firstify as F2
@@ -51,10 +53,22 @@ transform c = uniqueFuncs $ traverseCore (trans c) c
 trans c (CoreApp (CoreFun s) [x,y]) | s == "Prelude.seq" = CoreCase x [(CoreVar "_",y)]
 
 -- remove dead default alternatives
-trans c (CoreCase on alts) | not (null found) && sort found == sort wanted =
-        CoreCase on [(lhs,rhs) | (lhs,rhs) <- alts, isCoreCon $ fst $ fromCoreApp lhs]
+trans c (CoreCase on alts)
+    | nfound > 0 && nfound == nwanted = CoreCase on nodefault
+    | nfound > 0 && nfound+1 == nwanted = CoreCase on newdefault
     where
+        nfound = length found
+        nwanted = length wanted
         found = [c | (lhs,rhs) <- alts, (CoreCon c,_) <- [fromCoreApp lhs]]
         wanted = map coreCtorName $ coreDataCtors $ coreCtorData c (head found)
+
+        nodefault = [(lhs,rhs) | (lhs,rhs) <- alts, isCoreCon $ fst $ fromCoreApp lhs]
+        newdefault = [if isCoreVar (fst alt) then expand alt else alt | alt <- alts]
+        expand (_,rhs) = (coreApp (CoreCon name) (map CoreVar vars), rhs)
+            where
+                vars = runFreeVars $ deleteVars (collectAllVars rhs) >> replicateM fields getVar
+                name = head $ wanted \\ found
+                fields = length $ coreCtorFields $ coreCtor c name
+
 
 trans c x = remCorePos x

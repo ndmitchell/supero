@@ -23,8 +23,12 @@ applyTemplate x = do
     case t of
         Nothing -> return x
         Just y -> do
-            addTemplate y
-            useTemplate y x
+            func <- getFunc (templateName y)
+            if isCoreFunc $ snd func then do
+                addTemplate y
+                useTemplate y x
+             else
+                return x
 
 
 createTemplate :: CoreExpr -> Spec (Maybe Template)

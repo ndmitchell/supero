@@ -26,6 +26,17 @@ spec (CoreApp (CoreFun err) xs) | err == "Prelude.error"
 
 spec o@(CoreFun x) = spec (CoreApp o [])
 
+spec o@(CoreApp x xs) | any isCoreLet (x:xs) = do
+        let (a:as,binds) = unzip $ runFreeVars $ deleteVars (collectAllVars o) >> mapM f (x:xs)
+        inner <- spec $ CoreApp a as
+        spec $ coreLet (concat binds) inner
+    where
+        f (CoreLet [(lhs,rhs)] x) = do
+            (x2,bs) <- f x
+            lhs2 <- getVar
+            return (replaceFreeVars [(lhs,CoreVar lhs2)] x2, (lhs2,rhs) : bs)
+        f x = return (x, [])
+
 spec o@(CoreApp (CoreFun x) xs) = do
     CoreApp (CoreFun name) args <- applyTemplate o
     sat <- isSaturated name args
@@ -49,9 +60,6 @@ spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
 
 spec (CoreApp (CoreCase on alts) xs) = liftM (CoreCase on) (mapM f alts)
     where f (lhs,rhs) = liftM ((,) lhs) $ spec $ coreApp rhs xs
-
--- breaks sharing and may break free variables
-spec (CoreApp (CoreLet bind x) ys) = spec . CoreLet bind =<< spec (CoreApp x ys)
 
 spec o@(CoreCase (CoreLet bind on) alts) = specExpr $ coreSimplifyCaseLet o
 
@@ -114,3 +122,7 @@ reducer lhs rhs x
     where
         deleteUnusedLets x = x
         reduceStrength x = CoreLet [(lhs,rhs)] x
+
+
+isCoreLet (CoreLet{}) = True
+isCoreLet _ = False

@@ -1,7 +1,7 @@
 
 module Firstify2.SpecExpr(specExpr) where
 
-import Yhc.Core hiding (collectAllVars, collectFreeVars, replaceFreeVars)
+import Yhc.Core hiding (collectAllVars, collectFreeVars, replaceFreeVars, countFreeVar)
 import Yhc.Core.FreeVar2
 import Yhc.Core.Play2
 import Firstify2.SpecState
@@ -12,12 +12,30 @@ import Data.Maybe
 import Data.List
 import Debug.Trace
 
-
 specExpr :: CoreExpr -> Spec CoreExpr
-specExpr = traverseCoreM spec
+specExpr x = do
+        res <- specs x
+        let extra = not $ null $ post \\ pre
+            pre = collectFreeVars x
+            post = collectFreeVars res
+        b <- isSpecData
+        () <- if b && not (check res) then trace (show (x,res)) $ return () else return ()
+        if extra then error (show (x,res)) else return res
+
+
+check x = null [() | CoreCase on alts <- everythingCore x, a <- alts, f a]
+    where
+        f (CoreApp _ xs, CoreApp _ ys) = any (`elem` vars) free
+            where
+                vars = map fromCoreVar xs
+                free = concatMap collectFreeVars $ reverse $ drop (length xs) $ reverse ys
+        f _ = False
 
 
 isDull x = isCoreVar x || isCoreCon x || isCorePos x
+
+
+specs = traverseCoreM spec
 
 
 spec :: CoreExpr -> Spec CoreExpr
@@ -43,14 +61,17 @@ spec o@(CoreApp (CoreFun x) xs) = do
     inline <- shouldInline name
     if sat && inline then do
         (_,func) <- getFunc name
-        specExpr $ fromJust $ coreInlineFunc func args
+        specs $ fromJust $ coreInlineFunc func args
      else
         return $ coreApp (CoreFun name) args
 
+{-
+-- dangerous at this point, breaks the invariant
 spec x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase (CoreInt 0) alts) =
-        specExpr $ CoreCase (CoreVar on) (map f alts)
+        specs $ CoreCase (CoreVar on) (map f alts)
     where
         f (lhs,rhs) = (lhs, replaceFreeVars [(on,lhs)] rhs)
+-}
 
 spec x@(CoreCase on _) | isCoreCon $ fst $ fromCoreApp on =
         if res == x then error "failed to match case" else spec res
@@ -66,7 +87,7 @@ spec (CoreApp (CoreApp x xs) ys) = spec $ CoreApp x (xs++ys)
 spec (CoreApp (CoreCase on alts) xs) = liftM (CoreCase on) (mapM f alts)
     where f (lhs,rhs) = liftM ((,) lhs) $ spec $ coreApp rhs xs
 
-spec o@(CoreCase (CoreLet bind on) alts) = specExpr $ coreSimplifyCaseLet o
+spec o@(CoreCase (CoreLet bind on) alts) = specs $ coreSimplifyCaseLet o
 
 spec (CoreLet [] x) = return x
 spec (CoreLet (b1:b2:bs) x) = spec (CoreLet (b2:bs) x) >>= spec . (CoreLet [b1])
@@ -76,7 +97,7 @@ spec o@(CoreLet [(lhs,CoreLet bind rhs)] x) = do
     spec $ CoreLet bind inner
 
 spec o@(CoreLet [(lhs,rhs)] x) 
-    | length (filter (==lhs) $ collectFreeVars x) <= 1 = specExpr $ replaceFreeVars [(lhs,rhs)] x
+    | countFreeVar lhs x <= 1 = specs $ replaceFreeVars [(lhs,rhs)] x
     | otherwise = do
         let (fn,args) = fromCoreApp rhs
             (newargs,newbinds) = unzip $ runFreeVars $ deleteVars (collectAllVars o) >> mapM promote args
@@ -96,11 +117,17 @@ spec o@(CoreLet [(lhs,rhs)] x)
                       _ -> return False
 
         if inline then
-            specExpr $ coreLet (concat newbinds) $ replaceFreeVars [(lhs,newrhs)] x
+            specs $ coreLet (concat newbinds) $ replaceFreeVars [(lhs,newrhs)] x
+            --specs $ replaceFreeVars [(lhs,rhs)] x
          else if reduce then
             let res = coreLet (concat newbinds) $ reducer lhs newrhs x
-            in if res == x then return x else specExpr res
-         else
+            in if res == o then return o else specs res
+            --specs $ replaceFreeVars [(lhs,rhs)] x
+         else do
+            res <- specs $ replaceFreeVars [(lhs,rhs)] x
+            -- () <- trace (show (o,res)) $ return ()
+            --return o
+            specs $ replaceFreeVars [(lhs,rhs)] x
             return o
     where
         promote (CoreVar x) = return (CoreVar x, [])
@@ -124,7 +151,7 @@ divide res xs = (map snd x, map snd y)
 -- but do NOT reduce the sharing
 reducer :: CoreVarName -> CoreExpr -> CoreExpr -> CoreExpr
 reducer lhs rhs x
-    | length (filter (== lhs) $ collectFreeVars x) <= 1 = replaceFreeVars [(lhs,rhs)] x
+    | True || countFreeVar lhs x <= 1 = replaceFreeVars [(lhs,rhs)] x
     | otherwise = reduceStrength $ deleteUnusedLets x
     where
         deleteUnusedLets x = x

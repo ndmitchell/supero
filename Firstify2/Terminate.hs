@@ -22,14 +22,18 @@ weakenTemplate x = do
         return $ Just x
 
 
-showTemplate (t, y) = y ++ " = " ++ f1 t
+showTemplate mp (t, y) = y ++ " = " ++ f1 t
     where
-        f1 (TemplateApp name args) = unwords $ name : map f2 args
+        f1 (TemplateApp name args) = unwords $ g name : map f2 args
         f1 (TemplateCase name extra alts) = "case " ++ f2 (TempApp name extra) ++ " of " ++ concatMap f3 alts
         
-        f2 (TempApp name extra) = name ++ " #" ++ show extra
+        f2 (TempApp name extra) = g name ++ " #" ++ show extra
         f2 TempNone = "_"
         f2 (TempCon c args) = "(" ++ unwords (c : map f2 args) ++ ")"
 
         f3 ("",x) = "_ -> " ++ f2 x ++ "; "
         f3 (c ,x) = c ++ " -> " ++ f2 x ++ "; "
+
+        g x = case Map.lookup x mp of
+                  Nothing -> x
+                  Just y -> "<" ++ f1 y ++ ">"

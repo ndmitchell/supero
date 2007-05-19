@@ -47,6 +47,11 @@ spec o@(CoreApp (CoreFun x) xs) = do
      else
         return $ coreApp (CoreFun name) args
 
+spec x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase (CoreInt 0) alts) =
+        specExpr $ CoreCase (CoreVar on) (map f alts)
+    where
+        f (lhs,rhs) = (lhs, replaceFreeVars [(on,lhs)] rhs)
+
 spec x@(CoreCase on _) | isCoreCon $ fst $ fromCoreApp on =
         if res == x then error "failed to match case" else spec res
     where
@@ -70,7 +75,9 @@ spec o@(CoreLet [(lhs,CoreLet bind rhs)] x) = do
     inner <- spec $ CoreLet [(lhs,rhs)] x
     spec $ CoreLet bind inner
 
-spec o@(CoreLet [(lhs,rhs)] x) = do
+spec o@(CoreLet [(lhs,rhs)] x) 
+    | length (filter (==lhs) $ collectFreeVars x) <= 1 = specExpr $ replaceFreeVars [(lhs,rhs)] x
+    | otherwise = do
         let (fn,args) = fromCoreApp rhs
             (newargs,newbinds) = unzip $ runFreeVars $ deleteVars (collectAllVars o) >> mapM promote args
             newrhs = coreApp fn newargs

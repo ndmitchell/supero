@@ -37,7 +37,7 @@ spec o@(CoreApp (CoreFun x) xs) = do
         return $ coreApp (CoreFun name) args
 
 spec x@(CoreCase on _) | isCoreCon $ fst $ fromCoreApp on =
-        if res == x then return x else spec res
+        if res == x then error "failed to match case" else spec res
     where
         res = coreSimplifyCaseCon x
 

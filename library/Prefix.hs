@@ -5,7 +5,6 @@ module Main(main) where
 import System.IO.Unsafe
 import System.IO
 import Foreign.C.Types
-import Data.Char
 
 
 -- BEGIN Stolen from Data.ByteString.Base
@@ -34,6 +33,8 @@ overlay_put_char h c = inlinePerformIO (hPutChar h (toEnum c) >> return 0)
 overlay_get_char h   = inlinePerformIO (getCharIO h)
 
 foreign import ccall unsafe "stdio.h getchar" getchar :: IO CInt
+foreign import ccall unsafe "ctype.h iswspace" isspace :: CInt -> CInt
+
 
 {-# NOINLINE getCharIO #-}
 getCharIO h = do
@@ -62,6 +63,5 @@ str_ x = map chr_ x
 system_IO_stdin = stdin
 system_IO_stdout = stdout
 
-data_Char_isSpace c = isSpace (toEnum c)
-
+data_Char_isSpace c = isspace (toEnum c) /= 0
 

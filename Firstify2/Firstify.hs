@@ -19,7 +19,7 @@ firstifyData = coreFix . specMain True specExpr
 
 
 coreFix :: Core -> Core
-coreFix = coreReachable ["main"] . coreInline InlineForward
+coreFix = coreReachable ["main"] . coreInline InlineCallOnce
 
 
 

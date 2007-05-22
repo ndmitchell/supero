@@ -3,20 +3,12 @@
 
 int main()
 {
-	int count;
-	int last_newline = 0, c;
-	c = getchar();
-	if (c == EOF)
-		count = 0;
-	else
-	{
-		count = 1;
-		while ((c = getchar()) != EOF) {
-			if (last_newline = (c == '\n'))
-				count++;
-		}
+	int count = 0;
+	int last_newline = 1, c;
+	while ((c = getchar()) != EOF) {
 		if (last_newline)
-			count--;
+			count++;
+		last_newline = (c == '\n');
 	}
 	printf("%i\n", count);
 	return 0;

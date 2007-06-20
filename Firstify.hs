@@ -35,7 +35,7 @@ The specialised version has:
 -- if the first result is not null, an error occurred
 -- the second result is how far you got
 firstify :: Core -> Core
-firstify core = coreReachable ["main"] $ coreSimplify $ fromCoreFuncMap core $ transform $ prepare core
+firstify core = coreReachable ["main"] $ coreSimplify $ fromCoreFuncMap core $ trans $ prepare core
 
 
 
@@ -54,8 +54,8 @@ type SpecM a = State Spec a
 
 
 
-transform :: CoreFuncMap -> CoreFuncMap
-transform fm = evalState f newSpec
+trans :: CoreFuncMap -> CoreFuncMap
+trans fm = evalState f newSpec
     where
         newSpec = Spec 1 fm Map.empty Set.empty Set.empty Set.empty
         

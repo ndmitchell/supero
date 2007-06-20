@@ -7,7 +7,7 @@
 module Unique(uniqueName, uniqueFuncs, uniqueNames, uniqueFuncsMin, uniqueNamesMin) where
 
 import Yhc.Core.Type
-import Yhc.Core.Play2
+import Yhc.Core.Uniplate
 
 import Data.Char
 import Data.Maybe
@@ -19,7 +19,7 @@ import qualified Data.Map as Map
 uniqueFuncs :: Core -> Core
 uniqueFuncs core = core{coreFuncs = zipWith f names (coreFuncs core)}
     where
-        f new (CoreFunc _ args body) = CoreFunc new args (traverseCore g body)
+        f new (CoreFunc _ args body) = CoreFunc new args (transform g body)
         f new (CorePrim _ arity) = CorePrim new arity
         
         g (CoreFun x) = CoreFun $ rep x

@@ -2,7 +2,6 @@
 module Firstify2.Firstify where
 
 import Yhc.Core
-import Yhc.Core.Play2
 import Unique
 import Firstify2.SpecExpr
 import Firstify2.SpecState
@@ -26,10 +25,10 @@ coreFix = coreReachable ["main"] . coreInline InlineCallOnce
 firstifyDataPrepare :: Core -> Core
 firstifyDataPrepare core2 = core{coreFuncs = newfuncs ++ oldfuncs}
     where
-        core = traverseCore simp $ coreSimplify core2
+        core = transformExpr simp $ coreSimplify core2
         (oldfuncs,(uid,newfuncs)) = runState (mapM f $ coreFuncs core) (uniqueFuncsMin core,[])
 
-        f (CoreFunc name args body) = liftM (CoreFunc name args) $ traverseCoreM (g name) body
+        f (CoreFunc name args body) = liftM (CoreFunc name args) $ transformM (g name) body
         f x = return x
         
         g name (CoreCase on alts) = liftM (CoreCase on) $ mapM (h name) alts

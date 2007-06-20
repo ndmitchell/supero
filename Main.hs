@@ -3,7 +3,6 @@ module Main where
 
 import Yhc.Core hiding (collectAllVars)
 import Yhc.Core.FreeVar2
-import Yhc.Core.Play2
 import Control.Monad
 import Generate
 import Firstify
@@ -22,7 +21,7 @@ main = do
     createDirectoryIfMissing True file
     core <- loadCore (file ++ ".yca")
     over <- loadCore "library/Overlay.ycr"
-    core <- return $ transform $ coreReachable ["main"] $ coreOverlay core over
+    core <- return $ transs $ coreReachable ["main"] $ coreOverlay core over
     output file 1 core
 
     putStrLn "Firstifying basic"
@@ -46,7 +45,7 @@ output file n core = do
     writeFile (file ++ "/" ++ sn ++ ".html") $ coreHtml core
 
 
-transform c = uniqueFuncs $ traverseCore (trans c) c
+transs c = uniqueFuncs $ transformExpr (trans c) c
 
 
 -- remove seq

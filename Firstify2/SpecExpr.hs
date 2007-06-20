@@ -3,7 +3,6 @@ module Firstify2.SpecExpr(specExpr) where
 
 import Yhc.Core hiding (collectAllVars, collectFreeVars, replaceFreeVars, countFreeVar)
 import Yhc.Core.FreeVar2
-import Yhc.Core.Play2
 import Firstify2.SpecState
 import Firstify2.Template
 
@@ -23,7 +22,7 @@ specExpr x = do
         if extra then error (show (x,res)) else return res
 
 
-check x = null [() | CoreCase on alts <- everythingCore x, a <- alts, f a]
+check x = null [() | CoreCase on alts <- universe x, a <- alts, f a]
     where
         f (CoreApp _ xs, CoreApp _ ys) = any (`elem` vars) free
             where
@@ -35,7 +34,7 @@ check x = null [() | CoreCase on alts <- everythingCore x, a <- alts, f a]
 isDull x = isCoreVar x || isCoreCon x || isCorePos x
 
 
-specs = traverseCoreM spec
+specs = transformM spec
 
 
 spec :: CoreExpr -> Spec CoreExpr
@@ -78,7 +77,7 @@ spec x@(CoreCase on _) | isCoreCon $ fst $ fromCoreApp on =
     where
         res = coreSimplifyCaseCon x
 
-spec x@(CoreCase (CoreCase _ _) _) = traverseCoreM spec $ coreSimplifyCaseCase x
+spec x@(CoreCase (CoreCase _ _) _) = transformM spec $ coreSimplifyCaseCase x
 
 spec x@(CoreCase on alts) | isCoreFun $ fst $ fromCoreApp on = applyTemplate x
 
@@ -156,7 +155,3 @@ reducer lhs rhs x
     where
         deleteUnusedLets x = x
         reduceStrength x = CoreLet [(lhs,rhs)] x
-
-
-isCoreLet (CoreLet{}) = True
-isCoreLet _ = False

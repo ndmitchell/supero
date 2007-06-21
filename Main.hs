@@ -4,7 +4,7 @@ module Main where
 import Yhc.Core hiding (collectAllVars)
 import Control.Monad
 import Generate
-import qualified Firstify2.Firstify as F2
+import Firstify2.Firstify
 import Report
 import Data.List
 import System.Directory
@@ -20,15 +20,15 @@ main = do
     output file 1 core
 
     putStrLn "Firstifying basic"
-    core <- return $ F2.firstify core
+    core <- return $ firstify core
     output file 2 core
     putStrLn $ unlines $ report core
 
-    core <- return $ F2.firstifyDataPrepare core
+    core <- return $ firstifyDataPrepare core
     output file 3 core
 
     putStrLn "Firstifying scary"
-    core <- return $ F2.firstifyData core
+    core <- return $ firstifyData core
     output file 4 core
     putStrLn $ unlines $ report core
 

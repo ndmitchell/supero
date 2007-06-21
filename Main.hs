@@ -5,7 +5,6 @@ import Yhc.Core hiding (collectAllVars)
 import Yhc.Core.FreeVar2
 import Control.Monad
 import Generate
-import Firstify
 import qualified Firstify2.Firstify as F2
 import Report
 import Data.List

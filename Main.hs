@@ -44,29 +44,11 @@ output file n core = do
     writeFile (file ++ "/" ++ sn ++ ".html") $ coreHtml core
 
 
-transs c = uniqueFuncs $ transformExpr (trans c) c
+transs = ensureInvariants [ConsecutiveFuncs, NoCorePos, NoRecursiveLet, NoCaseDefaultOne]
+       . transformExpr removeSeq
 
 
--- remove seq
-trans c (CoreApp (CoreFun s) [x,y]) | s == "Prelude.seq" = CoreCase x [(CoreVar "_",y)]
-
--- remove dead default alternatives
-trans c (CoreCase on alts)
-    | nfound > 0 && nfound == nwanted = CoreCase on nodefault
-    | nfound > 0 && nfound+1 == nwanted = CoreCase on newdefault
-    where
-        nfound = length found
-        nwanted = length wanted
-        found = [c | (lhs,rhs) <- alts, (CoreCon c,_) <- [fromCoreApp lhs]]
-        wanted = map coreCtorName $ coreDataCtors $ coreCtorData c (head found)
-
-        nodefault = [(lhs,rhs) | (lhs,rhs) <- alts, isCoreCon $ fst $ fromCoreApp lhs]
-        newdefault = [if isCoreVar (fst alt) then expand alt else alt | alt <- alts]
-        expand (_,rhs) = (coreApp (CoreCon name) (map CoreVar vars), rhs)
-            where
-                vars = runFreeVars $ deleteVars (collectAllVars rhs) >> replicateM fields getVar
-                name = head $ wanted \\ found
-                fields = length $ coreCtorFields $ coreCtor c name
-
-
-trans c x = remCorePos x
+-- cannot be done by Overlay since case _ converts to nothing when compiled
+removeSeq (CoreApp (CoreFun s) [x,y])
+    | s == "Prelude.seq" = CoreCase x [(CoreVar "_",y)]
+removeSeq x = x

@@ -8,7 +8,6 @@ import Generate
 import Firstify
 import qualified Firstify2.Firstify as F2
 import Church
-import LambdaLift
 import Report
 import Data.List
 import Unique

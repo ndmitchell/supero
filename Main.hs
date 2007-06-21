@@ -2,7 +2,6 @@
 module Main where
 
 import Yhc.Core hiding (collectAllVars)
-import Yhc.Core.FreeVar2
 import Control.Monad
 import Generate
 import qualified Firstify2.Firstify as F2

@@ -1,146 +1,150 @@
 
 module Firstify.Template(
-    isHO, isLambda, isConLambda, lamArity,
-    Template, genTemplate, useTemplate
+    applyTemplate,
+    createTemplate, addTemplate, useTemplate
     ) where
 
-import Yhc.Core hiding (collectAllVars,collectFreeVars,uniqueBoundVars,replaceFreeVars)
+import Yhc.Core hiding (collectAllVars, collectFreeVars)
 import Yhc.Core.FreeVar2
-
-import Data.List
-import Control.Monad
+import Firstify.SpecState
 import Control.Monad.State
 import qualified Data.Map as Map
-
-{-
-SPECIALISE ALGORITHM
-
-Need to generate a specialised version if:
-* f gets called with more arguments than its arity
-* any argument is higher order
-
-The specialised version has:
-* a free variable for each non-ho argument
-* the free variables within a function, for a ho argument
--}
-
-isHO :: CoreExpr -> Bool
-isHO x = isLambda x || isConLambda x
+import Data.Maybe
+import Data.List
+import Debug.Trace
+import Firstify.Terminate
 
 
-isLambda :: CoreExpr -> Bool
-isLambda (CoreLet _ x) = isLambda x
-isLambda (CoreLam _ _) = True
-isLambda (CoreCase x ys) = any (isLambda . snd) ys
-isLambda _ = False
+
+applyTemplate :: CoreExpr -> Spec CoreExpr
+applyTemplate x = do
+    t <- createTemplate x
+    case t of
+        Nothing -> return x
+        Just y -> do
+            func <- getFunc (templateName y)
+            if isCoreFunc $ snd func then do
+                addTemplate y
+                useTemplate y x
+             else
+                return x
 
 
-isConLambda :: CoreExpr -> Bool
-isConLambda (CoreLet _ x) = isConLambda x
-isConLambda (CoreCase x ys) = any (isConLambda . snd) ys
-isConLambda (CoreApp (CoreCon _) args) = any isLambda args
-isConLambda _ = False
+createTemplate :: CoreExpr -> Spec (Maybe Template)
+createTemplate (CoreApp (CoreFun name) args) = do
+        (ar,fn) <- getFunc name
+        let valid targs = length args > coreFuncArity fn || not (all isTempNone targs)
 
-
-lamArity :: CoreExpr -> Int
-lamArity (CoreLet _ x) = lamArity x
-lamArity (CoreLam xs x) = length xs + lamArity x
-lamArity (CoreCase x ys) = maximum $ map (lamArity . snd) ys
-lamArity _ = 0
-
-
-data Template = Template [CoreExpr]
-                deriving (Eq,Ord,Show)
-
-
--- given a call to this function, with the given arguments
--- return Just (Template, [Args]) if you want to make it a new call
-useTemplate :: CoreFunc -> [CoreExpr] -> Maybe (Template, [CoreExpr])
-useTemplate func xs | isCoreFunc func && nxs >= ar && (nxs > ar || any isHO xs)
-        = Just (Template ts, concat xs2)
+        targs <- mapM f args
+        if not (valid targs)
+            then return Nothing
+            else do
+                t <- weakenTemplate $ TemplateApp name targs
+                case t of
+                    Just t@(TemplateApp _ targs) | valid targs -> return $ Just t
+                    _ -> return Nothing
     where
-        nxs = length xs
-        ar = length $ coreFuncArgs func
-        
-        (ts,xs2) = unzip $ map f xs
+        f (CoreFun x) = f (CoreApp (CoreFun x) [])
+        f (CoreApp (CoreFun x) xs) = do
+            Arity i dat <- getArity x
+            b <- isSpecData
+            return $ if i > length xs || (b && dat)
+                then TempApp x (length xs)
+                else TempNone
 
-        f x | isHO x    = (normVars x  , map CoreVar $ collectFreeVars x)
-            | otherwise = (CoreVar "v1", [x])
+        f (CoreApp (CoreCon x) xs) = do
+            b <- isSpecData
+            xs2 <- mapM f xs
+            return $ if not b && all isTempNone xs2 then TempNone else TempCon x xs2
 
-useTemplate _ _ = Nothing
+        f x = return TempNone
 
-
-
-genTemplate :: Template -> CoreFunc -> CoreFuncName -> CoreFunc
-genTemplate (Template xs) (CoreFunc _ args body) newname = CoreFunc newname (concat args2) body2
+createTemplate (CoreCase on alts) | isCoreFun name = do
+        b <- isSpecData
+        (_,func) <- getFunc $ fromCoreFun name
+        if b && isCoreFunc func
+            then weakenTemplate $ TemplateCase (fromCoreFun name) (length onargs) (map f alts)
+            else return Nothing
     where
-        (norm,extra) = splitAt (length args) reps
-        (args2,reps) = runFreeVars $ do deleteVars (concatMap collectAllVars (body:xs))
-                                        mapAndUnzipM f xs
-        
-        body2 = coreApp (replaceFreeVars (zip args norm) body) extra
+        (name,onargs) = fromCoreApp on
+    
+        f (CoreVar _, y) = ("", TempNone)
+        f (CoreCon x, y) = (x,  TempNone)
+        f (CoreApp (CoreCon x) [], y) = f (CoreCon x, y)
+        f (CoreApp (CoreCon x) xs, CoreApp (CoreFun y) ys) | xs `isSuffixOf` ys = (x, TempApp y (length ys - length xs))
+        f x = error $ "createTemplate, " ++ show (CoreCase on alts) ++ " gives rise to: " ++ show x
 
-        -- return the arguments you require, and the expression you are    
-        f :: CoreExpr -> FreeVar ([CoreVarName], CoreExpr)
-        f x = do
-            let free = collectFreeVars x
-            vs <- replicateM (length $ collectFreeVars x) getVar
-            return (vs, replaceFreeVars (zip free $ map CoreVar vs) x)
+createTemplate _ = return Nothing
 
 
 
--- for all equivalent expressions
--- irrelevant of free or bound var names, alpha rename to the same thing
-
-
-data Stat = Stat {statFree :: Int, statBound :: Int, seenFree :: Map.Map String String}
-
-normVars :: CoreExpr -> CoreExpr
-normVars x = evalState (f Map.empty x) (Stat 1 1 Map.empty)
+useTemplate :: Template -> CoreExpr -> Spec CoreExpr
+useTemplate t@(TemplateApp name args) (CoreApp (CoreFun n) xs) | n == name = do
+        newname <- return . fromJust . Map.lookup t . template =<< get
+        return $ CoreApp (CoreFun newname) (concat $ fs args xs)
     where
-        getF x = do s <- get
-                    case Map.lookup x (seenFree s)  of
-                        Nothing -> do
-                            let new = 'f' : show (statFree s)
-                            put s{statFree = statFree s + 1
-                                 ,seenFree = Map.insert x new (seenFree s)}
-                            return new
-                        Just y -> return y
+        fs [] [] = []
+        fs (x:xs) (y:ys) = f x y : fs xs ys
 
-        getB = do s <- get
-                  put s{statBound = statBound s + 1}
-                  return $ 'b':show (statBound s)
+        f TempNone x = [x]
+        f (TempApp a b) (CoreApp (CoreFun x) xs) | a == x && length xs == b = xs
+        f ab (CoreFun x) = f ab (CoreApp (CoreFun x) [])
+        f (TempCon a b) (CoreApp (CoreCon x) xs) | a == x = concat $ fs b xs
 
-        f mp (CoreVar x) =
-            case Map.lookup x mp of
-                Nothing -> liftM CoreVar (getF x)
-                Just y -> return $ CoreVar y
-        
-        f mp (CoreCase on alts) = do
-                on2 <- f mp on
-                alts2 <- mapM g alts
-                return $ CoreCase on2 alts2
-            where
-                g (CoreVar lhs,rhs) = do
-                    l <- getB
-                    r <- f (Map.insert lhs l mp) rhs
-                    return (CoreVar l, r)
-                
-                g (CoreApp c lhs,rhs) = do
-                    l <- replicateM (length lhs) getB
-                    r <- f (Map.union (Map.fromList $ zip (map fromCoreVar lhs) l) mp) rhs
-                    return (CoreApp c (map CoreVar l), r)
+useTemplate t@(TemplateCase name args alts) (CoreCase on alt) | app == name = do
+        newname <- return . fromJust . Map.lookup t . template =<< get
+        return $ CoreApp (CoreFun newname) (concat (zipWith f alts alt) ++ args)
+    where
+        (CoreFun app,args) = fromCoreApp on
 
-        f mp (CoreLet bind xs) = do
-                bs <- replicateM (length bind) getB
-                xs2 <- f (Map.union (Map.fromList $ zip (map fst bind) bs) mp) xs
-                return $ CoreLet (zip bs $ map snd bind) xs2
+        f (_,TempNone) (_,x) = [x]
+        f (_,TempApp _ n) (_,CoreApp (CoreFun _) xs) = take n xs
 
-        f mp (CoreLam x xs) = do
-                bs <- replicateM (length x) getB
-                xs2 <- f (Map.union (Map.fromList $ zip x bs) mp) xs
-                return $ CoreLam bs xs2
-        
-        f mp x = do
-            xs2 <- mapM (f mp) (getChildrenCore x)
-            return $ setChildrenCore x xs2
+
+genTemplate :: CoreFuncName -> Template -> Spec CoreFunc
+genTemplate newname (TemplateApp oldname tempargs) = do
+        (_, func@(CoreFunc _ oldargs oldbody)) <- getFunc oldname
+        let args = runFreeVars $ deleteVars (oldargs ++ collectAllVars oldbody) >> mapM f tempargs
+            vars = concatMap collectAllVars args
+            (extra,newbody) = coreInlineFuncLambda func args
+        return $ CoreFunc newname (vars ++ extra) newbody
+    where
+        f :: TempArg -> FreeVar CoreExpr
+        f TempNone = getVar >>= return . CoreVar
+        f (TempCon c xs) = mapM f xs >>= return . CoreApp (CoreCon c)
+        f (TempApp a i) = replicateM i (liftM CoreVar getVar) >>= return . CoreApp (CoreFun a)
+
+genTemplate newname (TemplateCase oldname extra alts) = do
+        (_, func@(CoreFunc _ oldargs oldbody)) <- getFunc oldname
+        cr <- liftM core get
+        let (CoreCase on2@(CoreApp _ vars2) alts2) = runFreeVars $ deleteVars (oldargs ++ collectAllVars oldbody) >> f cr
+            vars = collectFreeVars (CoreCase (CoreFun "") alts2) ++ collectFreeVars on2
+            bod2 = CoreCase (fromJust $ coreInlineFunc func vars2) alts2
+        return $ CoreFunc newname vars bod2
+    where
+        f :: Core -> FreeVar CoreExpr
+        f cr = do
+            a <- replicateM extra getVar
+            b <- mapM (g cr) alts
+            return $ CoreCase (CoreApp (CoreFun oldname) (map CoreVar a)) b
+
+        g :: Core -> (CoreCtorName,TempArg) -> FreeVar (CoreExpr,CoreExpr)
+        g cr (c,TempNone) = do
+            i <- getVar
+            return (if null c then CoreVar "_" else CoreCon c, CoreVar i)
+        g cr (c,TempApp fn i) = do
+            j <- replicateM i getVar
+            k <- replicateM (length $ coreCtorFields $ coreCtor cr c) getVar
+            return (CoreApp (CoreCon c) (map CoreVar k), CoreApp (CoreFun fn) (map CoreVar $ j ++ k))
+
+
+addTemplate :: Template -> Spec ()
+addTemplate t = do
+    s <- get
+    when (not $ Map.member t (template s)) $ do
+        let newname = uniqueJoin (templateName t) (uid s)
+        newfunc <- genTemplate newname t
+        put $ s{uid = uid s + 1
+               ,info = Map.insert newname (Arity 0 False,newfunc) (info s)
+               ,template = Map.insert t newname (template s)
+               }

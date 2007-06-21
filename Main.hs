@@ -4,7 +4,7 @@ module Main where
 import Yhc.Core hiding (collectAllVars)
 import Control.Monad
 import Generate
-import Firstify2.Firstify
+import Firstify.Firstify
 import Report
 import Data.List
 import System.Directory

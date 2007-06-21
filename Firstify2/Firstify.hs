@@ -2,7 +2,6 @@
 module Firstify2.Firstify where
 
 import Yhc.Core
-import Unique
 import Firstify2.SpecExpr
 import Firstify2.SpecState
 import Control.Monad.State
@@ -26,7 +25,7 @@ firstifyDataPrepare :: Core -> Core
 firstifyDataPrepare core2 = core{coreFuncs = newfuncs ++ oldfuncs}
     where
         core = transformExpr simp $ coreSimplify core2
-        (oldfuncs,(uid,newfuncs)) = runState (mapM f $ coreFuncs core) (uniqueFuncsMin core,[])
+        (oldfuncs,(uid,newfuncs)) = runState (mapM f $ coreFuncs core) (uniqueFuncsNext core,[])
 
         f (CoreFunc name args body) = liftM (CoreFunc name args) $ transformM (g name) body
         f x = return x
@@ -36,7 +35,7 @@ firstifyDataPrepare core2 = core{coreFuncs = newfuncs ++ oldfuncs}
         
         h name (CoreApp (CoreCon c) args, rhs) | not $ null args = do
             (uid,fs) <- get
-            let newname = uniqueName name uid
+            let newname = uniqueJoin name uid
                 vars = map fromCoreVar args
                 free = collectFreeVars rhs \\ vars
                 newargs = free ++ vars

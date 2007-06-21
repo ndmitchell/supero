@@ -10,7 +10,6 @@ import qualified Firstify2.Firstify as F2
 import Church
 import Report
 import Data.List
-import Unique
 import System.Directory
 import System.Environment
 

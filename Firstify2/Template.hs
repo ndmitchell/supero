@@ -5,7 +5,6 @@ module Firstify2.Template(
     ) where
 
 import Yhc.Core hiding (collectAllVars, collectFreeVars)
-import Unique
 import Yhc.Core.FreeVar2
 import Firstify2.SpecState
 import Control.Monad.State
@@ -143,7 +142,7 @@ addTemplate :: Template -> Spec ()
 addTemplate t = do
     s <- get
     when (not $ Map.member t (template s)) $ do
-        let newname = uniqueName (templateName t) (uid s)
+        let newname = uniqueJoin (templateName t) (uid s)
         newfunc <- genTemplate newname t
         put $ s{uid = uid s + 1
                ,info = Map.insert newname (Arity 0 False,newfunc) (info s)

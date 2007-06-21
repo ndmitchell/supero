@@ -5,7 +5,6 @@ import Yhc.Core hiding (collectAllVars)
 import Yhc.Core.FreeVar2
 import Control.Monad.State
 import Data.Maybe
-import Unique
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -119,7 +118,7 @@ specMain specData coreExpr core = fromCoreFuncMap core $ Map.map snd $ info $ ex
     where
         fm = toCoreFuncMap core
         s0 = SpecState [] (Map.map g fm) Set.empty Set.empty Map.empty
-                       (uniqueFuncsMin core) core specData coreExpr
+                       (uniqueFuncsNext core) core specData coreExpr
 
         g x = (Arity (coreFuncArity x) False,x)
 

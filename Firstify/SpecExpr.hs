@@ -7,6 +7,7 @@ import Firstify.SpecState
 import Firstify.Template
 
 import Data.Maybe
+import Data.List
 
 
 specExpr :: CoreExpr -> Spec CoreExpr
@@ -32,5 +33,16 @@ spec cont o@(CoreApp (CoreFun x) xs) = do
 spec cont x@(CoreCase on alts) | isCoreFun $ fst $ fromCoreApp on = do
     res <- applyTemplate x
     duplicateExpr res
+
+spec cont x@(CoreLet bind bod) = do
+    b <- isSpecData
+    sats <- mapM isSat bind
+    if b || and sats then return x else do
+        let (sat,unsat) = partition fst (zip sats bind)
+        transformM cont $ coreLet (map snd sat) $ replaceFreeVars (map snd unsat) bod
+    where
+        isSat (lhs,CoreFun name) = isSaturated name []
+        isSat (lhs,CoreApp (CoreFun name) args) = isSaturated name args
+        isSat _ = return True
 
 spec cont x = return x

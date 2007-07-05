@@ -14,7 +14,7 @@ import System.Environment
 main = do
     [file] <- getArgs
     createDirectoryIfMissing True file
-    core <- loadCore (file ++ ".yca")
+    core <- loadCore ("test/" ++ file ++ "/Example.yca")
     over <- loadCore "library/Overlay.ycr"
     core <- return $ transs $ coreReachable ["main"] $ coreOverlay core over
     output file 1 core

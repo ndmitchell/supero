@@ -12,23 +12,7 @@ import Data.List
 import Debug.Trace
 
 specExpr :: CoreExpr -> Spec CoreExpr
-specExpr x = do
-        res <- specs x
-        let extra = not $ null $ post \\ pre
-            pre = collectFreeVars x
-            post = collectFreeVars res
-        b <- isSpecData
-        () <- if b && not (check res) then trace (show (x,res)) $ return () else return ()
-        if extra then error (show (x,res)) else return res
-
-
-check x = null [() | CoreCase on alts <- universe x, a <- alts, f a]
-    where
-        f (CoreApp _ xs, CoreApp _ ys) = any (`elem` vars) free
-            where
-                vars = map fromCoreVar xs
-                free = concatMap collectFreeVars $ reverse $ drop (length xs) $ reverse ys
-        f _ = False
+specExpr = specs
 
 
 isDull x = isCoreVar x || isCoreCon x || isCorePos x

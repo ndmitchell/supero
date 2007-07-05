@@ -3,6 +3,7 @@ module Firstify.SpecState where
 
 import Yhc.Core hiding (collectAllVars,uniqueBoundVarsCore)
 import Yhc.Core.FreeVar3
+import Yhc.Core.UniqueId
 import Control.Monad.State
 import Data.Maybe
 import qualified Data.Map as Map
@@ -35,6 +36,11 @@ data Guess = Guess CoreFuncName String (FuncInfo -> Spec Bool)
 
 instance Show Guess where
     show (Guess name val _) = name ++ "=" ++ val
+
+
+instance UniqueId SpecState where
+    getId = eid
+    putId i x = x{eid=i}
 
 
 -- the function being called, along with the arguments being passed

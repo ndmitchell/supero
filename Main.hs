@@ -35,9 +35,9 @@ main = do
 
 output file n core = do
     let sn = show n
-    writeFile (file ++ "/" ++ sn ++ "__.hs") $ show core
-    generate  (file ++ "/" ++ sn ++ ".hs"  ) core
-    writeFile (file ++ "/" ++ sn ++ ".html") $ coreHtml core
+    writeFile ("test/" ++ file ++ "/" ++ sn ++ "__.hs") $ show core
+    generate  ("test/" ++ file ++ "/" ++ sn ++ ".hs"  ) core
+    writeFile ("test/" ++ file ++ "/" ++ sn ++ ".html") $ coreHtml core
 
 
 transs = ensureInvariants [ConsecutiveFuncs, NoCorePos, NoRecursiveLet, NoCaseDefaultOne]

@@ -1,0 +1,396 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+        <title>Super Optimisation for Haskell</title>
+        <style type="text/css">
+pre {
+    border: 2px solid gray;
+    padding: 1px;
+    padding-left: 5px;
+    margin-left: 10px;
+    background-color: #eee;
+}
+
+pre.define {
+    background-color: #ffb;
+    border-color: #cc0;
+}
+
+pre.compos {
+    font-style: italic;
+}
+
+body {
+    font-family: sans-serif;
+}
+
+h1, h2, h3 {
+    font-family: serif;
+}
+
+h1 {
+    color: rgb(23,54,93);
+    border-bottom: 1px solid rgb(79,129,189);
+    padding-bottom: 2px;
+    font-variant: small-caps;
+    text-align: center;
+}
+
+a {
+    color: rgb(54,95,145);
+}
+
+h2 {
+    color: rgb(54,95,145);
+}
+
+h3 {
+    color: rgb(79,129,189);
+}
+        </style>
+    </head>
+    <body>
+
+<h1>Super Optimisation for Haskell</h1>
+
+<p style="text-align:right;margin-bottom:25px;">
+    by <a href="http://www.cs.york.ac.uk/~ndm/">Neil Mitchell</a>
+</p>
+
+<p>
+    This document presents a reasoned account of the optimisation technique that is used by the <i>Supero</i> tool. The principles behind the optimisation techniques are discussed, along with practical motivation, and bounds on the power of this optimisation. The rules produced in this document are very similar to Philip Wadlers <a href="http://homepages.inf.ed.ac.uk/wadler/topics/deforestation.html">"Deforestation: transforming programs to eliminate trees"</a>, although was derived independantly, and covers more than merely deforestation.
+</p>
+<p>
+    This document proceeds as follows:
+</p>
+<ol>
+    <li>Introduction to the Yhc.Core language</li>
+    <li>Discussion on the cost of evaluation</li>
+    <li>Sharing and the use of let</li>
+    <li>Local Transformation Rules</li>
+    <li>Global Transformation Rules</li>
+    <li>Examples and Comparison</li>
+    <li>Termination Conditions</li>
+    <li>Performance comparison</li>
+</ol>
+
+<h3>Acknowledgements</h3>
+
+<p>
+    Thanks to Peter A. Jonsson for various discussions about deforestation.
+</p>
+
+
+<h2>Introduction to the Yhc.Core language</h2>
+
+<p>
+    The Yhc.Core language is an untyped, higher-order, lazy functional programming language, which Haskell is automatically transformed to by the Yhc compiler. There are a limited number of features in Yhc.Core, along with various transformations to eliminate some constructs. This document lists the restricted form of Yhc.Core used in the optimiser, which can be automatically generated from full Yhc.Core.
+</p>
+<ul>
+    <li>Functions are at the top level only.</li>
+    <li>Various constants are available, string, integer, float etc - along with primitive operations on them.</li>
+    <li>Case statements, restricted to only match the outer most constructor.</li>
+    <li>Let statements, non recursive - this is a restriction over Yhc.Core.</li>
+    <li>Function calls, including automatic currying.</li>
+    <li>Constructor application, without currying.</li>
+</ul>
+<p>
+    Lots of transformations are already written for Yhc.Core, free variable analysis, strictness analysis, recursive let removal. In addition a Play class is available for Yhc.Core.
+</p>
+
+
+<h2>Cost of evaluation</h2>
+
+<p>
+    Following on from the operational model introduced in the STG machine papers, the costs of evalation in Yhc.Core are:
+</p>
+<ul>
+    <li>Creation of a new cell - a call or a constructor - memory.</li>
+    <li>Evaluation by a case expression - time.</li>
+    <li>Primitives - both time and memory.</li>
+</ul>
+<p>
+    From now on the cost of primitives will be ignored. The question is what transformations can be applied to the program to increase the performance. I will not consider any "leaps of faith" transformations, for example, accumulators are not added. In addition, this transformation scheme will preserve strictness/laziness properties.
+</p>
+<p>
+    Now let us move towards a more information-theory based approach. A program has a certain inherent complexity - a certain cost that must be paid to use this algorithm on the input data. The actual program must pay at least this price, but typically will end up paying more. The question is where does this additional cost lie. Is it possible to characterise not the cost of a program, but the excess cost of a program?
+</p>
+<p>
+    One way to characterise this loss of performance is as the places where the program "disguards information". For example (note, in all these examples <tt>main</tt> is considered to be the function being evaluated as the program):
+</p>
+<pre>
+main = not True
+
+not x = case x of
+            True -> False
+            False -> True
+</pre>
+<p>
+    In the above example <tt>main</tt> has called <tt>not</tt>, and within the scope of <tt>main</tt> extra information is know. It is possible to rewrite this, using curly braces, to show where information is "lost".
+</p>
+<pre>
+main = not {True}
+
+not x = case x of
+            True -> False
+            False -> True
+</pre>
+<p>
+    Another example where information is lost is:
+</p>
+<pre>
+main = case {f} of
+            True -> False
+            False -> True
+
+f = True
+</pre>
+<p>
+    Here information is lost which would have allowed the elimination of a case statement. This would have in turn allowed the elimination of the memory to allocate <tt>f</tt>.
+</p>
+
+<h3>Cost of Excess Evaluation</h3>
+
+<p>
+    Excess evaluation can only occur within braces, hence eliminating braces will produce a faster program, and the number of braces corresponds to the excess cost. Note that each pair of braces will not have the same cost - some may actually not represent any excess cost, some may be very expensive.
+</p>
+<p>
+    An evaluation brace pair must be inserted in the following places:
+</p>
+<pre class="define">
+f ... (g ...) ... = f ... {g ...} ...
+f ... (C ...) ... = f ... {C ...} ...
+f ... x ... x ... = f ... {x} ... {x} ...
+case (f ...) of = case {f ...} of
+</pre>
+<p>
+    Where <tt>f</tt> and <tt>g</tt> are functions, <tt>C</tt> is a constructor and <tt>x</tt> is a variable.
+</p>
+<p>
+    This definition actually hides one cost, the cost of function calls. For example:
+</p>
+<pre>
+main x = f x
+f x = g x
+g x = x
+</pre>
+<p>
+    This program will take more memory and more time than the corresponding <tt>main x = x</tt> program. Note that no case expressions will be saved, and no fewer data constructors will be created, but this still is an excessive cost. This situation can be resolved by standard inlining, performed after the optimisation given here.
+</p>
+
+<h2>Sharing and let</h2>
+
+<p>
+    One thing to note is that in the following example:
+</p>
+<pre>
+main y = let y = g x in f y || h y
+</pre>
+<p>
+    There is additional information in <tt>main</tt> about <tt>y</tt>, and unless specialised instances of <tt>f</tt> and <tt>h</tt> are generated, then information is lost. However, to generate specialised versions of both may mean that <tt>g x</tt> is computed twice.
+</p>
+<p>
+    The guiding principle is to optimise the code, and therefore, in this case, <tt>f</tt> is not further specialised. If a let-bound expression is used only once down each branch of the code, then this is inlined within the program, which may lead to brace pairs being introduced, and further simplification. This is usually referred to as a variable being linearity.
+</p>
+
+
+<h2>Local Transformation Rules</h2>
+
+<p>
+    Taking a look at Figure 4 in Wadler's paper, the rules can be classified into 3 distinct sets.
+</p>
+<ul>
+    <li>Movement through the tree, 1,2,4 - these are not required by my program, as the Play class captures this pattern.</li>
+    <li>Local transformations, 5,7 - these are presented next.</li>
+    <li>Global transformations, 3,6 - in the case of Walder these are inlining.</li>
+</ul>
+<p>
+    Since the Core language has lets, these must often be moved to allow case statements to occur in the best places. Additional rules are used in the implementation to achieve this, although they are not of any fundamental complexity.
+</p>
+<pre class="define">
+case (C v1..vn) of ... ; C w1..wn -> x ; ....
+ =>
+x[w1..wn/v1..vn]
+
+case (case x of al->ar ; bl->br) c ; d
+ =>
+case x of (al -> case ar of c ; d) (bl -> case br of c ; d)
+</pre>
+
+
+<h2>Global Transformation Rules</h2>
+
+<p>
+    There are two global transformation rules, corresponding to the two places evaluation braces are inserted. A transformation rule is global if it operates outside of one expression - for example, inlining is a global rule. These rules are:
+</p>
+<pre class="define">
+case {f ...} of = case [inline f] of
+f ... {...} ... = f' ... [generate specialised f']
+</pre>
+<p>
+    As a constrast to this, note that Walder uses inline in the second case, and only if a function call is found. This approach always generates a specialised version. Termination is discussed later on.
+</p>
+
+<h3>Inline Inside Case Rule</h3>
+
+<p>
+    The rule about inlining inside of case statements is reasonably natural. The function body is inserted, and all the arguments are frozen into the given values. This may cause new evaluation braces to be created, and this process continues.
+</p>
+
+<h3>Generate Specialised</h3>
+
+<p>
+    The generation of a specialised variant of a function is more complex. A list of which specialised versions exist is maintained, and upon asking for an existing one, the previous one is returned. (Not true, do I want to introduced generalised Haskell?)
+</p>
+<p>
+    To generate a specialised version of a function, the outer-most expression is evaluated one-step. For example, in:
+</p>
+<pre>
+main xs = map {head} xs
+
+map f x = case x of
+              [] -> []
+              (x:xs) -> f x : map f xs
+
+-- specialised
+main xs = map' xs
+
+map' x = case x of
+             [] -> []
+             (x:xs) -> head x : map' xs
+</pre>
+
+<h2>Examples</h2>
+
+<p>
+    A lot of the properties from this transformation system are emergent, rather than being explicitly stated. This section shows some examples of which other techniques are emulated by these rules.
+</p>
+
+<h3>"Inlining"</h3>
+
+<pre>
+main = not {True}
+
+not x = case x of
+            False -> True
+            True -> False
+
+-- generates
+main = not'
+not' = False
+</pre>
+<p>
+    Here the rule of generating a specialised variant of <tt>not</tt> solves the lost complexity. This is the kind of transformation that inlining would acheive in other compilers, but is implemented without inlining.
+</p>
+<pre>
+-- dot == (.) in Haskell
+main = dot {not} {odd}
+dot f g x = f (g x)
+
+-- generates
+main = dot'
+dot' x = not (odd x)
+</pre>
+<p>
+    Again this transformation would be done by inlining <tt>dot</tt> in other compilers, but here it is done by generating a specialised instance. Note that in this case, <tt>main</tt> is actually a function of arity one.
+</p>
+
+<h3>Specialisation</h3>
+
+<pre>
+main xs = map {head} xs
+
+map f x = case x of
+              [] -> []
+              (x:xs) -> f x : map f xs
+
+-- specialised
+main xs = map' xs
+
+map' x = case x of
+             [] -> []
+             (x:xs) -> head x : map' xs
+</pre>
+<p>
+    Here the <tt>head</tt> function is pushed inside main. This is really the obvious consequence of the specialisation rule.
+</p>
+
+<h3>Deforestation</h3>
+
+<pre>
+main f g xs = map f {map g xs}
+
+map f x = case x of
+              [] -> []
+              (x:xs) -> f x : map f xs
+
+-- one step, specialised map
+map' f g x = case {map g x} of
+                 [] -> []
+                 (x:xs) -> f x : map f xs
+
+-- inline the case statement
+map' f g x = case (case x of
+                       [] -> []
+                       (x:xs) -> g x : map g xs)
+                 [] -> []
+                 (x:xs) -> f x : map f xs
+
+-- case/case transformation
+map' f g x = case x of
+                 [] -> []
+                 (x:xs) -> f (g x) : map f {map g xs}
+
+-- specialisation once more
+map' f g x = case x of
+                 [] -> []
+                 (x:xs) -> f (g x) : map' f g xs
+</pre>
+<p>
+    Here the deforestation comes about automatically.
+</p>
+
+<h3>Partial Evaluation</h3>
+
+<pre>
+data Expr = Add Expr Expr
+          | Mul Expr Expr
+          | Val Int
+
+main x y z = eval {Add (Mul (Val x) (Val y)) (Val z)}
+
+eval x = case x of
+             Val i -> i
+             Add x y -> eval x + eval y
+             Mul x y -> eval x * eval y
+
+-- specialise eval
+main x y z = eval' x y z
+
+eval' x y z = eval {Mul (Val x) (Val y)} + eval {Val z}
+
+-- specialise eval'
+eval' x y z = eval2 x y + eval3 z
+
+eval2 x y = eval {Val x} * eval {Val y}
+
+eval3 z = z
+
+-- use the specialised eval3 in eval2
+eval2 x y = eval3 x * eval3 y
+
+-- whole thing
+main x y z = eval' x y z
+eval' x y z = eval2 x y + eval3 z
+eval2 x y = eval3 x * eval3 y
+eval3 z = z
+</pre>
+<p>
+    Note here that partial evaluation has been done.
+</p>
+
+
+    </body>
+</html>

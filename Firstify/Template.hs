@@ -6,6 +6,7 @@ module Firstify.Template(
 
 import Yhc.Core hiding (collectAllVars, collectFreeVars)
 import Yhc.Core.FreeVar2
+import qualified Yhc.Core.FreeVar3 as FV
 import Firstify.SpecState
 import Control.Monad.State
 import qualified Data.Map as Map
@@ -144,7 +145,9 @@ addTemplate t = do
     when (not $ Map.member t (template s)) $ do
         let newname = uniqueJoin (templateName t) (uid s)
         newfunc <- genTemplate newname t
-        put $ s{uid = uid s + 1
-               ,info = Map.insert newname (Arity 0 False,newfunc) (info s)
-               ,template = Map.insert t newname (template s)
-               }
+        newfunc <- FV.uniqueBoundVarsFunc newfunc
+        modify $ \s -> s
+            {uid = uid s + 1
+            ,info = Map.insert newname (Arity 0 False,newfunc) (info s)
+            ,template = Map.insert t newname (template s)
+            }

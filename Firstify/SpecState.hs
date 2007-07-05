@@ -1,8 +1,8 @@
 
 module Firstify.SpecState where
 
-import Yhc.Core hiding (collectAllVars)
-import Yhc.Core.FreeVar2
+import Yhc.Core hiding (collectAllVars,uniqueBoundVarsCore)
+import Yhc.Core.FreeVar3
 import Control.Monad.State
 import Data.Maybe
 import qualified Data.Map as Map
@@ -22,6 +22,7 @@ data SpecState = SpecState
     ,done :: Set.Set CoreFuncName -- those which have been done
     ,template :: Map.Map Template CoreFuncName -- templates created
     ,uid :: Int
+    ,eid :: Int
     ,core :: Core
     ,specData :: Bool -- should you try and specialise data
     
@@ -114,11 +115,13 @@ specFunc name = do
 
 
 specMain :: Bool -> (CoreExpr -> Spec CoreExpr) -> Core -> Core
-specMain specData coreExpr core = fromCoreFuncMap core $ Map.map snd $ info $ execState f s0
+specMain specData coreExpr core_ = fromCoreFuncMap core $ Map.map snd $ info $ execState f s0
     where
+        (core,eid) = runState (uniqueBoundVarsCore core_) 1
+    
         fm = toCoreFuncMap core
         s0 = SpecState [] (Map.map g fm) Set.empty Set.empty Map.empty
-                       (uniqueFuncsNext core) core specData coreExpr
+                       (uniqueFuncsNext core) eid core specData coreExpr
 
         g x = (Arity (coreFuncArity x) False,x)
 

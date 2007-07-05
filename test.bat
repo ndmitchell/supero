@@ -1,16 +1,13 @@
 @echo off
 pushd test\%1
+mkdir obj 2> nul
+mkdir obj\supero 2> nul
+mkdir obj\super 2> nul
 
-del 4.o
-del 4.hi
-del 4.exe
-ghc --make -O2 4.hs -o 4.exe
-type 4.hs | 4.exe
+ghc --make -O2 4.hs -o supero.exe -hidir obj\supero -odir obj\supero
+type 4.hs | supero.exe
 
-del 4.o
-del 4.hi
-del 4.exe
-ghc --make -O0 4.hs -o 4.exe
-type 4.hs | 4.exe
+ghc --make -O0 4.hs -o super.exe -hidir obj\super -odir obj\super
+type 4.hs | super.exe
 
 popd

@@ -4,7 +4,7 @@
 module Overlay where
 
 import System.IO(Handle, hGetContents, hGetChar)
-import Data.Char(ord)
+import Data.Char(ord,chr)
 import Foreign(unsafePerformIO)
 
 
@@ -27,12 +27,13 @@ foreign import primitive global_System'_IO'_stdin  :: handle
 foreign import primitive global_System'_IO'_stdout :: handle
 foreign import primitive global_System'_IO'_stderr :: handle
 
-foreign import primitive token :: a
 
 foreign import primitive global_Data'_Char'_isSpace :: char -> int
 
 
--- IO stuff
+{-
+-- IO Monad Version 1, custom design
+
 data IO a = IO a
 
 global_Prelude'_Prelude'_Monad'_YHC'_Internal'_IO'_return a = IO a
@@ -58,3 +59,55 @@ global_System'_IO'_hPutChar h c =
 foreign import primitive get_char :: token -> Int
 foreign import primitive put_char :: handle -> Int -> Int
 
+-}
+
+-- IO Monad Version 2, GHC's design
+
+type TIO a = State -> NIO a
+
+data NIO a = NIO State a
+data State = State
+
+global_Prelude'_Prelude'_Monad'_YHC'_Internal'_IO'_return a = returnIO a
+global_Prelude'_Prelude'_Monad'_YHC'_Internal'_IO'_'gt'gt a b = bindIO_ a b
+global_Prelude'_Prelude'_Monad'_YHC'_Internal'_IO'_'gt'gt'eq a b = bindIO a b
+global_YHC'_Internal'_unsafePerformIO a = unsafeIO a
+
+foreign import primitive global_realWorld :: State
+
+
+returnIO :: a -> TIO a
+returnIO x s = NIO s x
+
+
+bindIO :: TIO a -> (a -> TIO b) -> TIO b
+bindIO m k s = case m s of
+    NIO news a -> k a news
+
+
+bindIO_ :: TIO a -> TIO b -> TIO b
+bindIO_ m k s = case m s of
+    NIO news a -> k news
+
+
+unsafeIO :: TIO a -> a
+unsafeIO m = case m global_realWorld of
+    NIO news a -> a
+
+
+global_Prelude'_getContents =
+    get_char `bindIO` \c ->
+    if c == -1 then
+        returnIO []
+    else
+        returnIO ((toEnum c :: Char) : unsafeIO global_Prelude'_getContents)
+
+
+-- if we make a primitive IO, it adds a mkIO wrapper, so avoid that
+foreign import primitive get_char :: TIO Int
+
+foreign import primitive global_Prelude_'getChar :: TIO Char
+foreign import primitive global_Prelude_'putChar :: Char -> TIO ()
+
+foreign import primitive global_System'_IO'_hGetChar :: Handle -> TIO Char
+foreign import primitive global_System'_IO'_hPutChar :: Handle -> Char -> TIO ()

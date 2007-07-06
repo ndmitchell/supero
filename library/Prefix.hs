@@ -7,39 +7,20 @@ import System.IO
 import Foreign.C.Types
 
 
--- BEGIN Stolen from Data.ByteString.Base
-#if defined(__GLASGOW_HASKELL__)
 import GHC.Base                 (realWorld#)
-import GHC.IOBase               (IO(IO), unsafePerformIO)
-#else
-import System.IO.Unsafe         (unsafePerformIO)
-#endif
+import GHC.IOBase               (IO(IO), unIO, unsafePerformIO)
 
-{-# INLINE inlinePerformIO #-}
-inlinePerformIO :: IO a -> a
-#if defined(__GLASGOW_HASKELL__)
-inlinePerformIO (IO m) = case m realWorld# of (# _, r #) -> r
-#else
-inlinePerformIO = unsafePerformIO
-#endif
--- END
+main = IO main_generated
 
+overlay_get_char = unIO $ do
+    c <- getchar
+    return $ fromIntegral c
 
-main = main_generated `seq` (return () :: IO ())
-
-overlay_token = 0 :: Int
-
-overlay_put_char h c = inlinePerformIO (hPutChar h (toEnum c) >> return 0)
-overlay_get_char h   = inlinePerformIO (getCharIO h)
+system_IO_hPutChar h c = unIO $ hPutChar h (toEnum c)
 
 foreign import ccall unsafe "stdio.h getchar" getchar :: IO CInt
 foreign import ccall unsafe "ctype.h iswspace" isspace :: CInt -> CInt
 
-
-{-# NOINLINE getCharIO #-}
-getCharIO h = do
-   c <- getchar
-   return $ if c == (-1) then h `seq` (-1) else fromIntegral c
 
 prelude_seq = seq
 
@@ -65,3 +46,25 @@ system_IO_stdout = stdout
 
 data_Char_isSpace c = isspace (toEnum c) /= 0
 
+
+{- OLD PREFIX
+
+inlinePerformIO :: IO a -> a
+inlinePerformIO (IO m) = case m realWorld# of (# _, r #) -> r
+
+main = main_generated `seq` (return () :: IO ())
+
+overlay_get_char = unIO $ do
+    c <- getchar
+    return $ fromIntegral c
+
+overlay_token = 0 :: Int
+
+overlay_put_char h c = inlinePerformIO (hPutChar h (toEnum c) >>
+overlay_get_char h   = inlinePerformIO (getCharIO h)
+
+-# NOINLINE getCharIO #-
+getCharIO h = do
+   c <- getchar
+   return $ if c == (-1) then h `seq` (-1) else fromIntegral c
+-}

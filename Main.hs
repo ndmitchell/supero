@@ -16,7 +16,7 @@ main = do
     createDirectoryIfMissing True file
     core <- loadCore ("test/" ++ file ++ "/Example.yca")
     over <- loadCore "library/Overlay.ycr"
-    core <- return $ transs $ coreReachable ["main"] $ coreOverlay core over
+    core <- return $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
     output file 1 core
 
     putStrLn "Firstifying basic"
@@ -48,3 +48,9 @@ transs = ensureInvariants [ConsecutiveFuncs, NoCorePos, NoRecursiveLet, NoCaseDe
 removeSeq (CoreApp (CoreFun s) [x,y])
     | s == "Prelude.seq" = CoreCase x [(CoreVar "_",y)]
 removeSeq x = x
+
+
+liftMain = applyFuncCore f
+    where
+        f (CoreFunc "main" [] x) = CoreFunc "main" ["real"] (CoreApp x [CoreVar "real"])
+        f x = x

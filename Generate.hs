@@ -10,7 +10,7 @@ import Data.Char
 generate :: FilePath -> Core -> IO ()
 generate output core = do
     src <- readFile "library/Prefix.hs"
-    let body = unlines . tail . lines . show . fixup
+    let body = unlines . tail . lines . show . ghcIO . fixup
     writeFile output (src ++ body core)
 
 
@@ -21,7 +21,7 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
                  ,coreFuncs = concatMap fFunc (coreFuncs core)}
     where
         fData (CoreData name tys ctrs)
-            | "Prelude." `isPrefixOf` name = []
+            | "Prelude." `isPrefixOf` name || "Overlay.NIO" == name = []
             | otherwise = [CoreData (upperName name) tys (map fCtor ctrs)]
 
         fCtor (CoreCtor name fields) = CoreCtor (upperName name) fields
@@ -43,6 +43,14 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
 
         fExpr x = x
 
+
+ghcIO :: Core -> Core
+ghcIO = applyFuncCore (mapUnderCore f)
+    where
+        f (CoreFun "realWorld") = CoreFun "realWorld#"
+        f (CoreApp (CoreCon "Overlay_NIO") [x,y]) = 
+            CoreApp (CoreVar " (#") [x,CoreVar " ,",y,CoreVar " #)"]
+        f x = x
 
 
 rep from to x = if x == from then to else x

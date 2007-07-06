@@ -9,6 +9,7 @@ import Foreign.C.Types
 
 import GHC.Base                 (realWorld#)
 import GHC.IOBase               (IO(IO), unIO, unsafePerformIO)
+import GHC.Prim                 (State#,RealWorld)
 
 main = IO main_generated
 
@@ -21,6 +22,8 @@ system_IO_hPutChar h c = unIO $ hPutChar h (toEnum c)
 foreign import ccall unsafe "stdio.h getchar" getchar :: IO CInt
 foreign import ccall unsafe "ctype.h iswspace" isspace :: CInt -> CInt
 
+typeRealWorld :: State# RealWorld -> State# RealWorld
+typeRealWorld x = x
 
 prelude_seq = seq
 

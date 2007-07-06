@@ -74,6 +74,7 @@ global_Prelude'_Prelude'_Monad'_YHC'_Internal'_IO'_'gt'gt'eq a b = bindIO a b
 global_YHC'_Internal'_unsafePerformIO a = unsafeIO a
 
 foreign import primitive global_realWorld :: State
+foreign import primitive global_typeRealWorld :: State -> State
 
 
 returnIO :: a -> TIO a
@@ -96,7 +97,9 @@ unsafeIO m = case m global_realWorld of
 
 
 interIO :: TIO a -> TIO a
-interIO x = returnIO (unsafeIO x)
+interIO m s = let r = case m (global_typeRealWorld s) of NIO _ res -> res
+              in NIO s r
+-- returnIO (unsafeIO x)
 
 
 global_Prelude'_getContents =

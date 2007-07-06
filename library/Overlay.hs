@@ -95,12 +95,17 @@ unsafeIO m = case m global_realWorld of
     NIO news a -> a
 
 
+interIO :: TIO a -> TIO a
+interIO x = returnIO (unsafeIO x)
+
+
 global_Prelude'_getContents =
     get_char `bindIO` \c ->
     if c == -1 then
         returnIO []
     else
-        returnIO ((toEnum c :: Char) : unsafeIO global_Prelude'_getContents)
+        interIO global_Prelude'_getContents `bindIO` \cs ->
+        returnIO ((toEnum c :: Char) : cs)
 
 
 -- if we make a primitive IO, it adds a mkIO wrapper, so avoid that

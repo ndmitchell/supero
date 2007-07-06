@@ -49,7 +49,7 @@ ghcIO = applyFuncCore (mapUnderCore f)
     where
         f (CoreFun "realWorld") = CoreFun "realWorld#"
         f (CoreApp (CoreCon "Overlay_NIO") [x,y]) = 
-            CoreApp (CoreVar " (#") [x,CoreVar " ,",y,CoreVar " #)"]
+            CoreApp (CoreVar " (#") [x,CoreVar " :: State# RealWorld ,",y,CoreVar " #)"]
         f x = x
 
 

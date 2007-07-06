@@ -82,12 +82,12 @@ returnIO x s = NIO s x
 
 
 bindIO :: TIO a -> (a -> TIO b) -> TIO b
-bindIO m k s = case m s of
+bindIO m k s = case m (global_typeRealWorld s) of
     NIO news a -> k a news
 
 
 bindIO_ :: TIO a -> TIO b -> TIO b
-bindIO_ m k s = case m s of
+bindIO_ m k s = case m (global_typeRealWorld s) of
     NIO news a -> k news
 
 

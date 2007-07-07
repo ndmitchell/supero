@@ -119,3 +119,6 @@ foreign import primitive global_Prelude_'putChar :: Char -> TIO ()
 
 foreign import primitive global_System'_IO'_hGetChar :: Handle -> TIO Char
 foreign import primitive global_System'_IO'_hPutChar :: Handle -> Char -> TIO ()
+
+
+foreign import primitive global_System'_Environment'_getArgs :: TIO [String]

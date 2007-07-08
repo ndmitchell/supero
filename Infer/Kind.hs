@@ -8,8 +8,24 @@ import qualified Data.Map as Map
 
 type Kinds = (Map.Map CoreFuncName Kind, Map.Map CoreVarName Kind)
 
-data Kind = Star | Kind :-> Kind | DataStar | Data | Unknown
+data Kind = Star | Kind :-> Kind | DataFunc | Data
             deriving (Eq,Show)
+
+{-
+
+   C->
+   
+    |
+    |
+    
+    C          ->
+    
+      \      /
+       \    /
+        
+         *
+
+-}
 
 kinds = foldr1 (:->)
 
@@ -36,8 +52,10 @@ kindFunc core (CoreFunc name args body) = do
 
 kindExpr :: Core -> Kind -> CoreExpr -> K Kind
 kindExpr core k (CoreVar x) = tellVar k x
-kindExpr core k (CoreFun x) = tellFunc k x
-kindExpr core k (CoreApp x []) = kindExpr k x
+
+kindExpr core k (CoreFun x) = do
+    r <- askFunc k x
+    return $ combine x k r
 
 kindExpr core k (CoreLet bind x) = do
     mapM_ f bind
@@ -53,12 +71,17 @@ kindExpr core k (CoreCase on alts) = do
     xs <- mapM (kindExpr k . snd) alts
     return $ combines "case" xs
 
-kindExpr core k (CoreApp x ys) = do
-    let (y1,y2) = (init ys, last ys)
+kindExpr core k (CoreApp x []) = kindExpr k x
+
+kindExpr core k (CoreApp x [y]) =
+    b <- kindExpr core Unknown y
     a :-> b <- kindExpr (Unknown :-> k) $ CoreApp x y1
     a <- kindExpr a y2
     return $ a :-> b
 
+kindExpr core k (CoreApp x ys) =
+    kindExpr core k (CoreApp (CoreApp x (init ys)) (last ys))
+    
 kindExpr core k (CoreCon x) = do
     let arity = length $ coreCtorFields $ coreCtor core x
     return $ combine x (kinds (replicate arity Unknown ++ [Data]) k

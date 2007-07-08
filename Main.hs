@@ -19,7 +19,9 @@ main = do
     core <- return $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
     output file 1 core
     
-    output file 9 (evaluate core)
+    output file 4 (evaluate core)
+
+{-
     error "done"
 
     putStrLn "Firstifying basic"
@@ -34,7 +36,7 @@ main = do
     core <- return $ firstifyData core
     output file 4 core
     putStrLn $ unlines $ report core
-
+-}
 
 output file n core = do
     let sn = show n

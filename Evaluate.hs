@@ -85,10 +85,15 @@ normalise x = do
     s <- get
     return $ flip evalState (1 :: Int) $ do
 
-        -- first lift out all primitive bindings
+        -- first lift out all primitive bindings which:
+        -- 1) depend only on free variables (for correctness)
+        -- 2) are fully saturated (for first order)
         x <- return $ transform wrapFun x
         let vars = freeVars 'v' \\ collectAllVars x
-            ps = zip vars [o | o@(CoreApp (CoreFun fn) _) <- universe x, prim s fn]
+            free = collectFreeVars x
+            ps = zip vars [o | o@(CoreApp (CoreFun fn) as) <- universe x, prim s fn
+                             , let uses = collectFreeVars o, all (`elem` free) uses
+                             , coreFuncArity (core s fn) == length as]
         x <- return $ transform (dePrim ps) x
 
         -- next order the free vars and prims in a normal order

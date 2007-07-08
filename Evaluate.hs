@@ -135,7 +135,6 @@ optimise :: CoreExpr -> SS CoreExpr
 optimise x = do
     s <- get
     x <- return $ evalState (uniqueBoundVars x >>= onf s) (1::Int)
-    () <- trace (show x) $ return ()
     optHead x
 
 

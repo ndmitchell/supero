@@ -10,6 +10,7 @@ import Data.List
 import System.Directory
 import System.Environment
 
+import Evaluate
 
 main = do
     [file] <- getArgs
@@ -17,6 +18,9 @@ main = do
     over <- loadCore "library/Overlay.ycr"
     core <- return $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
     output file 1 core
+    
+    output file 9 (evaluate core)
+    error "done"
 
     putStrLn "Firstifying basic"
     core <- return $ firstify core

@@ -14,6 +14,9 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 
+exclude = ["Prelude.Prelude.Prelude.1107.showPosInt"]
+
+
 data S = S {names :: Map.Map CoreExpr CoreFuncName
            ,funcs :: [CoreFunc] -> [CoreFunc] -- difference list to make it lazy
            ,nameId :: Int
@@ -184,8 +187,6 @@ onf s x = f x
                     f $ _let $ _case $ _app $ CoreLam args body
                 _ -> return o
 
-
-exclude = ["Prelude.Prelude.Prelude.1107.showPosInt"]
 
 
 unwrapLet (CoreLet x y) = (CoreLet x,y)

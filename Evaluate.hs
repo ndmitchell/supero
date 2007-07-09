@@ -154,12 +154,15 @@ optimise x = do
 optHead :: CoreExpr -> SS CoreExpr
 optHead x = do
         s <- get
-        case x of
+        (bind,x) <- return $ fromCoreLet x
+        x <- case x of
             CoreCase on alts -> do
                 on <- f s on
                 alts <- liftM (zip (map fst alts)) $ mapM (f s . snd) alts
                 return $ CoreCase on alts
             _ -> descendM (f s) x
+        bind <- liftM (zip (map fst bind)) $ mapM (f s . snd) bind
+        return $ coreLet bind x
     where
         f s (CoreApp (CoreFun x) xs) | prim s x = liftM (CoreApp (CoreFun x)) (mapM (f s) xs)
         f s x | isRoot s x = descendM (f s) x

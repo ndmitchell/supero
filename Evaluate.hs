@@ -14,6 +14,19 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 
+evaluate :: Core -> Core
+evaluate = coreFix . eval  . inlineLambda . eval
+
+inlineLambda core = transformExpr f core
+    where
+        names = Map.fromList [(name,CoreLam args body)
+                | (CoreFunc name args body) <- coreFuncs core, isCoreLam body]
+
+        f (CoreFun x) = Map.findWithDefault (CoreFun x) x names
+        f x = x
+
+
+
 exclude = ["Prelude.Prelude.Prelude.1107.showPosInt"]
 
 
@@ -30,8 +43,8 @@ coreFix = coreReachable ["main"] . coreInline InlineCallOnce
 
 type SS a = State S a
 
-evaluate :: Core -> Core
-evaluate core = coreFix $ core{coreFuncs = prims ++ funcs s []}
+eval :: Core -> Core
+eval core = core{coreFuncs = prims ++ funcs s []}
     where
         s = execState f s0
         s0 = S Map.empty id 1 (coreFuncMap fm) (`Set.member` primsSet)

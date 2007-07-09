@@ -27,7 +27,9 @@ inlineLambda core = transformExpr f core
 
 
 
-exclude = ["Prelude.Prelude.Prelude.1107.showPosInt"]
+exclude = ["Prelude.Prelude.Prelude.1107.showPosInt"
+          ,"Prelude.Prelude.Prelude.1108.showPosInt"
+          ,"Prelude.Prelude.Prelude.1111.showPosInt"]
 
 
 data S = S {names :: Map.Map CoreExpr CoreFuncName

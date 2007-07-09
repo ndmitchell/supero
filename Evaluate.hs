@@ -20,7 +20,7 @@ evaluate = coreFix . eval . inlineLambda . eval
 inlineLambda core = transformExpr f core
     where
         names = Map.fromList [(name,CoreLam args body)
-                | (CoreFunc name args body) <- coreFuncs core, isCoreLam body]
+                | (CoreFunc name args body) <- coreFuncs core, isCoreLam body || isCoreInt body]
 
         f (CoreFun x) = Map.findWithDefault (CoreFun x) x names
         f x = x

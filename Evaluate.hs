@@ -3,7 +3,7 @@ module Evaluate(evaluate) where
 
 import Yhc.Core hiding (
     uniqueBoundVarsCore, uniqueBoundVarsFunc, uniqueBoundVars,
-    collectAllVars, collectFreeVars)
+    collectAllVars, collectFreeVars, replaceFreeVars)
 import Yhc.Core.FreeVar3
 import Debug.Trace
 
@@ -180,7 +180,7 @@ onf :: S -> CoreExpr -> State Int CoreExpr
 onf s x = f x
     where
         f x = do
-            x <- coreSimplifyExprUnique x
+            x <- coreSimplifyExprUniqueExt onfExt x
             let o = x
             (_let , x) <- return $ unwrapLet  x
             (_case, x) <- return $ unwrapCase x
@@ -190,6 +190,22 @@ onf s x = f x
                     CoreFunc _ args body <- uniqueBoundVarsFunc $ core s x
                     f $ _let $ _case $ _app $ CoreLam args body
                 _ -> return o
+
+
+onfExt cont x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase (CoreInt 0) alts) =
+        liftM (CoreCase (CoreVar on)) (mapM f alts)
+    where
+        f (lhs,rhs) = do
+            rhs <- transformM cont $ replaceFreeVars [(on,lhs)] rhs
+            return (lhs,rhs)
+
+onfExt cont (CoreLet bind x) | not $ null lam =
+        transformM cont $ coreLet other $ replaceFreeVars lam x
+    where
+        (lam,other) = partition (isCoreLam . snd) bind
+
+onfExt cont x = return x
+
 
 
 

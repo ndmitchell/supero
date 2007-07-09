@@ -222,8 +222,19 @@ onfExt cont (CoreLet bind x) | not $ null lam =
     where
         (lam,other) = partition (isCoreLam . snd) bind
 
+onfExt cont (CoreApp (CoreFun x) [CoreInt a,CoreInt b])
+        | isJust p = cont $ CoreCon $ if fromJust p a b then "Prelude.True" else "Prelude.False"
+    where
+        p = Map.lookup x intPrims
+
 onfExt cont x = return x
 
+
+intPrims :: Map.Map CoreFuncName (Int -> Int -> Bool)
+intPrims = Map.fromList
+    [("LT_W",(<))
+    ,("GT_W",(>))
+    ]
 
 
 

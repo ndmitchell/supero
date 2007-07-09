@@ -15,7 +15,7 @@ import qualified Data.Set as Set
 
 
 evaluate :: Core -> Core
-evaluate = coreFix . eval  . inlineLambda . eval
+evaluate = coreFix . eval . inlineLambda . eval
 
 inlineLambda core = transformExpr f core
     where

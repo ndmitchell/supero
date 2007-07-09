@@ -1,4 +1,7 @@
 
+/* stop isspace from being inlined */
+#define __NO_CTYPE_INLINES
+
 #include "stdio.h"
 #include "ctype.h"
 

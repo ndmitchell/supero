@@ -9,7 +9,7 @@ mkdir obj\haskell 2> nul
 
 ghc -optc-O3 Example.c -odir obj\c -o c.exe
 
-ghc --make -O2 ExampleSingle.hs -o haskell.exe -hidir obj\haskell -odir obj\haskell
+ghc --make -O2 -fasm ExampleSingle.hs -o haskell.exe -hidir obj\haskell -odir obj\haskell
 
 echo Benchmarking Haskell
 type %data% | timer haskell

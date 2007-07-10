@@ -177,15 +177,6 @@ isRoot s (CoreFun x) | prim s x = True
 isRoot s _ = False
 
 
-isOnf :: S -> CoreExpr -> Bool
-isOnf s (CoreLet _ x) = isOnf s x
-isOnf s (CoreCase x _) = isCoreVar x || isPrim s x
-isOnf s x = isCoreVar x || isPrim s x || isCoreCon (fst $ fromCoreApp x)
-
-isPrim s (CoreApp (CoreFun x) _) = prim s x
-isPrim s (CoreFun x) = prim s x
-isPrim s _ = False
-
 {-
 To acheive ONF need to do standard simplification rules, plus
 if the root is a function, expand it.
@@ -247,73 +238,3 @@ unwrapCase x = (id,x)
 unwrapApp (CoreApp x y) = (flip CoreApp y,x)
 unwrapApp x = (id,x)
 
-
-
-{-    
-        g (CoreFun x) = g (CoreApp (CoreFun x) [])
-
-        g (CoreApp (CoreFun x) xs) = do
-            CoreFunc _ args body <- uniqueBoundVarsFunc $ core s x
-            f $ coreApp (CoreLam args body) xs
-
-        g (CoreCase (CoreFun x) y) = g (CoreCase (CoreApp (CoreFun x) []) y)
-
-        g (Core        
-            
-
-        f (CoreCase o x) = do
-            o <- f o
-            f (CoreCase o x)
--}
-
-
-{-            
-
-
-evalMain :: Core -> State Int Core
-evalMain core = do
-    i <- eval core (coreFuncBody $ coreFunc core "main")
-    error $ show i
-
-
-eval :: Core -> CoreExpr -> State Int CoreExpr
-eval core x = case x of
-    CoreApp x y -> do
-        x <- cont x
-        case x of
-            CoreApp x1 x2 -> cont $ CoreApp x1 (x2++y)
-            _ -> error $ show ("app here",x)
-
-    _ -> error $ show ("end",x)
-    
-    where
-        cont = eval core
--}
-{-
-
-    CoreCase on alts -> do
-        i <- 
-    
-        
-        f x
-    where
-        f (CoreCase on alts) = do
-            i <- eval 
-    
-        func = isCoreFunc . coreFunc core
--}    
-{-
-        f (CoreCase (CoreApp (CoreFun fn) _) ((_,rhs):_)) | not $ func fn = f rhs
-        
-        f (CoreApp (CoreFun fn) xs) | func fn = uncurry coreLam $ coreInlineFuncLambda (coreFunc core fn) xs
-        f (CoreFun fn) = f (CoreApp (CoreFun fn) [])
-        f o@(CoreCase x y) | isCoreCon $ fst $ fromCoreApp x = coreSimplifyCaseCon o
-        f o@(CoreCase (CoreCase x y) z) = coreSimplifyCaseCase o
-        f (CoreApp (CoreApp x y) z) = f $ CoreApp x (y++z)
-        f (CoreApp (CoreCase x y) z) = CoreCase x [(a,CoreApp b z) | (a,b) <- y]
-        f (CoreCase x y) = CoreCase (f x) y
-        
-        
-        f x = error $ show x
-
--}

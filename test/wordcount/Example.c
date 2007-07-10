@@ -1,6 +1,7 @@
 
-/* stop isspace from being inlined */
-#define __NO_CTYPE_INLINES
+#define __NO_CTYPE_INLINES /* stop inlining for isspace() */
+#define _MT /* stop inlining for getchar() */
+
 
 #include "stdio.h"
 #include "ctype.h"

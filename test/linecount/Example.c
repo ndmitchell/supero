@@ -1,4 +1,6 @@
 
+#define _MT /* stop inlining for getchar() */
+
 #include "stdio.h"
 
 int main()

@@ -13,6 +13,9 @@ import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import qualified Data.IntSet as IntSet
+import Data.IntSet(IntSet)
+
 
 evaluate :: Core -> Core
 evaluate = coreFix . eval . inlineLambda . eval
@@ -63,12 +66,12 @@ addFunc x = modify $ \s -> s{funcs = funcs s . (x:)}
 
 tieFunc :: CoreFunc -> SS ()
 tieFunc (CoreFunc name args body) = do
-    body <- tie body
+    body <- tie IntSet.empty body
     addFunc (CoreFunc name args body)
 
 
-tie :: CoreExpr -> SS CoreExpr
-tie x = do
+tie :: IntSet -> CoreExpr -> SS CoreExpr
+tie seen x = do
     (args,CoreFunc _ params x) <- normalise x
     key <- represent x
     s <- get
@@ -80,10 +83,10 @@ tie x = do
                 Nothing -> do
                     name <- getName x
                     modify $ \s -> s{names = Map.insert key name (names s)}
-                    x <- optimise x
+                    x <- optimise seen x
                     addFunc (CoreFunc name params x)
                     return name
-            liftM (CoreApp (CoreFun name)) $ mapM optHead args
+            liftM (CoreApp (CoreFun name)) $ mapM (optHead seen) args
     where
         getName x = do
             s <- get
@@ -157,15 +160,15 @@ onf = let bind in onf
     | con
 -}
 
-optimise :: CoreExpr -> SS CoreExpr
-optimise x = do
+optimise :: IntSet -> CoreExpr -> SS CoreExpr
+optimise seen x = do
     s <- get
-    x <- return $ evalState (uniqueBoundVars x >>= onf s) (1::Int)
-    optHead x
+    (seen,x) <- return $ evalState (uniqueBoundVars x >>= onf s seen) (1::Int)
+    optHead seen x
 
 
-optHead :: CoreExpr -> SS CoreExpr
-optHead x = do
+optHead :: IntSet -> CoreExpr -> SS CoreExpr
+optHead seen x = do
         s <- get
         (bind,x) <- return $ fromCoreLet x
         x <- case x of
@@ -180,7 +183,7 @@ optHead x = do
     where
         f s (CoreApp (CoreFun x) xs) | prim s x = liftM (CoreApp (CoreFun x)) (mapM (f s) xs)
         f s x | isRoot s x = descendM (f s) x
-              | otherwise  = tie x
+              | otherwise  = tie seen x
 
 
 isRoot :: S -> CoreExpr -> Bool
@@ -197,10 +200,10 @@ Functions may be wrapped in case, or in let.
 -}
 
 
-onf :: S -> CoreExpr -> State Int CoreExpr
-onf s x = f x
+onf :: S -> IntSet -> CoreExpr -> State Int (IntSet,CoreExpr)
+onf s seen x = f seen x
     where
-        f x = do
+        f seen x = do
             x <- coreSimplifyExprUniqueExt onfExt x
             let o = x
             (_let , x) <- return $ unwrapLet  x
@@ -209,9 +212,9 @@ onf s x = f x
             case x of
                 CoreFun x | not (prim s x) && name `notElem` exclude -> do
                     CoreFunc _ args body <- uniqueBoundVarsFunc $ core s name
-                    f $ _let $ _case $ _app $ CoreLam args body
+                    f (IntSet.insert num seen) $ _let $ _case $ _app $ CoreLam args body
                         where (num,name) = splitFuncName x
-                _ -> return o
+                _ -> return (seen,o)
 
 
 onfExt cont x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase (CoreInt 0) alts) =

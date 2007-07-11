@@ -49,12 +49,13 @@ eval :: Core -> Core
 eval core = core{coreFuncs = prims ++ funcs s []}
     where
         s = execState f s0
-        s0 = S Map.empty id 1 (coreFuncMap fm) (`Set.member` primsSet)
+        s0 = S Map.empty id 1 (coreFuncMap fm) isPrim
         f = mapM_ tieFunc [func | name <- "main":exclude, Just func <- [coreFuncMapMaybe fm name]]
 
-        fm = toCoreFuncMap core
+        fm = toCoreFuncMap $ nameFuns isPrim core
         prims = filter isCorePrim (coreFuncs core)
         primsSet = Set.fromList $ map coreFuncName prims
+        isPrim = flip Set.member primsSet
 
 
 addFunc :: CoreFunc -> SS ()
@@ -69,15 +70,16 @@ tieFunc (CoreFunc name args body) = do
 tie :: CoreExpr -> SS CoreExpr
 tie x = do
     (args,CoreFunc _ params x) <- normalise x
+    key <- represent x
     s <- get
     case x of
         CoreVar y -> return $ head args
         _ -> do
-            name <- case Map.lookup x (names s) of
+            name <- case Map.lookup key (names s) of
                 Just name -> return name
                 Nothing -> do
                     name <- getName x
-                    modify $ \s -> s{names = Map.insert x name (names s)}
+                    modify $ \s -> s{names = Map.insert key name (names s)}
                     x <- optimise x
                     addFunc (CoreFunc name params x)
                     return name
@@ -86,12 +88,20 @@ tie x = do
         getName x = do
             s <- get
             put $ s{nameId = nameId s + 1}
-            return $ uniqueJoin (f x) (nameId s)
+            return $ uniqueJoin (f s x) (nameId s)
 
-        f (CoreFun x) = x
-        f (CoreApp x y) = f x
-        f _ = "f"
+        f s (CoreFun x) | not $ prim s x = snd $ splitFuncName x
+        f s (CoreApp x y) = f s x
+        f s _ = "f"
 
+
+represent :: CoreExpr -> SS CoreExpr
+represent x = do
+    s <- get
+    return $ transform (f s) x
+    where
+        f s (CoreFun x) | not $ prim s x = CoreFun $ snd $ splitFuncName x
+        f s x = x
 
 -- lift out all primitives to the top level
 -- name the variables so they are in normal form
@@ -106,9 +116,10 @@ normalise x = do
         x <- return $ transform wrapFun x
         let vars = freeVars 'v' \\ collectAllVars x
             free = collectFreeVars x
-            ps = zip vars [o | o@(CoreApp (CoreFun fn) as) <- universe x, prim s fn
+            ps = zip vars [o | o@(CoreApp (CoreFun fn) as) <- universe x
                              , let uses = collectFreeVars o, all (`elem` free) uses
-                             , coreFuncArity (core s fn) == length as]
+                             , prim s fn, coreFuncArity (core s fn) == length as
+                             ]
         x <- return $ transform (dePrim ps) x
 
         -- next order the free vars and prims in a normal order
@@ -162,6 +173,7 @@ optHead x = do
                 on <- f s on
                 alts <- liftM (zip (map fst alts)) $ mapM (f s . snd) alts
                 return $ CoreCase on alts
+            CoreFun x | not $ prim s x -> return $ CoreFun $ snd $ splitFuncName x
             _ -> descendM (f s) x
         bind <- liftM (zip (map fst bind)) $ mapM (f s . snd) bind
         return $ coreLet bind x
@@ -195,9 +207,10 @@ onf s x = f x
             (_case, x) <- return $ unwrapCase x
             (_app , x) <- return $ unwrapApp  x
             case x of
-                CoreFun x | not (prim s x) && x `notElem` exclude -> do
-                    CoreFunc _ args body <- uniqueBoundVarsFunc $ core s x
+                CoreFun x | not (prim s x) && name `notElem` exclude -> do
+                    CoreFunc _ args body <- uniqueBoundVarsFunc $ core s name
                     f $ _let $ _case $ _app $ CoreLam args body
+                        where (num,name) = splitFuncName x
                 _ -> return o
 
 
@@ -237,4 +250,22 @@ unwrapCase x = (id,x)
 
 unwrapApp (CoreApp x y) = (flip CoreApp y,x)
 unwrapApp x = (id,x)
+
+
+
+
+-- name each non primitive call with n:name
+nameFuns :: (CoreFuncName -> Bool) -> Core -> Core
+nameFuns prim core = evalState (transformExprM f core) (1::Int)
+    where
+        f (CoreFun x) | not $ prim x = do
+            i <- get
+            put (i+1)
+            return $ CoreFun $ show i ++ ":" ++ x
+        f x = return x
+
+
+splitFuncName :: CoreFuncName -> (Int,String)
+splitFuncName x = (read a, b)
+    where (a,_:b) = break (== ':') x
 

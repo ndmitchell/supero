@@ -26,7 +26,7 @@ type Env = (Int, IntMap.IntMap (Map.Map CoreFuncName Int))
 -- 1 does not work, since to get the recursion optimised
 --   you need to inline the function, then one recursive call
 -- 2 is still low, but more than 1
-defaultQuota = 3:: Int
+defaultQuota = 6 :: Int
 
 
 emptyEnv :: Env

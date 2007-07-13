@@ -98,6 +98,12 @@ tieFunc (CoreFunc name args body) = do
     addFunc (CoreFunc name args body)
 
 
+size :: CoreExpr -> Int
+size x = foldr max 0 (map size $ children x) + 1
+
+
+seqList x = length x `seq` x
+
 tie :: Env -> CoreExpr -> SS CoreExpr
 tie seen x = do
     (args,CoreFunc _ params x) <- normalise x

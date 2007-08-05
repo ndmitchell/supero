@@ -8,6 +8,7 @@ import Yhc.Core.FreeVar3
 import Debug.Trace
 
 import Control.Monad.State
+import StateFail
 import Data.List
 import Data.Maybe
 
@@ -46,7 +47,7 @@ doneInline (u,e) i s = (u, (u+1, IntMap.insert u new e))
 
 
 evaluate :: Core -> Core
-evaluate = coreFix . eval . inlineLambda . eval
+evaluate = coreFix . eval -- . inlineLambda . eval
 
 inlineLambda core = transformExpr f core
     where
@@ -60,7 +61,8 @@ inlineLambda core = transformExpr f core
 
 exclude = ["Prelude.Prelude.Prelude.1107.showPosInt"
           ,"Prelude.Prelude.Prelude.1108.showPosInt"
-          ,"Prelude.Prelude.Prelude.1111.showPosInt"]
+          ,"Prelude.Prelude.Prelude.1111.showPosInt"
+          ]
 
 
 data S = S {names :: Map.Map CoreExpr CoreFuncName
@@ -68,21 +70,30 @@ data S = S {names :: Map.Map CoreExpr CoreFuncName
            ,nameId :: Int
            ,core :: CoreFuncName -> CoreFunc
            ,prim :: CoreFuncName -> Bool
+           ,skip :: [Int]
            }
 
 coreFix :: Core -> Core
 coreFix = coreReachable ["main"] . coreInline InlineCallOnce
 
 
-type SS a = State S a
+
+type SS a = StateFail S Int a
+
+
+fromRight (Right x) = x
+
 
 eval :: Core -> Core
-eval core = core{coreFuncs = prims ++ funcs s []}
+eval core_orig = core_orig{coreFuncs = prims ++ f s0}
     where
-        s = execState f s0
-        s0 = S Map.empty id 1 (coreFuncMap fm) isPrim
-        f = tieFunc (coreFuncMap fm "main")
+        core = annotate isPrim core_orig
 
+        f s = case sfRun (tieFunc (coreFuncMap fm "main")) s of
+                  Left i -> f s{skip = i : skip s}
+                  Right (_,s) -> funcs s []
+
+        s0 = S Map.empty id 1 (coreFuncMap fm) isPrim [41]
         fm = toCoreFuncMap core
         prims = filter isCorePrim (coreFuncs core)
         primsSet = Set.fromList $ map coreFuncName prims
@@ -94,7 +105,7 @@ addFunc x = modify $ \s -> s{funcs = funcs s . (x:)}
 
 tieFunc :: CoreFunc -> SS ()
 tieFunc (CoreFunc name args body) = do
-    body <- tie emptyEnv (annotate 0 body)
+    body <- tie emptyEnv body
     addFunc (CoreFunc name args body)
 
 
@@ -153,11 +164,7 @@ normalise x = do
         x <- return $ transform wrapFun x
         let vars = freeVars 'v' \\ collectAllVars x
             free = collectFreeVars x
-            ps = zip vars [o | o@(CoreApp (CoreFun fn) as) <- universe x
-                             , let (num,name) = splitFuncName fn
-                             , let uses = collectFreeVars o, all (`elem` free) uses
-                             , prim s name, coreFuncArity (core s name) == length as
-                             ]
+            ps = zip vars $ shouldLift s free x
         x <- return $ transform (dePrim ps) x
 
         -- next order the free vars and prims in a normal order
@@ -172,11 +179,21 @@ normalise x = do
         wrapFun (CoreApp (CoreApp x y) z) = CoreApp x (y++z)
         wrapFun x = x
 
-        dePrim ps o@(CoreApp (CoreFun fn) xs) =
+        dePrim ps o =
             case lookupRev o ps of
                 Nothing -> o
                 Just y -> CoreVar y
         dePrim ps x = x
+
+        shouldLift s free o@(CoreApp (CoreFun fn) as)
+                | all (`elem` free) uses && prim s name && coreFuncArity (core s name) == length as
+                = [o]
+            where
+                (num,name) = splitFuncName fn
+                uses = collectFreeVars o
+
+        shouldLift s free xs = concatMap (shouldLift s free) (children xs)
+
 
 
 lookupRev :: Eq key => key -> [(val,key)] -> Maybe val
@@ -245,22 +262,61 @@ Functions may be wrapped in case, or in let.
 -}
 
 
-onf :: S -> Env -> CoreExpr -> State Int (Env,CoreExpr)
-onf s seen x = f seen x
+exprSize :: CoreExpr -> Int
+exprSize = fold (\_ cs -> 1 + maximum (0:cs)) . transform f
     where
-        f seen x = do
+        f (CoreLet bind x) = replaceFreeVars bind x
+        f x = x
+
+
+repeats :: CoreFuncName -> CoreExpr -> [String]
+repeats name = f ["Prelude.:" | name == "Prelude.Prelude.Prelude.1111.showPosInt"] . transform remLet
+    where
+        remLet (CoreLet bind x) = replaceFreeVars bind x
+        remLet x = x
+
+        f seen (CoreApp x xs) = f seen x ++ concatMap (f new) xs
+            where new = seen ++ concatMap g (universe x)
+        f seen (CoreFun x) = [x | snd (splitFuncName x) `elem` seen, snd (splitFuncName x) /= "typeRealWorld"]
+        f seen (CoreCon x) = [x | x `elem` seen]
+        f seen x = concatMap (f seen) (children x)
+
+        g (CoreFun x) = [snd $ splitFuncName x]
+        g (CoreCon x) = [x]
+        g x = []
+
+
+onf :: S -> Env -> CoreExpr -> State Int (Env,CoreExpr)
+onf s seen original = f [] seen original
+    where
+        f done seen x = do
             x <- coreSimplifyExprUniqueExt onfExt x
             let o = x
             (_let , x) <- return $ unwrapLet  x
             (_case, x) <- return $ unwrapCase x
+            let size = exprSize o
+            let x2 = x
             (_app , x) <- return $ unwrapApp  x
             case x of
                 CoreFun x | not (prim s name) ->
-                    if name `notElem` exclude {- canInline seen num name -} then do
+                    --let rep = repeats x $ _let x2 in
+                    --if size > 10 && null rep then
+                    --    error $ show o
+                    if size > 10 then
+                        error $ show o
+                    else if name `notElem` exclude then do
+                        -- () <- if size > 4 then trace ("Inlining at size " ++ show size ++ ", " ++ x) $ return () else return ()
+                        --() <- if size == 8 then error $ show o else return ()
+                        --() <- if rep then trace ("Repeated, " ++ x) (return ()) else return ()
+                        --() <- trace ("Inlining " ++ name) $ return ()
                         (i,seen) <- return $ doneInline seen num name
                         CoreFunc _ args body <- uniqueBoundVarsFunc $ core s name
-                        f seen $ _let $ _case $ _app $ CoreLam args $ annotate i body
+                        r <- f (name:done) seen $ _let $ _case $ _app $ CoreLam args body
+                        --() <- if name `elem` exclude then error $ show $ snd r else return ()
+                        () <- if x `elem` done then error $ show (name,original,_let $ _case $ _app $ CoreFun x) else return ()
+                        return r
                     else
+                        --error $ show o
                         trace ("Skipping " ++ name) $ return (seen,o)
                     where
                         (num,name) = splitFuncName x
@@ -284,6 +340,13 @@ onfExt cont (CoreApp (CoreFun x) [CoreInt a,CoreInt b])
         | isJust p = cont $ CoreCon $ if fromJust p a b then "Prelude.True" else "Prelude.False"
     where
         p = Map.lookup (snd $ splitFuncName x) intPrims
+
+onfExt cont (CoreCase on alts) | isCoreCon a && con `elem` lhs =
+        cont $ CoreCase (coreApp (CoreCon con) b) alts
+    where
+        lhs = [c | CoreCon c <- map (fst . fromCoreApp . fst) alts]
+        con = snd $ splitFuncName $ fromCoreCon a
+        (a,b) = fromCoreApp on
 
 onfExt cont x = return x
 
@@ -314,9 +377,30 @@ splitFuncName x = (read a, b)
     where (a,_:b) = break (== ':') x
 
 
-annotate :: Int -> CoreExpr -> CoreExpr
-annotate i = transform f
+-- annotate each function call with i:...
+annotate :: (CoreFuncName -> Bool) -> Core -> Core
+annotate isPrim core = core{coreFuncs = evalState (mapM g (coreFuncs core)) 0}
     where
-        f (CoreFun x) = CoreFun (show i ++ ":" ++ x)
-        f x = x
+        g x | isCoreFunc x = do
+            bod <- f $ coreFuncBody x
+            return $ x{coreFuncBody=bod}
+        g x = return x
+
+        f (CoreFun x) = do
+            i <- get
+            put (i+1)
+            return $ CoreFun $ show i ++ ":" ++ x
+
+        f (CoreCon x) = do
+            i <- get
+            put (i+1)
+            return $ CoreCon $ show i ++ ":" ++ x
+
+        f (CoreCase on alts) = do
+            on2 <- f on
+            let (lhs,rhs) = unzip alts
+            rhs2 <- mapM f rhs
+            return $ CoreCase on2 (zip lhs rhs2)
+
+        f x = descendM f x
 

@@ -3,6 +3,7 @@ module StateFail where
 
 import Control.Monad.State
 import Control.Monad.Error
+import Yhc.Core.UniqueId
 
 
 type StateFail state failure result = StateT state (Either String) result
@@ -16,3 +17,9 @@ sfRun x state = case runStateT x state of
 
 sfFail :: Show failure => failure -> StateFail state failure result
 sfFail failure = lift $ fail (show failure)
+
+
+instance (Monad m, UniqueId i) => UniqueIdM (StateT i m) where
+    getIdM = liftM getId get
+    putIdM n = modify (putId n)
+

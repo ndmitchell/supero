@@ -8,9 +8,11 @@ import Yhc.Core.FreeVar3
 import Debug.Trace
 
 import Control.Monad.State
+import Control.Arrow
 import StateFail
 import Data.List
 import Data.Maybe
+import Safe
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -45,9 +47,14 @@ doneInline (u,e) i s = (u, (u+1, IntMap.insert u new e))
 
 
 
+preOpt x = transformExpr f x
+    where
+        f (CoreFun "Prelude.otherwise") = CoreCon "Prelude.True"
+        f x = x
+
 
 evaluate :: Core -> Core
-evaluate = coreFix . eval -- . inlineLambda . eval
+evaluate = coreFix . eval . preOpt -- . inlineLambda . eval
 
 inlineLambda core = transformExpr f core
     where
@@ -93,7 +100,7 @@ eval core_orig = core_orig{coreFuncs = prims ++ f s0}
                   Left i -> f s{skip = i : skip s}
                   Right (_,s) -> funcs s []
 
-        s0 = S Map.empty id 1 (coreFuncMap fm) isPrim [41]
+        s0 = S Map.empty id 1 (coreFuncMap fm) isPrim []
         fm = toCoreFuncMap core
         prims = filter isCorePrim (coreFuncs core)
         primsSet = Set.fromList $ map coreFuncName prims
@@ -164,7 +171,7 @@ normalise x = do
         x <- return $ transform wrapFun x
         let vars = freeVars 'v' \\ collectAllVars x
             free = collectFreeVars x
-            ps = zip vars $ shouldLift s free x
+            ps = zip vars $ concatMap (shouldLift x s free) $ universeCase x
         x <- return $ transform (dePrim ps) x
 
         -- next order the free vars and prims in a normal order
@@ -185,14 +192,24 @@ normalise x = do
                 Just y -> CoreVar y
         dePrim ps x = x
 
-        shouldLift s free o@(CoreApp (CoreFun fn) as)
+        shouldLift _ s free o@(CoreApp (CoreFun fn) as)
                 | all (`elem` free) uses && prim s name && coreFuncArity (core s name) == length as
                 = [o]
             where
                 (num,name) = splitFuncName fn
                 uses = collectFreeVars o
 
-        shouldLift s free xs = concatMap (shouldLift s free) (children xs)
+        shouldLift orig s free o@(CoreApp x as)
+                | not (null fn) && num `elem` skip s = [o]
+            where
+                fn = coreName x
+                (num,name) = splitFuncNameNote ("shouldlift" ++ show orig) fn
+
+        shouldLift _ s free _ = []
+
+        coreName (CoreCon x) = x
+        coreName (CoreFun x) = x
+        coreName _ = ""
 
 
 
@@ -215,8 +232,9 @@ onf = let bind in onf
 optimise :: Env -> CoreExpr -> SS CoreExpr
 optimise seen x = do
     s <- get
-    (seen,x) <- return $ evalState (uniqueBoundVars x >>= onf s seen) (1::Int)
-    optHead seen x
+    case sfRun (uniqueBoundVars x >>= onf s seen) (1::Int) of
+        Left i -> sfFail (i :: Int)
+        Right ((seen,x),_) -> optHead seen x
 
 
 optHead :: Env -> CoreExpr -> SS CoreExpr
@@ -286,7 +304,20 @@ repeats name = f ["Prelude.:" | name == "Prelude.Prelude.Prelude.1111.showPosInt
         g x = []
 
 
-onf :: S -> Env -> CoreExpr -> State Int (Env,CoreExpr)
+pickBreak :: CoreExpr -> Int
+pickBreak x = snd $ maximumBy (comparing fst) $ map (length &&& head) $ group $ sort
+    [fst $ splitFuncNameNote "pickbreak" c | CoreCon c <- universeCase x]
+
+
+universeCase o@(CoreCase on alts) = o : concatMap universeCase (on:map snd alts)
+universeCase x = x : concatMap universeCase (children x)
+
+
+comparing x = on compare x
+
+on f g x y = f (g x) (g y)
+
+onf :: S -> Env -> CoreExpr -> StateFail Int Int (Env,CoreExpr)
 onf s seen original = f [] seen original
     where
         f done seen x = do
@@ -302,9 +333,12 @@ onf s seen original = f [] seen original
                     --let rep = repeats x $ _let x2 in
                     --if size > 10 && null rep then
                     --    error $ show o
-                    if size > 10 then
-                        error $ show o
-                    else if name `notElem` exclude then do
+                    if size > 12 then do
+                        let common = pickBreak o
+                        () <- trace (show o) $ return ()
+                        () <- trace ("Break on: " ++ show common) $ return ()
+                        sfFail common
+                    else if True || name `notElem` exclude then do
                         -- () <- if size > 4 then trace ("Inlining at size " ++ show size ++ ", " ++ x) $ return () else return ()
                         --() <- if size == 8 then error $ show o else return ()
                         --() <- if rep then trace ("Repeated, " ++ x) (return ()) else return ()
@@ -372,8 +406,12 @@ unwrapApp x = (id,x)
 primFunc s = prim s . snd . splitFuncName
 
 
+splitFuncNameNote :: String -> CoreFuncName -> (Int,String)
+splitFuncNameNote s x = (readNote ("splitFuncName: " ++ s) a, b)
+    where (a,_:b) = break (== ':') x
+
 splitFuncName :: CoreFuncName -> (Int,String)
-splitFuncName x = (read a, b)
+splitFuncName x = (readNote "splitFuncName" a, b)
     where (a,_:b) = break (== ':') x
 
 

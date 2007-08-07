@@ -9,12 +9,14 @@ import Generate
 import Data.List
 import System.Directory
 import System.Environment
+import System.Cmd
 
 import Evaluate
 
 main = do
     [file] <- getArgs
-    core <- loadCore ("test/" ++ file ++ "/Example.yca")
+    system $ "yhc test/" ++ file ++ "/" ++ file ++ ".hs --linkcore --hide"
+    core <- loadCore ("test/" ++ file ++ "/ycr/" ++ file ++ ".yca")
     over <- loadCore "library/Overlay.ycr"
     core <- return $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
     output file 1 core

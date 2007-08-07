@@ -54,7 +54,7 @@ preOpt x = transformExpr f x
 
 
 evaluate :: Core -> Core
-evaluate = coreFix . eval . preOpt -- . inlineLambda . eval
+evaluate = coreFix . eval . inlineLambda . eval . preOpt
 
 inlineLambda core = transformExpr f core
     where

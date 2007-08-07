@@ -21,7 +21,7 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
                  ,coreFuncs = concatMap fFunc (coreFuncs core)}
     where
         fData (CoreData name tys ctrs)
-            | "Prelude." `isPrefixOf` name || "Overlay.NIO" == name = []
+            | "Prelude;" `isPrefixOf` name || "Overlay;NIO" == name = []
             | otherwise = [CoreData (upperName name) tys (map fCtor ctrs)]
 
         fCtor (CoreCtor name fields) = CoreCtor (upperName name) fields
@@ -34,23 +34,30 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
         fExpr (CoreVar x) = CoreVar (lowerName x)
         fExpr (CoreLet bind x) = CoreLet [(lowerName a, b) | (a,b) <- bind] x
 
-        fExpr (CoreInt x) = CoreApp (CoreFun "int_") [CoreInt x]
-        fExpr (CoreChr x) = CoreApp (CoreFun "chr_") [CoreChr x]
-        fExpr (CoreStr x) = CoreApp (CoreFun "str_") [CoreStr x]
+        fExpr (CoreCase on alts) = CoreCase on [(fAlt a, b) | (a,b) <- alts]
+
+        fExpr (CoreLit (CoreInt x)) = CoreApp (CoreFun "int_") [CoreLit (CoreInt x)]
+        fExpr (CoreLit (CoreChr x)) = CoreApp (CoreFun "chr_") [CoreLit (CoreChr x)]
+        fExpr (CoreLit (CoreStr x)) = CoreApp (CoreFun "str_") [CoreLit (CoreStr x)]
         
-        fExpr (CoreCase on [(CoreVar lhs,rhs)]) =
-            CoreLet [(lhs,on)] (CoreApp (CoreFun "seq") [CoreVar lhs,rhs])
+        fExpr (CoreCase on [(PatDefault,rhs)]) =
+            CoreApp (CoreFun "seq") [on,rhs]
 
         fExpr x = x
+
+        fAlt (PatCon c vs) = PatCon (upperName c) vs
+        fAlt x = x
 
 
 ghcIO :: Core -> Core
 ghcIO = applyFuncCore (mapUnderCore f)
     where
         f (CoreFun "realWorld") = CoreFun "realWorld#"
-        f (CoreApp (CoreCon "Overlay_NIO") [x,y]) = 
-            CoreApp (CoreVar " (#") [x,CoreVar " :: State# RealWorld ,",y,CoreVar " #)"]
+        f (CoreCase on alts) = CoreCase on [(g a,b) | (a,b) <- alts]
         f x = x
+
+        g (PatCon "Overlay;NIO" [x,y]) = PatCon "(#" [x," :: State# RealWorld ,",y," #)"]
+        g x = x
 
 
 rep from to x = if x == from then to else x
@@ -61,12 +68,13 @@ primName x = "p_" ++ fixName x
 
 
 upperName :: String -> String
-upperName x | "Prelude." `isPrefixOf` x = drop 8 x
+upperName x | "Prelude;" `isPrefixOf` x = drop 8 x
+            | "Overlay;NIO" == x = x
             | otherwise = fixName x
 
 lowerName :: String -> String
 lowerName x | x == "main" = "main_generated"
-            | x == "Prelude.." = "o"
+            | x == "Prelude;." = "o"
             | otherwise = case fixName x of
                               (c:cs) | isAlpha c -> toLower c : cs
                               cs -> 'l' : cs
@@ -77,7 +85,7 @@ boring = ["Prelude","YHC","Internal"]
 
 
 fixName :: String -> String
-fixName = map (rep ' ' '_') . unwords . f . words . map (rep '.' ' ')
+fixName = map (rep ' ' '_') . unwords . f . words . map (rep '.' ' ' . rep ';' ' ')
     where
         f (x:xs) = map (concatMap g) $ x : filter (`notElem` boring) xs
 

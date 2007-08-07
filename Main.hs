@@ -4,8 +4,8 @@ module Main where
 import Yhc.Core hiding (collectAllVars)
 import Control.Monad
 import Generate
-import Firstify.Firstify
-import Report
+--import Firstify.Firstify
+--import Report
 import Data.List
 import System.Directory
 import System.Environment
@@ -51,7 +51,7 @@ transs = ensureInvariants [ConsecutiveFuncs, NoCorePos, NoRecursiveLet, NoCaseDe
 
 -- cannot be done by Overlay since case _ converts to nothing when compiled
 removeSeq (CoreApp (CoreFun s) [x,y])
-    | s == "Prelude.seq" = CoreCase x [(CoreVar "_",y)]
+    | s == "Prelude;seq" = CoreCase x [(PatDefault,y)]
 removeSeq x = x
 
 

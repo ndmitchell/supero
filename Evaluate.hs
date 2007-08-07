@@ -49,7 +49,7 @@ doneInline (u,e) i s = (u, (u+1, IntMap.insert u new e))
 
 preOpt x = transformExpr f x
     where
-        f (CoreFun "Prelude.otherwise") = CoreCon "Prelude.True"
+        f (CoreFun "Prelude;otherwise") = CoreCon "Prelude;True"
         f x = x
 
 
@@ -59,7 +59,7 @@ evaluate = coreFix . eval . preOpt -- . inlineLambda . eval
 inlineLambda core = transformExpr f core
     where
         names = Map.fromList [(name,coreLam args body)
-                | (CoreFunc name args body) <- coreFuncs core, isCoreLam body || isCoreInt body]
+                | (CoreFunc name args body) <- coreFuncs core, isCoreLam body || isCoreLit body]
 
         f (CoreFun x) = Map.findWithDefault (CoreFun x) x names
         f x = x
@@ -108,7 +108,7 @@ eval core_orig = core_orig{coreFuncs = prims ++ f s0}
 
 
 addFunc :: CoreFunc -> SS ()
-addFunc x = modify $ \s -> s{funcs = funcs s . (x:)}
+addFunc (CoreFunc name args body) = modify $ \s -> s{funcs = funcs s . (CoreFunc name args (unannotate body):)}
 
 tieFunc :: CoreFunc -> SS ()
 tieFunc (CoreFunc name args body) = do
@@ -267,7 +267,7 @@ optHead seen x = do
 
 
 isRoot :: S -> CoreExpr -> Bool
-isRoot s x | isCoreVar x || isCoreCon x || isCoreConst x = True
+isRoot s x | isCoreVar x || isCoreCon x || isCoreLit x = True
 isRoot s (CoreFun x) | primFunc s x = True
 isRoot s _ = False
 
@@ -358,27 +358,30 @@ onf s seen original = f [] seen original
                 _ -> return (seen,o)
 
 
-onfExt cont x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase (CoreInt 0) alts) =
+onfExt cont x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase (CoreLit $ CoreInt 0) alts) =
         liftM (CoreCase (CoreVar on)) (mapM f alts)
     where
-        f (lhs,rhs) = do
+        f (pat@(PatCon c vs),rhs) = do
+            let lhs = coreApp (CoreCon ("0:"++c)) (map CoreVar vs)
             rhs <- transformM cont $ replaceFreeVars [(on,lhs)] rhs
-            return (lhs,rhs)
+            return (pat,rhs)
+
+        f (lhs,rhs) = return (lhs,rhs)
 
 onfExt cont (CoreLet bind x) | not $ null lam =
         transformM cont $ coreLet other $ replaceFreeVars lam x
     where
         (lam,other) = partition (isCoreLam . snd) bind
 
-onfExt cont (CoreApp (CoreFun x) [CoreInt a,CoreInt b])
-        | isJust p = cont $ CoreCon $ if fromJust p a b then "Prelude.True" else "Prelude.False"
+onfExt cont (CoreApp (CoreFun x) [CoreLit (CoreInt a), CoreLit (CoreInt b)])
+        | isJust p = cont $ CoreCon $ if fromJust p a b then "0:Prelude;True" else "0:Prelude;False"
     where
         p = Map.lookup (snd $ splitFuncName x) intPrims
 
 onfExt cont (CoreCase on alts) | isCoreCon a && con `elem` lhs =
         cont $ CoreCase (coreApp (CoreCon con) b) alts
     where
-        lhs = [c | CoreCon c <- map (fst . fromCoreApp . fst) alts]
+        lhs = [c | (PatCon c _, _) <- alts]
         con = snd $ splitFuncName $ fromCoreCon a
         (a,b) = fromCoreApp on
 
@@ -415,9 +418,16 @@ splitFuncName x = (readNote "splitFuncName" a, b)
     where (a,_:b) = break (== ':') x
 
 
+unannotate :: CoreExpr -> CoreExpr
+unannotate = transform f
+    where
+        f (CoreCon x) = CoreCon $ snd $ splitFuncName x
+        f x = x
+
+
 -- annotate each function call with i:...
 annotate :: (CoreFuncName -> Bool) -> Core -> Core
-annotate isPrim core = core{coreFuncs = evalState (mapM g (coreFuncs core)) 0}
+annotate isPrim core = core{coreFuncs = evalState (mapM g (coreFuncs core)) 1}
     where
         g x | isCoreFunc x = do
             bod <- f $ coreFuncBody x

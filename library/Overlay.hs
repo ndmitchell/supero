@@ -12,23 +12,23 @@ import Foreign(unsafePerformIO)
 -- Prelude
 
 -- make error primitive
-foreign import primitive global_Prelude'_error :: string -> bottom
-global_Prelude'__patternMatchFail c = error c
-global_Prelude'__noMethodError c = error c
+foreign import primitive global_Prelude''error :: string -> bottom
+global_Prelude''_patternMatchFail c = error c
+global_Prelude''_noMethodError c = error c
 
-foreign import primitive global_Prelude'_seq :: a -> b -> b
+foreign import primitive global_Prelude''seq :: a -> b -> b
 
 
 ---------------------------------------------------------------------
 -- System.IO
 
 
-foreign import primitive global_System'_IO'_stdin  :: handle
-foreign import primitive global_System'_IO'_stdout :: handle
-foreign import primitive global_System'_IO'_stderr :: handle
+foreign import primitive global_System'_IO''stdin  :: handle
+foreign import primitive global_System'_IO''stdout :: handle
+foreign import primitive global_System'_IO''stderr :: handle
 
 
-foreign import primitive global_Data'_Char'_isSpace :: char -> int
+foreign import primitive global_Data'_Char''isSpace :: char -> int
 
 
 {-
@@ -68,10 +68,10 @@ type TIO a = State -> NIO a
 data NIO a = NIO State a
 data State = State
 
-global_Prelude'_Prelude'_Monad'_YHC'_Internal'_IO'_return a = returnIO a
-global_Prelude'_Prelude'_Monad'_YHC'_Internal'_IO'_'gt'gt a b = bindIO_ a b
-global_Prelude'_Prelude'_Monad'_YHC'_Internal'_IO'_'gt'gt'eq a b = bindIO a b
-global_YHC'_Internal'_unsafePerformIO a = unsafeIO a
+global_Prelude''YHC'_Internal'_IO''Prelude'_Monad''return a = returnIO a
+global_Prelude''YHC'_Internal'_IO''Prelude'_Monad'''gt'gt a b = bindIO_ a b
+global_Prelude''YHC'_Internal'_IO''Prelude'_Monad'''gt'gt'eq a b = bindIO a b
+global_YHC'_Internal''unsafePerformIO a = unsafeIO a
 
 foreign import primitive global_realWorld :: State
 foreign import primitive global_typeRealWorld :: State -> State
@@ -102,28 +102,28 @@ interIO m s = let r = case m (global_typeRealWorld s) of NIO _ res -> res
 -- returnIO (unsafeIO x)
 
 
-global_Prelude'_getContents =
+global_Prelude''getContents =
     get_char `bindIO` \c ->
     if c == -1 then
         returnIO []
     else
-        interIO global_Prelude'_getContents `bindIO` \cs ->
+        interIO global_Prelude''getContents `bindIO` \cs ->
         returnIO ((toEnum c :: Char) : cs)
 
 
 -- if we make a primitive IO, it adds a mkIO wrapper, so avoid that
 foreign import primitive get_char :: TIO Int
 
-foreign import primitive global_Prelude_'getChar :: TIO Char
-foreign import primitive global_Prelude_'putChar :: Char -> TIO ()
+foreign import primitive global_Prelude''getChar :: TIO Char
+--foreign import primitive global_Prelude''putChar :: Char -> TIO ()
 
-foreign import primitive global_System'_IO'_hGetChar :: Handle -> TIO Char
-foreign import primitive global_System'_IO'_hPutChar :: Handle -> Char -> TIO ()
+foreign import primitive global_System'_IO''hGetChar :: Handle -> TIO Char
+foreign import primitive global_System'_IO''hPutChar :: Handle -> Char -> TIO ()
 
 
-foreign import primitive global_System'_Environment'_getArgs :: TIO [String]
+foreign import primitive global_System'_Environment''getArgs :: TIO [String]
 
 
 -- read is just WAY too complex
-foreign import primitive global_Prelude'_Prelude'_Read'_Prelude'_Int'_readsPrec :: a
-foreign import primitive global_Prelude'_Prelude'_Read'_Prelude'_Int'_readList :: a
+foreign import primitive global_Prelude'_Prelude'_Read'_Prelude'_Int''readsPrec :: a
+foreign import primitive global_Prelude'_Prelude'_Read'_Prelude'_Int''readList :: a

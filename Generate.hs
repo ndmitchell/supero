@@ -34,15 +34,14 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
         fExpr (CoreVar x) = CoreVar (lowerName x)
         fExpr (CoreLet bind x) = CoreLet [(lowerName a, b) | (a,b) <- bind] x
 
+        fExpr (CoreCase on [(PatDefault,rhs)]) =
+            CoreApp (CoreFun "seq") [on,rhs]
         fExpr (CoreCase on alts) = CoreCase on [(fAlt a, b) | (a,b) <- alts]
 
         fExpr (CoreLit (CoreInt x)) = CoreApp (CoreFun "int_") [CoreLit (CoreInt x)]
         fExpr (CoreLit (CoreChr x)) = CoreApp (CoreFun "chr_") [CoreLit (CoreChr x)]
         fExpr (CoreLit (CoreStr x)) = CoreApp (CoreFun "str_") [CoreLit (CoreStr x)]
         
-        fExpr (CoreCase on [(PatDefault,rhs)]) =
-            CoreApp (CoreFun "seq") [on,rhs]
-
         fExpr x = x
 
         fAlt (PatCon c vs) = PatCon (upperName c) vs

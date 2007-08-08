@@ -14,23 +14,23 @@ if exist %1_.hs set file=%1_
 ghc --make -O2 -fasm %file%.hs -o haskell.exe -hidir obj\haskell -odir obj\haskell
 
 echo Benchmarking Haskell
-type %data% | timer haskell
+type %data% | timer haskell %2
 echo.
 
 echo Benchmarking C
-type %data% | timer c
+type %data% | timer c %2
 echo.
 
 echo Benchmarking Supero
-type %data% | timer supero
+type %data% | timer supero %2
 echo.
 
 echo Benchmarking C
-type %data% | timer c
+type %data% | timer c %2
 echo.
 
 echo Benchmarking Supero
-type %data% | timer supero
+type %data% | timer supero %2
 echo.
 
 

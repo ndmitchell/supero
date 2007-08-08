@@ -124,6 +124,7 @@ foreign import primitive global_System'_IO''hPutChar :: Handle -> Char -> TIO ()
 foreign import primitive global_System'_Environment''getArgs :: TIO [String]
 
 
--- read is just WAY too complex
-foreign import primitive global_Prelude'_Prelude'_Read'_Prelude'_Int''readsPrec :: a
-foreign import primitive global_Prelude'_Prelude'_Read'_Prelude'_Int''readList :: a
+-- things which are just way too complex
+foreign import primitive global_Prelude''Prelude'_Double''Prelude'_Show''showsPrec :: a -> Double -> ShowS
+foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Read''readsPrec :: Int -> ReadS Int
+foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Read''readList :: a

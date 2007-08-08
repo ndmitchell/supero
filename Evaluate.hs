@@ -304,9 +304,12 @@ repeats name = f ["Prelude.:" | name == "Prelude.Prelude.Prelude.1111.showPosInt
         g x = []
 
 
-pickBreak :: CoreExpr -> Int
-pickBreak x = snd $ maximumBy (comparing fst) $ map (length &&& head) $ group $ sort
-    [fst $ splitFuncNameNote "pickbreak" c | CoreCon c <- universeCase x]
+pickBreak :: S -> CoreExpr -> Int
+pickBreak s x =
+    snd $ maximumBy (comparing fst) $ map (length &&& head) $
+    group $ sort $ filter (`notElem` skip s) $
+        concat [[i,i,i] | CoreCon c <- universeCase x, let i = fst $ splitFuncName c] ++
+        [fst $ splitFuncName c | CoreFun c <- universe x]
 
 
 universeCase o@(CoreCase on alts) = o : concatMap universeCase (on:map snd alts)
@@ -333,8 +336,8 @@ onf s seen original = f [] seen original
                     --let rep = repeats x $ _let x2 in
                     --if size > 10 && null rep then
                     --    error $ show o
-                    if size > 12 then do
-                        let common = pickBreak o
+                    if size > 20 then do
+                        let common = pickBreak s o
                         () <- trace (show o) $ return ()
                         () <- trace ("Break on: " ++ show common) $ return ()
                         sfFail common

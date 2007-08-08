@@ -53,8 +53,13 @@ preOpt x = transformExpr f x
         f x = x
 
 
+safety = [("Prelude;1111_showPosInt",1)
+         ,("Prelude;foldl",1)
+         ]
+
+
 evaluate :: Core -> Core
-evaluate = coreFix . eval . inlineLambda . eval . preOpt
+evaluate = coreFix . unprotect . eval . inlineLambda . eval . preOpt . protect safety
 
 inlineLambda core = transformExpr f core
     where
@@ -455,3 +460,26 @@ annotate isPrim core = core{coreFuncs = evalState (mapM g (coreFuncs core)) 1}
 
         f x = descendM f x
 
+
+
+protect :: [(CoreFuncName,Int)] -> Core -> Core
+protect pos x = x{coreFuncs = idFunc : map f (coreFuncs x)}
+    where
+        idFunc = CorePrim "id" 1 "" "" True []
+
+        f (CoreFunc name args body) = CoreFunc name args2 (coreLet binds body)
+            where
+                args2 = [if i `elem` as then v else a | (i,a,v) <- zip3 [0..] args vars]
+                binds = [(a,CoreApp (CoreFun "id") [CoreVar v]) | (i,a,v) <- zip3 [0..] args vars, i `elem` as]
+
+                vars = freeVars 'v' \\ (args ++ collectAllVars body)
+                as = [i | (n,i) <- pos, n == name]
+
+        f x = x
+
+
+unprotect :: Core -> Core
+unprotect = transformExpr f
+    where
+        f (CoreApp (CoreFun "id") [x]) = x
+        f x = x

@@ -55,6 +55,8 @@ preOpt x = transformExpr f x
 
 safety = [("Prelude;1111_showPosInt",1)
          ,("Prelude;foldl",1)
+         ,("Prelude;_foldr",1)
+         ,("Prelude;_filter",0)
          ]
 
 

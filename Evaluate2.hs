@@ -81,7 +81,7 @@ evaluate out c = do
     out 1 c
     c <- return $ preOpt c
     out 2 c
-    c <- return $ eval c
+    c <- eval c
     out 3 c
     c <- return $ coreFix c
     out 4 c
@@ -116,15 +116,17 @@ coreFix = coreReachable ["main"] . coreInline InlineCallOnce
 
 
 
-type SS a = State S a
+type SS a = StateFail S Int a
 
 
-eval :: Core -> Core
-eval core = core{coreFuncs = prims ++ funcs sn []}
+eval :: Core -> IO Core
+eval core = do
+    let s0 = S Map.empty id 1 (coreFuncMap fm) (`Set.member` primsSet)
+    sn <- sfRun (tieFunc (coreFuncMap fm "main")) s0
+    case sn of
+        Left i -> error $ show (i :: Int)
+        Right (_,sn) -> return $ core{coreFuncs = prims ++ funcs sn []}
     where
-        sn = execState (tieFunc (coreFuncMap fm "main")) s0
-        s0 = S Map.empty id 1 (coreFuncMap fm) (`Set.member` primsSet)
-
         fm = toCoreFuncMap core
         prims = filter isCorePrim (coreFuncs core)
         primsSet = Set.fromList $ map coreFuncName prims

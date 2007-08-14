@@ -248,7 +248,13 @@ onf = let bind in onf
 optimise :: Env -> CoreExpr -> SS CoreExpr
 optimise env x = do
     s <- get
+    sfPrint "=== FROM =========================================="
+    sfPrint (show x)
     (env,x) <- return $ evalState (uniqueBoundVars x >>= onf s env) 1
+    sfPrint "--- TO   ------------------------------------------"
+    sfPrint (show x)
+    ans <- liftIO $ getChar
+    () <- if ans /= '\n' then error "done" else return ()
     optHead env x
 
 
@@ -311,7 +317,10 @@ onf s env x = f [] env x
         f bound env x = do
             x <- coreSimplifyExprUniqueExt onfExt x
             let o = x
-            (binds, x) <- return $ fromCoreLet x
+            (binds, x) <- return $ fromCoreLetDeep x
+            --binds <- mapM (\(a,b) -> do b <- f bound env b; return (a,snd b)) binds
+            --x <- coreSimplifyExprUniqueExt onfExt (coreLet binds x)
+            --(binds, x) <- return $ fromCoreLet x
             (_case, x) <- return $ unwrapCase x
             () <- if exprSizeOld o > 25 then error $ show o ++ "\nSize Overflow!" else return ()
             case fromCoreApp x of
@@ -335,8 +344,16 @@ onf s env x = f [] env x
 
                     CoreFunc _ params body <- uniqueBoundVarsFunc $ core s x
                     f newbound env2 $ coreLet movebind $ _case $ coreApp (CoreLam params body) args2
-                    
-                _ -> return (env, coreLet bound o)
+
+                (CoreVar lhs, args) | isJust $ lookup lhs binds -> do
+                    let Just rhs = lookup lhs binds
+                    (env,rhs) <- f [] env rhs
+                    let binds2 = filter ((/= lhs) . fst) binds
+                    if inlineLetBind rhs
+                        then f bound env $ replaceFreeVars [(lhs,rhs)] $ coreLet binds2 $ _case $ coreApp rhs args
+                        else return (env, coreLet bound $ coreLet ((lhs,rhs):binds2) $ _case x)
+
+                _ -> return (env, coreLet bound $ coreLet binds $ _case x)
 
 
 onfExt cont x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase (CoreLit $ CoreInt 0) alts) =
@@ -388,3 +405,12 @@ unwrapCase x = (id,x)
 unwrapApp (CoreApp x y) = (flip CoreApp y,x)
 unwrapApp x = (id,x)
 
+
+inlineLetBind (CoreLit{}) = True
+inlineLetBind (CoreLam{}) = True
+inlineLetBind _ = False
+
+
+fromCoreLetDeep (CoreLet x y) = (x++a,b)
+    where (a,b) = fromCoreLetDeep y
+fromCoreLetDeep x = ([],x)

@@ -76,8 +76,17 @@ safety = [("Prelude;1111_showPosInt",1)
          ]
 
 
-evaluate :: Core -> Core
-evaluate = coreFix . eval . inlineLambda . eval . preOpt
+evaluate :: (Int -> Core -> IO ()) -> Core -> IO Core
+evaluate out c = do
+    out 1 c
+    c <- return $ preOpt c
+    out 2 c
+    c <- return $ eval c
+    out 3 c
+    c <- return $ coreFix c
+    out 4 c
+    return c
+
 
 inlineLambda core = transformExpr f core
     where

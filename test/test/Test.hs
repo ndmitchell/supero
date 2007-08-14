@@ -13,7 +13,7 @@ main = do
     print $ nsoln $ read arg
 -}
 
-nsoln nq = length (gen nq)
+nsoln nq = gen nq
     where
         safe :: Int -> Int -> [Int] -> Bool
         safe x d []    = True
@@ -21,4 +21,4 @@ nsoln nq = length (gen nq)
 
         gen :: Int -> [[Int]]
         gen 0 = [[]]
-        gen n = [ (q:b) | b <- gen (n-1), q <- [1..nq], safe q 1 b]
+        gen n = [ (q:b) | b <- gen (n-1), q <- [1..nq]]

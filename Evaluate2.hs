@@ -328,7 +328,7 @@ onf s env x = f [] env x
                     let now = map (exprSize . replaceFreeVars binds) args
                         lim = [getEnv env (x,i) | i <- [0..length args - 1]]
 
-                        evil = [a | (n,l,a) <- zip3 now lim args, n - 4 > l]
+                        evil = [] :: [CoreExpr]  -- [a | (n,l,a) <- zip3 now lim args, n - 4 > l]
                         env2 = setEnv env x now
 
                     vars <- replicateM (length evil) getVar
@@ -338,7 +338,7 @@ onf s env x = f [] env x
                         newbound = newbind ++ freezebind ++ bound
 
                     -- () <- if x == "Prelude;1111_showPosInt" then trace (show (now,old,args,binds)) $ return () else return ()
-                    () <- if null evil then return () else trace ("Recursive call bigger: " ++ show o) $ return ()
+                    () <- if null evil then return () else trace ("Recursive call bigger: " ++ show evil ++ "\n" ++ show o) $ return ()
 
                     let args2 = [maybe a CoreVar (lookupRev a newbind) | a <- args]
 
@@ -366,8 +366,9 @@ onfExt cont x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase
 
         f (lhs,rhs) = return (lhs,rhs)
 
-onfExt cont (CoreLet bind x) | not $ null lam =
-        transformM cont $ coreLet other $ replaceFreeVars lam x
+onfExt cont (CoreLet bind x) | not $ null lam = do
+        x <- replaceFreeVarsUnique lam x
+        transformM cont $ coreLet other x
     where
         (lam,other) = partition (isCoreLam . snd) bind
 

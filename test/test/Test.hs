@@ -1,17 +1,31 @@
 
 module Test where
 
+{-
+main :: Int -> Int -> Int
+main n m = len [() | x <- list 1 n, y <- list 1 m]
+
+
+len :: [a] -> Int
+len [] = 0
+len (x:xs) = 1 + len xs
+
+list :: Int -> Int -> [Int]
+list i n = if i > n then []
+                    else i : list (i+1) n
+-}
+
+
 -- !!! count the number of solutions to the "n queens" problem.
 -- (grabbed from LML dist)
-
-main nq = nsoln nq
-
 
 {-
 main = do
     [arg] <- getArgs
     print $ nsoln $ read arg
 -}
+
+main nq = nsoln nq
 
 nsoln nq = gen nq
     where

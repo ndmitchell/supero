@@ -11,7 +11,7 @@ import System.Directory
 import System.Environment
 import System.Cmd
 
-import Evaluate2
+import Evaluate3
 
 main = do
     [file] <- getArgs

@@ -247,7 +247,7 @@ onf x = do
                 Just (rest,x) -> do
                     s <- get
                     case fromCoreApp x of
-                        (CoreFun x, args) | not (primInfo s x) && x /= protectName -> do
+                        (CoreFun x, args) | x /= protectName && not (primInfo s x) -> do
                             res <- unfold x args
                             case res of
                                 Nothing -> g ps o

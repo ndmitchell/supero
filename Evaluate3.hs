@@ -85,26 +85,40 @@ putInfo a b = show b ++ "@" ++ a
 
 unfoldBound = 2 :: Int
 
+
+-- given that these arguments happened previously, shall we blur this one?
+blur :: CoreExpr -> [CoreExpr] -> Bool
+blur _ _ = False
+
+
 -- rule 1, do not allow more than n recursive unfoldings of something
 unfold :: CoreFuncNameInfo -> [CoreExprInfo] -> SS (Maybe ([(CoreVarName,CoreExprInfo)], CoreExprInfo))
 unfold x args = do
         let (name,info) = getInfo x
         s <- get
         let recs = map (\i -> fromJust $ IntMap.lookup i (unfolds s)) info
-            prev = length [() | Unfold x _ <- recs, x == name]
+            prev = [as | Unfold x as <- recs, x == name]
 
-        if prev >= unfoldBound then return Nothing else do
+        if length prev >= unfoldBound then return Nothing else do
+            let blurs = zipWith blur (map unannotate args) (transpose prev)
+            (binds,newargs) <- liftM unzip $ sequence $ zipWith g (blurs ++ repeat False) args
+
             let newid = IntMap.size (unfolds s)
                 newinfo = newid : info
-            put $ s{unfolds = IntMap.insert newid (Unfold name (map unannotate args)) (unfolds s)}
+            put $ s{unfolds = IntMap.insert newid (Unfold name (map unannotate newargs)) (unfolds s)}
 
             CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
             body <- return $ transform (f newinfo) body
-            let expr = coreApp (coreLam params body) args
-            return $ Just ([], expr)
+            let expr = coreApp (coreLam params body) newargs
+            return $ Just (concat binds, expr)
     where
         f info (CoreFun x) = CoreFun (putInfo x info)
         f info x = x
+
+        g True arg = do
+            v <- getVar
+            return ([(v,arg)], CoreVar v)
+        g False arg = return ([], arg)
 
 
 annotate :: CoreExpr -> CoreExprInfo

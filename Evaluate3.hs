@@ -645,3 +645,8 @@ exprSizeOld = fold (\_ cs -> 1 + maximum (0:cs))
 comparing x = on compare x
 
 on f g x y = f (g x) (g y)
+
+fixM :: (Eq a, Monad m) => (a -> m a) -> a -> m a
+fixM f x = do
+    x2 <- f x
+    if x == x2 then return x2 else fixM f x2

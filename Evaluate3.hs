@@ -591,7 +591,8 @@ onfExt cont x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase
 
         f (lhs,rhs) = return (lhs,rhs)
 
-onfExt cont (CoreLet bind x) | not $ null lam = do
+-- be careful with letrec
+onfExt cont o@(CoreLet bind x) | not (null lam) && not (isCoreLetRec o) = do
         x <- replaceFreeVarsUnique lam x
         transformM cont $ coreLet other x
     where

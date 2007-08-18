@@ -83,7 +83,7 @@ putInfo a b = show b ++ "@" ++ a
 ---------------------------------------------------------------------
 -- UNFOLD STUFF
 
-unfoldBound = 4 :: Int
+unfoldBound = 8 :: Int
 
 
 -- given that these arguments happened previously, shall we blur this one?
@@ -106,18 +106,22 @@ unfold x args = do
         let recs = map (\i -> fromJust $ IntMap.lookup i (unfolds s)) info
             prev = [as | Unfold x as <- recs, x == name]
 
-        if length prev >= unfoldBound then return Nothing else do
-            let blurs = zipWith blur (map unannotate args) (transpose prev)
-            (binds,newargs) <- liftM unzip $ sequence $ zipWith g (blurs ++ repeat False) args
+        if length prev >= unfoldBound
+            then do
+                sfPrint $ "Warning, aborted on " ++ name ++ " " ++ show prev
+                return Nothing
+            else do
+                let blurs = zipWith blur (map unannotate args) (transpose prev)
+                (binds,newargs) <- liftM unzip $ sequence $ zipWith g (blurs ++ repeat False) args
 
-            let newid = IntMap.size (unfolds s)
-                newinfo = newid : info
-            modify $ \s -> s{unfolds = IntMap.insert newid (Unfold name (map unannotate newargs)) (unfolds s)}
+                let newid = IntMap.size (unfolds s)
+                    newinfo = newid : info
+                modify $ \s -> s{unfolds = IntMap.insert newid (Unfold name (map unannotate newargs)) (unfolds s)}
 
-            CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
-            body <- return $ transform (f newinfo) body
-            let expr = coreApp (coreLam params body) newargs
-            return $ Just (concat binds, expr)
+                CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
+                body <- return $ transform (f newinfo) body
+                let expr = coreApp (coreLam params body) newargs
+                return $ Just (concat binds, expr)
     where
         f info (CoreFun x) = CoreFun (putInfo x info)
         f info x = x

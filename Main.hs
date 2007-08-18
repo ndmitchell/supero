@@ -10,12 +10,14 @@ import Data.List
 import System.Directory
 import System.Environment
 import System.Cmd
+import System.Exit
 
 import Evaluate3
 
 main = do
     [file] <- getArgs
-    system $ "yhc test/" ++ file ++ "/" ++ file ++ ".hs --linkcore --hide"
+    res <- system $ "yhc test/" ++ file ++ "/" ++ file ++ ".hs --linkcore --hide"
+    when (res /= ExitSuccess) $ error "Failed to compile"
     core <- loadCore ("test/" ++ file ++ "/ycr/" ++ file ++ ".yca")
     over <- loadCore "library/Overlay.ycr"
     core <- return $ coreReachable ["main"] $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over

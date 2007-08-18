@@ -83,12 +83,19 @@ putInfo a b = show b ++ "@" ++ a
 ---------------------------------------------------------------------
 -- UNFOLD STUFF
 
-unfoldBound = 2 :: Int
+unfoldBound = 4 :: Int
 
 
 -- given that these arguments happened previously, shall we blur this one?
+-- say yes if this call is a superset of one of the previous calls
 blur :: CoreExpr -> [CoreExpr] -> Bool
-blur _ _ = False
+blur this prev = concatMap universe (children (blurVar this)) `overlap` map blurVar prev
+    where
+        blurVar = transform f
+        f (CoreVar _) = CoreVar ""
+        f x = x
+
+overlap a b = any (`elem` b) a
 
 
 -- rule 1, do not allow more than n recursive unfoldings of something
@@ -105,7 +112,7 @@ unfold x args = do
 
             let newid = IntMap.size (unfolds s)
                 newinfo = newid : info
-            put $ s{unfolds = IntMap.insert newid (Unfold name (map unannotate newargs)) (unfolds s)}
+            modify $ \s -> s{unfolds = IntMap.insert newid (Unfold name (map unannotate newargs)) (unfolds s)}
 
             CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
             body <- return $ transform (f newinfo) body
@@ -159,7 +166,8 @@ addFunc :: CoreFunc -> SS ()
 addFunc func = modify $ \s -> s{funcs = funcs s . (func:)}
 
 tieFunc :: CoreFunc -> SS ()
-tieFunc (CoreFunc name args body) = do
+tieFunc func = do
+    CoreFunc name args body <- uniqueBoundVarsFunc func
     body <- tie $ annotate body
     addFunc (CoreFunc name args body)
 

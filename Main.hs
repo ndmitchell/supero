@@ -20,6 +20,7 @@ main = do
     over <- loadCore "library/Overlay.ycr"
     core <- return $ coreReachable ["main"] $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
     evaluate (output file) core
+    return ()
 
 {-
     error "done"

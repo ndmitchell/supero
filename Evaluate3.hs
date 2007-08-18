@@ -1,8 +1,9 @@
 
-module Evaluate2(evaluate) where
+module Evaluate3(evaluate) where
 
-import Yhc.Core
+import Yhc.Core hiding (uniqueBoundVarsFunc)
 import Yhc.Core.FreeVar3
+import Yhc.Core.UniqueId
 import Debug.Trace
 
 import Control.Monad.State
@@ -28,6 +29,11 @@ data S = S {names :: Map.Map CoreExpr CoreFuncName
            ,core :: CoreFuncName -> CoreFunc
            ,prim :: CoreFuncName -> Bool
            }
+
+instance UniqueId S where
+    getId = uniqueId
+    putId i x = x{uniqueId = i}
+
 
 -- don't use the fail, but can remove that later...
 type SS a = StateFail S () a
@@ -86,7 +92,7 @@ unfold _ _ = return Nothing
 
 eval :: Core -> IO Core
 eval core = do
-    let s0 = S Map.empty id 1 (coreFuncMap fm) (`Set.member` primsSet)
+    let s0 = S Map.empty id IntMap.empty 1 1 (coreFuncMap fm) (`Set.member` primsSet)
     sn <- sfRun (tieFunc (coreFuncMap fm "main")) s0
     case sn of
         Left i -> error $ show (i :: Int)
@@ -113,19 +119,19 @@ tieFunc (CoreFunc name args body) = do
 tie :: CoreExpr -> SS CoreExpr
 tie x = do
     (args,CoreFunc _ params x) <- return $ normalise x
-    case normalise x of
-        CoreVar y -> return $ head args
+    case x of
+        CoreVar y -> return $ CoreVar $ head args
         x -> do
             s <- get
             name <- case Map.lookup x (names s) of
-                Just name -> return $ CoreFun name
+                Just name -> return name
                 Nothing -> do
                     name <- getName x
                     modify $ \s -> s{names = Map.insert x name (names s)}
-                    x <- optimise seen x
+                    x <- onf x
                     addFunc (CoreFunc name params x)
                     return name
-            return $ coreApp (CoreFun name) args
+            return $ coreApp (CoreFun name) (map CoreVar args)
     where
         getName x = do
             s <- get
@@ -149,22 +155,12 @@ normalise x = (vars, evalState (uniqueBoundVarsFunc (CoreFunc "" vars x)) (1 :: 
 -- OPTIMISATION
 
 
-fixM f x = do
-    x2 <- f x
-    if x == x2 then return x2 else fixM f x2
-
 {-
-ALGORITHM:
+POSTCONDITIONS:
 
-Must start at the top-most let, and must optimise it as best as you can
-
-Then move down the let chains, if any give rise to any fixed let's
-must also promote the let's they depend on into fixed let's
-
-Once you get to the final thing, you have fixed and dynamic lets, and
-optimise as normal.
-
-Do not call tie on the let variables until the end.
+* Any let binding spit out by unfold MUST be preserved
+* All let bindings must be in ONF, and referenced more than once
+* The body must be in ONF
 -}
 
 
@@ -172,9 +168,160 @@ Do not call tie on the let variables until the end.
 onf :: CoreExpr -> SS CoreExpr
 onf x = do
         x <- coreSimplifyExprUniqueExt onfExt x
-        g fromCoreLetDeep x
-
+        x <- f [] x
+        onfTie =<< unprotect x
     where
+        -- control the ordering so that let's get done in the right order
+        f done x = do
+            (binds,x) <- return $ fromCoreLetDeep x
+            case binds of
+                [] -> g $ coreLet done x
+                (name,val):bs -> do
+                    (binds,val) <- liftM fromCoreLetDeep $ g $ coreLet done val
+                    f (binds ++ [(name,val)]) (coreLet bs x)
+
+        -- optimise something
+        g x = do
+            x <- coreSimplifyExprUniqueExt onfExt x
+            let o = x
+            (binds,x) <- return $ fromCoreLetDeep x
+            (_case,x) <- return $ unwrapCase x
+            s <- get
+            case fromCoreApp x of
+                (CoreFun x, args) | not (prim s x) && x /= protectName -> do
+                    res <- unfold x args
+                    case res of
+                        Nothing -> return o
+                        Just (newbinds,x) -> do
+                            binds <- return $ binds ++ map (id *** protect) newbinds
+                            g $ coreLet binds $ _case x
+                _ -> return o
+
+
+protectName = "PROTECT!"
+
+protect x = CoreApp (CoreFun protectName) [x]
+
+-- find all the protect names, and hoist them up as let's (if not already there)
+-- remove all protect markers
+unprotect :: CoreExpr -> SS CoreExpr
+unprotect x = do
+        let (a,b) = fromCoreLet x
+            items = concatMap universe $ concatMap (children . snd) a ++ [b]
+            prot = [x | CoreApp (CoreFun p) (x:_) <- items, p == protectName]
+
+        names <- replicateM (length prot) getVar
+        x <- return $ transform (f (zip prot names)) x
+        return $ transform g $ coreLet (zip names prot) x
+    where
+        f ren o@(CoreApp (CoreFun p) (x:xs)) | p == protectName =
+            case lookup x ren of
+                Nothing -> o
+                Just y -> CoreApp (CoreFun p) (CoreVar y:xs)
+        f ren x = x
+
+        g (CoreApp (CoreFun p) (x:xs)) | p == protectName =
+            coreApp x xs
+        g x = x
+
+
+
+
+-- call tie on all subexpressions that need optimising
+-- this code smells bad, refactoring required
+onfTie :: CoreExpr -> SS CoreExpr
+onfTie x = do
+        s <- get
+        (bind,x) <- return $ fromCoreLet x
+        x <- case x of
+            CoreCase on alts -> do
+                on <- f s on
+                alts <- liftM (zip (map fst alts)) $ mapM (f s . snd) alts
+                return $ CoreCase on alts
+
+            CoreFun x | prim s x -> return $ CoreFun x
+                      | otherwise -> tieFunc (core s x) >> return (CoreFun x)
+
+            _ -> descendM (f s) x
+
+        bind <- liftM (zip (map fst bind)) $ mapM (f s . snd) bind
+        return $ coreLet bind x
+    where
+        f s (CoreApp (CoreFun x) xs) | prim s x = liftM (CoreApp (CoreFun x)) (mapM (f s) xs)
+
+        f s (CoreFun x) | prim s x = return $ CoreFun x
+
+        f s x | isRoot s x = descendM (f s) x
+              | otherwise  = tie x
+
+
+isRoot :: S -> CoreExpr -> Bool
+isRoot s x | isCoreVar x || isCoreCon x || isCoreLit x = True
+isRoot s (CoreFun x) | prim s x = True
+isRoot s _ = False
+
+
+
+
+{-
+
+
+
+
+
+
+
+
+
+
+                        
+unfold :: CoreFuncNameInfo -> [CoreExprInfo] -> SS (Maybe ([(CoreVarName,CoreExprInfo)], CoreExprInfo))
+
+
+                    let now = map (exprSize . replaceFreeVars binds) args
+                        lim = [getEnv env (x,i) | i <- [0..length args - 1]]
+
+                        evil = [] :: [CoreExpr]  -- [a | (n,l,a) <- zip3 now lim args, n - 4 > l]
+                        env2 = setEnv env x now
+
+                    vars <- replicateM (length evil) getVar
+                    let free = collectFreeVars (CoreApp (CoreCon "") evil)
+                        (freezebind,movebind) = partition ((`elem` free) . fst) binds
+                        newbind = zip vars evil
+                        newbound = newbind ++ freezebind ++ bound
+
+                    -- () <- if x == "Prelude;1111_showPosInt" then trace (show (now,old,args,binds)) $ return () else return ()
+                    () <- if null evil then return () else trace ("Recursive call bigger: " ++ show evil ++ "\n" ++ show o) $ return ()
+
+                    let args2 = [maybe a CoreVar (lookupRev a newbind) | a <- args]
+
+                    CoreFunc _ params body <- uniqueBoundVarsFunc $ core s x
+                    f newbound env2 $ coreLet movebind $ _case $ coreApp (CoreLam params body) args2
+
+                (CoreVar lhs, args) | isJust $ lookup lhs binds -> do
+                    let Just rhs = lookup lhs binds
+                    (env,rhs) <- f [] env rhs
+                    let binds2 = filter ((/= lhs) . fst) binds
+                    if inlineLetBind rhs
+                        then f bound env $ replaceFreeVars [(lhs,rhs)] $ coreLet binds2 $ _case $ coreApp rhs args
+                        else return (env, coreLet bound $ coreLet ((lhs,rhs):binds2) $ _case x)
+
+                _ -> return (env, coreLet bound $ coreLet binds $ _case x)
+
+            
+        
+            g 
+    
+        f fixed free x = do
+            (binds,x) <- return $ fromCoreLetDeep x
+            case binds of
+                [] -> do
+                    
+
+
+
+
+
         f (fixed,x) = do
             x <- coreSimplifyExprUniqueExt onfExt x
             (bind,x) <- return $ fromCoreLetDeep x
@@ -300,6 +447,7 @@ isRoot :: S -> CoreExpr -> Bool
 isRoot s x | isCoreVar x || isCoreCon x || isCoreLit x = True
 isRoot s (CoreFun x) | prim s x = True
 isRoot s _ = False
+-}
 
 
 {-
@@ -311,6 +459,7 @@ Functions may be wrapped in case, or in let.
 For all subexpressions that result, call tie on them
 -}
 
+{-
 
 onf :: S -> Env -> CoreExpr -> State Int (Env,CoreExpr)
 onf s env x = f [] env x
@@ -356,6 +505,7 @@ onf s env x = f [] env x
 
                 _ -> return (env, coreLet bound $ coreLet binds $ _case x)
 
+-}
 
 ---------------------------------------------------------------------
 -- SIMPLIFICATION RULES
@@ -422,4 +572,3 @@ exprSizeOld = fold (\_ cs -> 1 + maximum (0:cs))
 comparing x = on compare x
 
 on f g x y = f (g x) (g y)
-

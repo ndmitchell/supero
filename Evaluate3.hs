@@ -83,8 +83,28 @@ putInfo a b = show b ++ "@" ++ a
 ---------------------------------------------------------------------
 -- UNFOLD STUFF
 
+unfoldBound = 2 :: Int
+
+-- rule 1, do not allow more than n recursive unfoldings of something
 unfold :: CoreFuncNameInfo -> [CoreExprInfo] -> SS (Maybe ([(CoreVarName,CoreExprInfo)], CoreExprInfo))
-unfold _ _ = return Nothing
+unfold x args = do
+        let (name,info) = getInfo x
+        s <- get
+        let recs = map (\i -> fromJust $ IntMap.lookup i (unfolds s)) info
+            prev = length [() | Unfold x _ <- recs, x == name]
+
+        if prev >= unfoldBound then return Nothing else do
+            let newid = IntMap.size (unfolds s)
+                newinfo = newid : info
+            put $ s{unfolds = IntMap.insert newid (Unfold name (map unannotate args)) (unfolds s)}
+
+            CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
+            body <- return $ transform (f newinfo) body
+            let expr = coreApp (coreLam params body) args
+            return $ Just ([], expr)
+    where
+        f info (CoreFun x) = CoreFun (putInfo x info)
+        f info x = x
 
 
 annotate :: CoreExpr -> CoreExprInfo

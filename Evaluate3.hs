@@ -230,9 +230,13 @@ POSTCONDITIONS:
 onf :: CoreExpr -> SS CoreExpr
 onf x = do
         x <- coreSimplifyExprUniqueExt onfExt x
-        x <- f [] x
+        x <- fRep x
         onfTie =<< unprotect x
     where
+        fRep x = do
+            x2 <- f [] x
+            if x == x2 then return x2 else fRep x2
+
         -- control the ordering so that let's get done in the right order
         f done x = do
             (binds,x) <- return $ fromCoreLetDeep x

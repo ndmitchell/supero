@@ -610,6 +610,7 @@ intPrims :: Map.Map CoreFuncName (Int -> Int -> Bool)
 intPrims = Map.fromList
     [("LT_W",(<))
     ,("GT_W",(>))
+    ,("EQ_W",(==))
     ]
 
 

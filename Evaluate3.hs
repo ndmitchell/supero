@@ -233,7 +233,8 @@ onf :: CoreExpr -> SS CoreExpr
 onf x = do
         x <- coreSimplifyExprUniqueExt onfExt x
         x <- fixM f x
-        onfTie =<< unprotect x
+        x <- unprotect x
+        onfTie x
     where
         f x = g (map (Just . fst) (fst $ fromCoreLetDeep x) ++ [Nothing]) x
 

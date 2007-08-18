@@ -87,6 +87,20 @@ unfold :: CoreFuncNameInfo -> [CoreExprInfo] -> SS (Maybe ([(CoreVarName,CoreExp
 unfold _ _ = return Nothing
 
 
+annotate :: CoreExpr -> CoreExprInfo
+annotate = transform f
+    where
+        f (CoreFun x) = CoreFun (putInfo x [])
+        f x = x
+
+
+unannotate :: CoreExprInfo -> CoreExpr
+unannotate = transform f
+    where
+        f (CoreFun x) = CoreFun (fst $ getInfo x)
+        f x = x
+
+
 ---------------------------------------------------------------------
 -- EVAL DRIVER
 
@@ -112,7 +126,7 @@ addFunc func = modify $ \s -> s{funcs = funcs s . (func:)}
 
 tieFunc :: CoreFunc -> SS ()
 tieFunc (CoreFunc name args body) = do
-    body <- tie body
+    body <- tie $ annotate body
     addFunc (CoreFunc name args body)
 
 
@@ -123,11 +137,12 @@ tie x = do
         CoreVar y -> return $ CoreVar $ head args
         x -> do
             s <- get
-            name <- case Map.lookup x (names s) of
+            let key = unannotate x
+            name <- case Map.lookup key (names s) of
                 Just name -> return name
                 Nothing -> do
                     name <- getName x
-                    modify $ \s -> s{names = Map.insert x name (names s)}
+                    modify $ \s -> s{names = Map.insert key name (names s)}
                     x <- onf x
                     addFunc (CoreFunc name params x)
                     return name
@@ -138,7 +153,8 @@ tie x = do
             put $ s{nameId = nameId s + 1}
             return $ uniqueJoin (f s x) (nameId s)
 
-        f s (CoreFun x) = if prim s x then "f" else x
+        f s (CoreFun x) = if prim s name then "f" else name
+            where name = fst $ getInfo x
         f s (CoreApp x y) = f s x
         f s _ = "f"
 
@@ -188,7 +204,7 @@ onf x = do
             (_case,x) <- return $ unwrapCase x
             s <- get
             case fromCoreApp x of
-                (CoreFun x, args) | not (prim s x) && x /= protectName -> do
+                (CoreFun x, args) | not (primInfo s x) && x /= protectName -> do
                     res <- unfold x args
                     case res of
                         Nothing -> return o
@@ -239,17 +255,20 @@ onfTie x = do
                 alts <- liftM (zip (map fst alts)) $ mapM (f s . snd) alts
                 return $ CoreCase on alts
 
-            CoreFun x | prim s x -> return $ CoreFun x
-                      | otherwise -> tieFunc (core s x) >> return (CoreFun x)
+            CoreFun x | prim s name -> return $ CoreFun name
+                      | otherwise -> tieFunc (core s name) >> return (CoreFun name)
+                where name = fst $ getInfo x
 
             _ -> descendM (f s) x
 
         bind <- liftM (zip (map fst bind)) $ mapM (f s . snd) bind
         return $ coreLet bind x
     where
-        f s (CoreApp (CoreFun x) xs) | prim s x = liftM (CoreApp (CoreFun x)) (mapM (f s) xs)
+        f s (CoreApp (CoreFun x) xs) | prim s name = liftM (CoreApp (CoreFun name)) (mapM (f s) xs)
+            where name = fst $ getInfo x
 
-        f s (CoreFun x) | prim s x = return $ CoreFun x
+        f s (CoreFun x) | prim s name = return $ CoreFun name
+            where name = fst $ getInfo x
 
         f s x | isRoot s x = descendM (f s) x
               | otherwise  = tie x
@@ -257,10 +276,12 @@ onfTie x = do
 
 isRoot :: S -> CoreExpr -> Bool
 isRoot s x | isCoreVar x || isCoreCon x || isCoreLit x = True
-isRoot s (CoreFun x) | prim s x = True
+isRoot s (CoreFun x) | primInfo s x = True
 isRoot s _ = False
 
 
+primInfo s = prim s . fst . getInfo
+coreInfo s = core s . fst . getInfo
 
 
 {-

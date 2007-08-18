@@ -28,3 +28,8 @@ instance (Monad m, UniqueId i) => UniqueIdM (StateT i m) where
 sfPrint :: String -> StateFail state failure ()
 sfPrint s = liftIO $ putStrLn s
 
+
+sfPause :: StateFail state failure ()
+sfPause = do
+    c <- liftIO getChar
+    when (c /= '\n') $ error "done"

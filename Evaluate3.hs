@@ -73,8 +73,10 @@ coreFix = coreReachable ["main"] . coreInline InlineCallOnce
 -- INFO STUFF
 
 getInfo :: CoreFuncNameInfo -> (CoreFuncName,Info)
-getInfo x = (b, read a)
-    where (a,_:b) = break (== '@') x
+getInfo x = case bs of
+                [] -> error $ show $ "getInfo failed on " ++ x
+                (_:b) -> (b, read a)
+    where (a,bs) = break (== '@') x
 
 putInfo :: CoreFuncName -> Info -> CoreFuncNameInfo
 putInfo a b = show b ++ "@" ++ a

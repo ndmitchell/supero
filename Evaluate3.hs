@@ -230,9 +230,51 @@ POSTCONDITIONS:
 onf :: CoreExpr -> SS CoreExpr
 onf x = do
         x <- coreSimplifyExprUniqueExt onfExt x
-        x <- fRep x
+        x <- fixM f x
         onfTie =<< unprotect x
     where
+        f x = g (map (Just . fst) (fst $ fromCoreLetDeep x) ++ [Nothing]) x
+
+        g [] x = return x
+        g (p:ps) x = do
+            x <- coreSimplifyExprUniqueExt onfExt x
+            let o = x
+            case pick p x of
+                Nothing -> g ps x
+                Just (rest,x) -> do
+                    s <- get
+                    case fromCoreApp x of
+                        (CoreFun x, args) | not (primInfo s x) && x /= protectName -> do
+                            res <- unfold x args
+                            case res of
+                                Nothing -> g ps o
+                                Just (binds,x) -> do
+                                    binds <- return $ map (id *** protect) binds
+                                    g (p:ps) $ rest $ coreLet binds x
+                        _ -> g ps o
+
+
+        pick :: Maybe CoreVarName -> CoreExpr -> Maybe (CoreExpr -> CoreExpr, CoreExpr)
+        pick Nothing (CoreLet binds x) = do
+            (rest,y) <- pick Nothing x
+            return (\y -> CoreLet binds (rest y), y)
+        pick Nothing (CoreCase on alts) = return (\y -> CoreCase y alts, on)
+        pick Nothing x = return (id, x)
+
+        pick (Just v) (CoreLet binds x) = do
+            let (pre,post) = break ((==) v . fst) binds
+            case post of
+                [] -> do
+                    (rest,y) <- pick (Just v) x
+                    return (\y -> CoreLet binds (rest y), y)
+                ((_,rhs):post) -> do
+                    (rest,y) <- pick Nothing rhs
+                    return (\y -> CoreLet (pre ++ [(v,rest y)] ++ post) x, y)
+        pick (Just v) _ = Nothing
+
+
+{-
+
         fRep x = do
             x2 <- f [] x
             if x == x2 then return x2 else fRep x2
@@ -262,6 +304,7 @@ onf x = do
                             binds <- return $ binds ++ map (id *** protect) newbinds
                             g $ coreLet binds $ _case x
                 _ -> return o
+-}
 
 
 protectName = "PROTECT!"

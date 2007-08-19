@@ -3,36 +3,34 @@ module Test where
 
 {-
 main :: Int -> Int -> Int
-main n m = len [() | x <- list 1 n, y <- list 1 m]
+main n m = len [j | i <- enum [1..n], j <- [1..m]]
+
+len (x:xs) = 1 + len xs
+len [] = 0
+
+main n = len (enum 1 n)
+
+
+enum :: Int -> Int -> [Int]
+enum i n = if i > n then [] else i : enum (i+1) n
 
 
 len :: [a] -> Int
-len [] = 0
+len (x:y:xs) = 2 + len xs
 len (x:xs) = 1 + len xs
+len [] = 0
 
-list :: Int -> Int -> [Int]
-list i n = if i > n then []
-                    else i : list (i+1) n
+
 -}
-
-
--- !!! count the number of solutions to the "n queens" problem.
--- (grabbed from LML dist)
 
 {-
-main = do
-    [arg] <- getArgs
-    print $ nsoln $ read arg
+main :: Int -> [()]
+main 0 = []
+main n = [() | b <- main (n-1), q <- [1]]
 -}
 
-main nq = nsoln nq
-
-nsoln nq = gen nq
-    where
-        safe :: Int -> Int -> [Int] -> Bool
-        safe x d []    = True
-        safe x d (q:l) = x /= q && safe x (d+1) l
-
-        gen :: Int -> [[Int]]
-        gen 0 = [[]]
-        gen n = [ (q:b) | b <- gen (n-1), q <- [1..nq]]
+main :: Int -> [()]
+main 0 = []
+main n = let ok2 q = [()]
+             ok1 p = concatMap ok2 [(1::Int)]
+         in concatMap ok1 (main (n-(1::Int)))

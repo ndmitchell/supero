@@ -29,8 +29,14 @@ main 0 = []
 main n = [() | b <- main (n-1), q <- [1]]
 -}
 
-main :: Int -> [()]
+main :: Int -> [[()]]
 main 0 = []
-main n = let ok2 q = [()]
-             ok1 p = concatMap ok2 [(1::Int)]
-         in concatMap ok1 (main (n-(1::Int)))
+main n = mapnil (main (n-(1::Int)))
+
+
+nil _ = []
+
+
+mapnil x = case x of
+                [] -> []
+                (x:xs) -> [] : mapnil xs

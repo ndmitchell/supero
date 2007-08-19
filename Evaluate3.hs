@@ -234,6 +234,8 @@ onf x = do
         x <- coreSimplifyExprUniqueExt onfExt x
         x <- fixM f x
         x <- unprotect x
+        sfPrint $ show $ unannotate x
+        sfPause
         onfTie x
     where
         f x = g (map (Just . fst) (fst $ fromCoreLetDeep x) ++ [Nothing]) x
@@ -241,6 +243,7 @@ onf x = do
         g [] x = return x
         g (p:ps) x = do
             x <- coreSimplifyExprUniqueExt onfExt x
+            sfPrint $ show $ x
             let o = x
             case pick p x of
                 Nothing -> g ps x

@@ -4,6 +4,7 @@ module Main(main) where
 
 import System.IO.Unsafe
 import System.IO
+import System.Environment
 import Foreign.C.Types
 
 
@@ -30,12 +31,14 @@ prelude_seq = seq
 prelude_error x = error (map toEnum x)
 
 aDD_W = (+) :: Int -> Int -> Int
+sUB_W = (-) :: Int -> Int -> Int
 eQ_W = (==) :: Int -> Int -> Bool
+nE_W = (/=) :: Int -> Int -> Bool
 gT_W = (>) :: Int -> Int -> Bool
 lT_W = (<) :: Int -> Int -> Bool
+lE_W = (<=) :: Int -> Int -> Bool
 qUOT = quot :: Int -> Int -> Int
 rEM = rem :: Int -> Int -> Int
-
 nEG_W = negate :: Int -> Int
 
 
@@ -47,7 +50,15 @@ str_ x = map chr_ x
 system_IO_stdin = stdin
 system_IO_stdout = stdout
 
+system_Environment_getArgs :: State# RealWorld -> (# State# RealWorld, [[Int]] #)
+system_Environment_getArgs r = case (unIO getArgs) r of
+                                (# r, s #) -> (# r, map str_ s #)
+
 data_Char_isSpace c = isspace (toEnum c) /= 0
+
+
+prelude_Int_Read_readsPrec :: Int -> ReadS Int
+prelude_Int_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
 
 
 {- OLD PREFIX

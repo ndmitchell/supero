@@ -5,6 +5,7 @@ module Main(main) where
 import System.IO.Unsafe
 import System.IO
 import System.Environment
+import System.Exit
 import Foreign.C.Types
 
 
@@ -13,6 +14,10 @@ import GHC.IOBase               (IO(IO), unIO, unsafePerformIO)
 import GHC.Prim                 (State#,RealWorld)
 
 main = IO main_generated
+
+overlay_errorIO :: [Int] -> State# RealWorld -> (# State# RealWorld, a #)
+overlay_errorIO x r = case unIO (putStrLn ("ERROR: " ++ map toEnum x)) r of
+                           (# r, _ #) -> unIO exitFailure r
 
 overlay_get_char = unIO $ do
     c <- getchar

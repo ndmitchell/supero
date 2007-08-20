@@ -71,10 +71,12 @@ data State = State
 global_Prelude''YHC'_Internal'_IO''Prelude'_Monad''return a = returnIO a
 global_Prelude''YHC'_Internal'_IO''Prelude'_Monad'''gt'gt a b = bindIO_ a b
 global_Prelude''YHC'_Internal'_IO''Prelude'_Monad'''gt'gt'eq a b = bindIO a b
+global_Prelude''YHC'_Internal'_IO''Prelude'_Monad''fail msg r = errorIO msg r
 global_YHC'_Internal''unsafePerformIO a = unsafeIO a
 
 foreign import primitive global_realWorld :: State
 foreign import primitive global_typeRealWorld :: State -> State
+foreign import primitive errorIO :: [String] -> TIO a
 
 
 returnIO :: a -> TIO a

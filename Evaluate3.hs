@@ -88,9 +88,8 @@ putInfo a b = show b ++ "@" ++ a
 -- f (g a) > f a, where g is some nonempty wrapping
 -- ignoring variable names
 
-{-
 (!>!) :: CoreExpr -> CoreExpr -> Bool
-(!>!) a b = ba /= bb && g (blurVar a) (blurVar b)
+(!>!) a b = ba /= bb && peel ba bb
     where
         ba = blurVar a
         bb = blurVar b
@@ -100,22 +99,21 @@ putInfo a b = show b ++ "@" ++ a
                 f (CoreVar _) = CoreVar ""
                 f x = x
 
-        g a b | length as == length bs && _a vs == _b vs =
+        -- peel away a common shell
+        peel a b | length as == length bs && _a vs == _b vs =
                 case neqs of
                     [] -> True
-                    [i] -> g (as !! i) (bs !! i)
-                    _ -> False
+                    [i] -> peel (as !! i) (bs !! i)
+                    _ -> inclusion a b
             where
                 neqs = [i | (i,a,b) <- zip3 [0..] as bs, a /= b]
                 vs = replicate nas (CoreVar "")
                 (nas, nbs) = (length as, length bs)
-                (_a, as) = uniplate a
-                (_b, bs) = uniplate b
-        g _ _ = False
--}
+                (as, _a) = uniplate a
+                (bs, _b) = uniplate b
+        peel a b = inclusion a b
 
--- a value is greater than another under crazy order
--- if f (g a)
+        inclusion a b = b `elem` universe a
 
 
 
@@ -129,14 +127,16 @@ unfoldBound = 8 :: Int
 -- given that these arguments happened previously, shall we blur this one?
 -- say yes if this call is a superset of one of the previous calls
 blur :: CoreExpr -> [CoreExpr] -> Bool
-blur this prev = concatMap universe (children (blurVar this)) `overlap` map blurVar prev
+blur this prev = any (this !>!) prev
+{-
+                 concatMap universe (children (blurVar this)) `overlap` map blurVar prev
     where
         blurVar = transform f
         f (CoreVar _) = CoreVar ""
         f x = x
 
 overlap a b = any (`elem` b) a
-
+-}
 
 -- rule 1, do not allow more than n recursive unfoldings of something
 unfold :: CoreFuncNameInfo -> [CoreExprInfo] -> SS (Maybe ([(CoreVarName,CoreExprInfo)], CoreExprInfo))

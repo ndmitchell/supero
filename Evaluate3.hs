@@ -212,7 +212,17 @@ tieFunc func = do
 
 
 tie :: CoreExpr -> SS CoreExpr
-tie o@(CoreCase on alts) = descendM tie o
+tie o | isCoreCase o = do
+    let CoreCase on alts = unannotate o
+    s <- get
+    let vs = [(CoreCase (CoreVar "") alts , CoreCase (CoreVar "") alts2)
+                 | CoreCase on2 alts2 <- Map.keys $ names s, blurVar on2 == blurVar on]
+        bad = any (uncurry (!>!)) vs
+        vs2 = [(a,b) | (a,b) <- vs, blurVar a /= blurVar b]
+    when (not (null vs2)) $ do
+        sfPrint $ show vs2
+        sfPause
+    if bad then error $ show o {- descendM tie o -} else tieAlways o
 tie x = tieAlways x
 
 

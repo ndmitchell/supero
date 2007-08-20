@@ -179,7 +179,11 @@ tieFunc func = do
 
 
 tie :: CoreExpr -> SS CoreExpr
-tie x = do
+tie o@(CoreCase on alts) = descendM tie o
+tie x = tieAlways x
+
+
+tieAlways x = do
     (args,CoreFunc _ params x) <- return $ normalise x
     case x of
         CoreVar y -> return $ CoreVar $ head args

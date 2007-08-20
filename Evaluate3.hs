@@ -82,6 +82,44 @@ putInfo :: CoreFuncName -> Info -> CoreFuncNameInfo
 putInfo a b = show b ++ "@" ++ a
 
 
+--------------------------------------------------------------------
+-- CRAZY ORDERING
+
+-- f (g a) > f a, where g is some nonempty wrapping
+-- ignoring variable names
+
+{-
+(!>!) :: CoreExpr -> CoreExpr -> Bool
+(!>!) a b = ba /= bb && g (blurVar a) (blurVar b)
+    where
+        ba = blurVar a
+        bb = blurVar b
+
+        blurVar = transform f
+            where
+                f (CoreVar _) = CoreVar ""
+                f x = x
+
+        g a b | length as == length bs && _a vs == _b vs =
+                case neqs of
+                    [] -> True
+                    [i] -> g (as !! i) (bs !! i)
+                    _ -> False
+            where
+                neqs = [i | (i,a,b) <- zip3 [0..] as bs, a /= b]
+                vs = replicate nas (CoreVar "")
+                (nas, nbs) = (length as, length bs)
+                (_a, as) = uniplate a
+                (_b, bs) = uniplate b
+        g _ _ = False
+-}
+
+-- a value is greater than another under crazy order
+-- if f (g a)
+
+
+
+
 ---------------------------------------------------------------------
 -- UNFOLD STUFF
 

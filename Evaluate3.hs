@@ -94,11 +94,6 @@ putInfo a b = show b ++ "@" ++ a
         ba = blurVar a
         bb = blurVar b
 
-        blurVar = transform f
-            where
-                f (CoreVar _) = CoreVar ""
-                f x = x
-
         -- peel away a common shell
         peel a b | length as == length bs && _a vs == _b vs =
                 case neqs of
@@ -738,3 +733,12 @@ fixM :: (Eq a, Monad m) => (a -> m a) -> a -> m a
 fixM f x = do
     x2 <- f x
     if x == x2 then return x2 else fixM f x2
+
+blurVar = transform f
+    where
+        f (CoreVar _) = CoreVar ""
+        f (CoreCase on alts) = CoreCase on [(g a,b) | (a,b) <- alts]
+        f x = x
+
+        g (PatCon x _) = PatCon x []
+        g x = x

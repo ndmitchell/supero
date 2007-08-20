@@ -40,6 +40,8 @@ lE_W = (<=) :: Int -> Int -> Bool
 qUOT = quot :: Int -> Int -> Int
 rEM = rem :: Int -> Int -> Int
 nEG_W = negate :: Int -> Int
+yHC_Primitive_primIntSignum = signum :: Int -> Int
+
 
 
 int_ x = x :: Int
@@ -57,7 +59,9 @@ system_Environment_getArgs r = case (unIO getArgs) r of
 data_Char_isSpace c = isspace (toEnum c) /= 0
 
 
-prelude_Int_Read_readsPrec :: Int -> ReadS Int
+
+
+prelude_Int_Read_readsPrec :: Int -> [Int] -> [(Int,[Int])]
 prelude_Int_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
 
 

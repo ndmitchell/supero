@@ -82,7 +82,7 @@ lowerName x | x == "main" = "main_generated"
                               cs -> 'l' : cs
 
 
-escapes = [">gt","<lt","!ex","=eq","+p","$d",":c","[ob","]sb","-h","/fs","|vb"]
+escapes = [">gt","<lt","!ex","=eq","+p","$d",":c","[ob","]sb","-h","/fs","|vb","&amp"]
 boring = ["Prelude","YHC","Internal"]
 
 

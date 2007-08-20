@@ -1,3 +1,6 @@
+
+module Main where
+
 import System
 
 suCC :: Int -> Int
@@ -14,4 +17,4 @@ primes = map head (iterate the_filter (iterate suCC 2))
 
 main = do
     [arg] <- getArgs
-    print $ primes !! (read arg)
+    print $ primes !! read arg

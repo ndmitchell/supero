@@ -48,6 +48,9 @@ nEG_W = negate :: Int -> Int
 yHC_Primitive_primIntSignum = signum :: Int -> Int
 
 
+yHC_Primitive_primIntegerLt = (<) :: Integer -> Integer -> Bool
+yHC_Primitive_primIntegerSub = (-) :: Integer -> Integer -> Integer
+
 
 int_ x = x :: Int
 chr_ x = fromEnum x
@@ -69,6 +72,8 @@ data_Char_isSpace c = isspace (toEnum c) /= 0
 prelude_Int_Read_readsPrec :: Int -> [Int] -> [(Int,[Int])]
 prelude_Int_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
 
+prelude_Integer_Read_readsPrec :: Int -> [Int] -> [(Integer,[Int])]
+prelude_Integer_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
 
 {- OLD PREFIX
 

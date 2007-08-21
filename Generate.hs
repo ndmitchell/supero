@@ -4,6 +4,7 @@ module Generate(generate) where
 import Yhc.Core hiding (primName)
 import Data.List
 import Data.Char
+import Control.Arrow
 
 
 -- | Generate a Haskell program from a string
@@ -24,7 +25,7 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
             | "Prelude;" `isPrefixOf` name || "Overlay;NIO" == name = []
             | otherwise = [CoreData (upperName name) tys (map fCtor ctrs)]
 
-        fCtor (CoreCtor name fields) = CoreCtor (upperName name) fields
+        fCtor (CoreCtor name fields) = CoreCtor (upperName name) (map (fixType *** id) fields)
 
         fFunc (CorePrim{}) = []
         fFunc (CoreFunc name args body) = [CoreFunc (lowerName name) (map lowerName args) (mapUnderCore fExpr body)]
@@ -82,7 +83,7 @@ lowerName x | x == "main" = "main_generated"
                               cs -> 'l' : cs
 
 
-escapes = [">gt","<lt","!ex","=eq","+p","$d",":c","[ob","]sb","-h","/fs","|vb","&amp","*st"]
+escapes = [">gt","<lt","!ex","=eq","+p","$d",":c","[ob","]sb","-h","/fs","|vb","&amp","*st","^hat","%per"]
 boring = ["Prelude","YHC","Internal"]
 
 
@@ -94,3 +95,7 @@ fixName = map (rep ' ' '_') . unwords . f . words . map (rep '.' ' ' . rep ';' '
         g x = case [ys | y:ys <- escapes, y == x] of
                    (y:_) -> '\'' : y
                    _ -> [x]
+
+
+fixType ('!':xs) = '!' : fixName xs
+fixType xs = fixName xs

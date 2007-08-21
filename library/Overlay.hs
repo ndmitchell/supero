@@ -130,3 +130,7 @@ foreign import primitive global_System'_Environment''getArgs :: TIO [String]
 foreign import primitive global_Prelude''Prelude'_Double''Prelude'_Show''showsPrec :: a -> Double -> ShowS
 foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Read''readsPrec :: Int -> ReadS Int
 foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Read''readList :: a
+
+foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Read''readsPrec :: Int -> ReadS Integer
+foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Read''readList :: a
+

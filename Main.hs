@@ -12,7 +12,7 @@ import System.Environment
 import System.Cmd
 import System.Exit
 
-import Evaluate3
+import Evaluate4
 
 main = do
     [file] <- getArgs
@@ -56,7 +56,7 @@ transs = ensureInvariants [ConsecutiveFuncs, NoCorePos, NoRecursiveLet, NoCaseDe
 
 -- cannot be done by Overlay since case _ converts to nothing when compiled
 removeSeq (CoreApp (CoreFun s) [x,y])
-    | s == "Prelude;seq" = CoreCase x [(PatDefault,y)]
+    | s == "Prelude;seq" || s == "SEQ" = CoreCase x [(PatDefault,y)]
 removeSeq x = x
 
 

@@ -88,6 +88,7 @@ putInfo a b = show b ++ "@" ++ a
 -- f (g a) > f a, where g is some nonempty wrapping
 -- ignoring variable names
 
+
 (!>!) :: CoreExpr -> CoreExpr -> Bool
 (!>!) a b = ba /= bb && peel ba bb
     where
@@ -95,13 +96,10 @@ putInfo a b = show b ++ "@" ++ a
         bb = blurVar b
 
         -- peel away a common shell
-        peel a b | length as == length bs && _a vs == _b vs =
-                case neqs of
-                    [] -> True
-                    [i] -> peel (as !! i) (bs !! i)
-                    _ -> inclusion a b
+        peel a b | a == b = True
+        peel a b | nas == nbs && _a vs == _b vs =
+                inclusion a b || and (zipWith peel as bs)
             where
-                neqs = [i | (i,a,b) <- zip3 [0..] as bs, a /= b]
                 vs = replicate nas (CoreVar "")
                 (nas, nbs) = (length as, length bs)
                 (as, _a) = uniplate a
@@ -109,6 +107,8 @@ putInfo a b = show b ++ "@" ++ a
         peel a b = inclusion a b
 
         inclusion a b = b `elem` universe a
+
+
 
 
 
@@ -122,16 +122,14 @@ unfoldBound = 8 :: Int
 -- given that these arguments happened previously, shall we blur this one?
 -- say yes if this call is a superset of one of the previous calls
 blur :: CoreExpr -> [CoreExpr] -> Bool
-blur this prev = any (this !>!) prev
-{-
-                 concatMap universe (children (blurVar this)) `overlap` map blurVar prev
+blur this prev = concatMap universe (children (blurVar this)) `overlap` map blurVar prev
     where
         blurVar = transform f
         f (CoreVar _) = CoreVar ""
         f x = x
 
 overlap a b = any (`elem` b) a
--}
+
 
 -- rule 1, do not allow more than n recursive unfoldings of something
 unfold :: CoreFuncNameInfo -> [CoreExprInfo] -> SS (Maybe ([(CoreVarName,CoreExprInfo)], CoreExprInfo))
@@ -143,7 +141,12 @@ unfold x args = do
 
         if length prev >= unfoldBound
             then do
-                sfPrint $ "Warning, aborted on " ++ name ++ " " ++ show prev
+                --s <- get
+                --liftIO $ writeFile "log.txt" $ unlines $ map show $ Map.keys $ names s
+                --liftIO $ writeFile "log2.txt" $ unlines $ map (("\n"++) . show) $ sort $ filter isCoreCase $ Map.keys $ names s
+                sfPrint $ "Warning, aborted on " ++ (show $ CoreApp (CoreFun name) (map unannotate args)) ++ "\n" ++ show prev
+                sfPause
+                --error "done"
                 return Nothing
             else do
                 let blurs = zipWith blur (map unannotate args) (transpose prev)
@@ -212,17 +215,35 @@ tieFunc func = do
 
 
 tie :: CoreExpr -> SS CoreExpr
-tie o | isCoreCase o = do
-    let CoreCase on alts = unannotate o
+tie o | letThenCase o = do
     s <- get
-    let vs = [(CoreCase (CoreVar "") alts , CoreCase (CoreVar "") alts2)
-                 | CoreCase on2 alts2 <- Map.keys $ names s, blurVar on2 == blurVar on]
+    let vs = [(o, o2) | o2 <- Map.keys $ names s]
         bad = any (uncurry (!>!)) vs
-        vs2 = [(a,b) | (a,b) <- vs, blurVar a /= blurVar b]
+        vs2 = [(blurVar a, blurVar b) | (a,b) <- vs, blurVar a /= blurVar b]
+
+{-
     when (not (null vs2)) $ do
-        sfPrint $ show vs2
+        let ((a,b):_) = vs2
+        sfPrint $ replicate 50 '-'
+        sfPrint $ show a
+        sfPrint $ show b
+        sfPrint $ show (a !>! b)
+        sfPrint $ show bad
         sfPause
-    if bad then error $ show o {- descendM tie o -} else tieAlways o
+-}
+    -- must descend beneath the case statement
+    if bad then descendM down o else tieAlways o
+    where
+        down (CoreLet binds x) = do
+            binds <- mapM (\(a,b) -> liftM ((,) a) (tie b)) binds
+            x <- down x
+            return $ CoreLet binds x
+        down x = descendM tie x
+
+        letThenCase (CoreCase _ _) = True
+        letThenCase (CoreLet _ x) = letThenCase x
+        letThenCase _ = False
+
 tie x = tieAlways x
 
 
@@ -236,6 +257,8 @@ tieAlways x = do
             name <- case Map.lookup key (names s) of
                 Just name -> return name
                 Nothing -> do
+                    --sfPrint $ show key
+                    --sfPause
                     name <- getName x
                     modify $ \s -> s{names = Map.insert key name (names s)}
                     x <- onf x
@@ -744,10 +767,13 @@ fixM f x = do
     x2 <- f x
     if x == x2 then return x2 else fixM f x2
 
+-- need to blur all uses and definitions
 blurVar = transform f
     where
         f (CoreVar _) = CoreVar ""
+        f (CoreLet bind x) = CoreLet (map ((,) "" . snd) bind) x
         f (CoreCase on alts) = CoreCase on [(g a,b) | (a,b) <- alts]
+        f (CoreLam x y) = CoreLam (map (const "") x) y
         f x = x
 
         g (PatCon x _) = PatCon x []

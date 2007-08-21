@@ -75,6 +75,10 @@ prelude_Int_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum
 prelude_Integer_Read_readsPrec :: Int -> [Int] -> [(Integer,[Int])]
 prelude_Integer_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
 
+prelude_Char_Read_readsPrec :: Int -> [Int] -> [(Int,[Int])]
+prelude_Char_Read_readsPrec p s = [(toEnum (a :: Char), str_ b) | (a,b) <- readsPrec p (map toEnum s)]
+
+
 {- OLD PREFIX
 
 inlinePerformIO :: IO a -> a

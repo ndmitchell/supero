@@ -134,3 +134,8 @@ foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Read''readList :
 foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Read''readsPrec :: Int -> ReadS Integer
 foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Read''readList :: a
 
+foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Read''readsPrec :: Int -> ReadS Char
+foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Read''readList :: a
+
+foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Show''showsPrec :: a
+foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Show''showList :: a

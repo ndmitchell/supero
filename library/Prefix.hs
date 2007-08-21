@@ -40,16 +40,31 @@ sUB_W = (-) :: Int -> Int -> Int
 eQ_W = (==) :: Int -> Int -> Bool
 nE_W = (/=) :: Int -> Int -> Bool
 gT_W = (>) :: Int -> Int -> Bool
+gE_W = (>=) :: Int -> Int -> Bool
 lT_W = (<) :: Int -> Int -> Bool
 lE_W = (<=) :: Int -> Int -> Bool
 qUOT = quot :: Int -> Int -> Int
 rEM = rem :: Int -> Int -> Int
 nEG_W = negate :: Int -> Int
 yHC_Primitive_primIntSignum = signum :: Int -> Int
+yHC_Primitive_primIntegerAdd = (+) :: Integer -> Integer -> Integer
+yHC_Primitive_primIntegerEq = (==) :: Integer -> Integer -> Bool
+yHC_Primitive_primIntegerFromInt = toInteger :: Int -> Integer
+yHC_Primitive_primIntegerGe = (>=) :: Integer -> Integer -> Bool
+yHC_Primitive_primIntegerGt = (>) :: Integer -> Integer -> Bool
+yHC_Primitive_primIntegerLe = (<=) :: Integer -> Integer -> Bool
+yHC_Primitive_primIntegerMul = (+) :: Integer -> Integer -> Integer
+yHC_Primitive_primIntegerNe = (/=) :: Integer -> Integer -> Bool
+yHC_Primitive_primIntegerNeg = negate :: Integer -> Integer
+yHC_Primitive_primIntegerQuot = (quot) :: Integer -> Integer -> Integer
+yHC_Primitive_primIntegerQuotRem = quotRem :: Integer -> Integer -> (Integer, Integer)
+yHC_Primitive_primIntegerRem = (rem) :: Integer -> Integer -> Integer
+yHC_Primitive_primIntFromInteger = fromInteger :: Integer -> Int
 
 
 yHC_Primitive_primIntegerLt = (<) :: Integer -> Integer -> Bool
 yHC_Primitive_primIntegerSub = (-) :: Integer -> Integer -> Integer
+
 
 
 int_ x = x :: Int
@@ -76,7 +91,11 @@ prelude_Integer_Read_readsPrec :: Int -> [Int] -> [(Integer,[Int])]
 prelude_Integer_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
 
 prelude_Char_Read_readsPrec :: Int -> [Int] -> [(Int,[Int])]
-prelude_Char_Read_readsPrec p s = [(toEnum (a :: Char), str_ b) | (a,b) <- readsPrec p (map toEnum s)]
+prelude_Char_Read_readsPrec p s = [(chr_ (a :: Char), str_ b) | (a,b) <- readsPrec p (map toEnum s)]
+
+prelude_Char_Show_showList :: [Int] -> [Int] -> [Int]
+prelude_Char_Show_showList value rest = str_ (show (map toEnum value :: [Char])) ++ rest
+
 
 
 {- OLD PREFIX

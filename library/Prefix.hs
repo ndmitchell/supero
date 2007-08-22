@@ -53,12 +53,12 @@ yHC_Primitive_primIntegerFromInt = toInteger :: Int -> Integer
 yHC_Primitive_primIntegerGe = (>=) :: Integer -> Integer -> Bool
 yHC_Primitive_primIntegerGt = (>) :: Integer -> Integer -> Bool
 yHC_Primitive_primIntegerLe = (<=) :: Integer -> Integer -> Bool
-yHC_Primitive_primIntegerMul = (+) :: Integer -> Integer -> Integer
+yHC_Primitive_primIntegerMul = (*) :: Integer -> Integer -> Integer
 yHC_Primitive_primIntegerNe = (/=) :: Integer -> Integer -> Bool
 yHC_Primitive_primIntegerNeg = negate :: Integer -> Integer
-yHC_Primitive_primIntegerQuot = (quot) :: Integer -> Integer -> Integer
+yHC_Primitive_primIntegerQuot = quot :: Integer -> Integer -> Integer
 yHC_Primitive_primIntegerQuotRem = quotRem :: Integer -> Integer -> (Integer, Integer)
-yHC_Primitive_primIntegerRem = (rem) :: Integer -> Integer -> Integer
+yHC_Primitive_primIntegerRem = rem :: Integer -> Integer -> Integer
 yHC_Primitive_primIntFromInteger = fromInteger :: Integer -> Int
 
 

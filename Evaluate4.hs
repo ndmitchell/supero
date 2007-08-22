@@ -28,6 +28,7 @@ data S = S {names :: Map.Map CoreExpr CoreFuncName
            ,uniqueId :: Int
            ,core :: CoreFuncName -> CoreFunc
            ,prim :: CoreFuncName -> Bool
+           ,caf :: CoreFuncName -> Bool -- an expensive caf
            }
 
 instance UniqueId S where
@@ -102,7 +103,7 @@ coreFix = coreReachable ["main"] . coreInline InlineCallOnce
 
 eval :: Core -> IO Core
 eval core = do
-    let s0 = S Map.empty id 1 1 (coreFuncMap fm) (`Set.member` primsSet)
+    let s0 = S Map.empty id 1 1 (coreFuncMap fm) (`Set.member` primsSet) (`Set.member` cafs)
     sn <- sfRun (tieFunc (coreFuncMap fm "main")) s0
     case sn of
         Left i -> error $ show (i :: Int)
@@ -111,6 +112,35 @@ eval core = do
         fm = toCoreFuncMap core
         prims = filter isCorePrim (coreFuncs core)
         primsSet = Set.fromList $ map coreFuncName prims
+        cafs = Set.fromList [coreFuncName x | x <- coreFuncs core, isCaf (coreFuncMap fm) x]
+
+
+isCaf func (CoreFunc name [] body) = expensive $ coreSimplify body
+    where
+        expensive (CoreCon x) = False
+        expensive (CoreFun x) = False
+        expensive (CoreLit x) = False
+        expensive (CoreApp (CoreCon x) xs) = any expensive xs
+        expensive (CoreApp (CoreFun x) xs) = not $ unsaturated func x xs
+        expensive x = error $ show ("missed",x)
+
+isCaf _ _ = False
+
+
+unsaturated :: (CoreFuncName -> CoreFunc) -> CoreFuncName -> [CoreExpr] -> Bool
+unsaturated func name args = f [] name (length args)
+    where
+        f seen name args | name `elem` seen = False
+                         | args == 0 || arity > args = True
+                         | isCoreFunc x = g (name:seen) (coreFuncBody x) (args - arity)
+            where
+                x = func name
+                arity = coreFuncArity x
+
+        g seen (CoreApp (CoreFun name) args) extra = f seen name (length args + extra)
+        g seen (CoreFun name) extra = f seen name extra
+        g seen (CorePos _ x) extra = g seen x extra
+        g _ _ _ = False
 
 
 ---------------------------------------------------------------------
@@ -205,7 +235,7 @@ done s x = optimal s x || size x > maxSize
 optimal s (CoreLet bind x) = optimal s x
 optimal s (CoreCase on alts) = optimal s on
 optimal s (CoreApp x xs) = optimal s x
-optimal s (CoreFun x) = prim s x
+optimal s (CoreFun x) = prim s x || caf s x
 optimal s _ = True
 
 
@@ -220,13 +250,15 @@ unfold s (CoreCase on alts) = do
 
 unfold s (CoreFun x) = unfold s (CoreApp (CoreFun x) [])
 
-unfold s (CoreApp (CoreFun name) args) | not $ prim s name = do
+unfold s (CoreApp (CoreFun name) args)
+    | not (prim s name) && not (caf s name) = do
     CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
     return $ coreApp (coreLam params body) args
 
 unfold s x = return x
 
 
+unpeel s (CoreFun x) | caf s x = tie (CoreFun x)
 unpeel s x | done s x = descendM (unpeel s) x
            | otherwise = tie x
 

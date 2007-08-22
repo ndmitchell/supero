@@ -197,7 +197,7 @@ normalise x = (vars, evalState (uniqueBoundVarsFunc (CoreFunc "" vars x)) (1 :: 
 -- OPTIMISATION
 
 
-maxSize = 6
+maxSize = 8
 
 size x = fold (\_ i -> 1 + maximum (0:i)) $ transform f x
     where
@@ -221,6 +221,15 @@ POSTCONDITIONS:
 onf :: CoreExpr -> SS CoreExpr
 onf x = do
         x <- coreSimplifyExprUniqueExt onfExt x
+        
+        -- if you are optimising a CAF, unfold it exactly ONCE
+        s <- get
+        x <- case x of
+                CoreFun name | caf s name -> do
+                    CoreFunc _ [] body <- uniqueBoundVarsFunc $ core s name
+                    return body
+                _ -> return x
+
         f x
     where
         f x = do

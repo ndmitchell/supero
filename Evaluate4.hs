@@ -57,8 +57,10 @@ preOpt x = transformExpr f x
 
 evaluate :: (Int -> Core -> IO ()) -> Core -> IO Core
 evaluate out c = do
-    out 1 c
+    out 0 c
     c <- return $ preOpt c
+    out 1 c
+    c <- return $ smallSize c
     out 2 c
     c <- liftM (coreReachable ["main"]) (eval c)
     out 3 c
@@ -68,6 +70,26 @@ evaluate out c = do
 
 coreFix :: Core -> Core
 coreFix = coreReachable ["main"] . coreInline InlineCallOnce
+
+
+
+-- make sure all function bodies have a size of <= 2
+-- to make sure the size is not overflowed too fast
+smallSize core = core{coreFuncs = fst $ execState (mapM_ f (coreFuncs core)) ([], uniqueFuncsNext core)}
+    where
+        f (CoreFunc name args body) = do
+            body <- h name body
+            modify $ \(a,b) -> (CoreFunc name args body:a,b)
+        f x = modify $ \(a,b) -> (x:a,b)
+
+        h name x | size x <= 2 = return x
+                 | otherwise = do
+            body <- descendM (h name) x
+            let free = collectFreeVars body
+            (a,b) <- get
+            let newname = uniqueJoin name b
+            put (CoreFunc newname free body:a, b+1)
+            return $ coreApp (CoreFun newname) (map CoreVar free)
 
 
 --------------------------------------------------------------------

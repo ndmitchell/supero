@@ -65,6 +65,8 @@ yHC_Primitive_primIntFromInteger = fromInteger :: Integer -> Int
 yHC_Primitive_primIntegerLt = (<) :: Integer -> Integer -> Bool
 yHC_Primitive_primIntegerSub = (-) :: Integer -> Integer -> Integer
 
+-- things which Yhc decides should be hopelessly slow
+prelude_Int_Integral_mod = mod :: Int -> Int -> Int
 
 
 int_ x = x :: Int

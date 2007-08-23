@@ -139,3 +139,7 @@ foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Read''readList 
 
 foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Show''showsPrec :: a
 foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Show''showList :: a
+
+
+-- things which are way too verbose in Yhc, and GHC has as primitives
+foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Integral''mod :: a

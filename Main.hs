@@ -16,6 +16,8 @@ import Evaluate4
 
 main = do
     [file] <- getArgs
+    res <- system $ "yhc library/Overlay.hs --core"
+    when (res /= ExitSuccess) $ error "Failed to compile overlay"
     res <- system $ "yhc test/" ++ file ++ "/" ++ file ++ ".hs --linkcore --hide"
     when (res /= ExitSuccess) $ error "Failed to compile"
     core <- loadCore ("test/" ++ file ++ "/ycr/" ++ file ++ ".yca")

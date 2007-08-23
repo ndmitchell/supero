@@ -155,6 +155,7 @@ unsaturated func name args = f [] name (length args)
         f seen name args | name `elem` seen = False
                          | args == 0 || arity > args = True
                          | isCoreFunc x = g (name:seen) (coreFuncBody x) (args - arity)
+                         | otherwise = False
             where
                 x = func name
                 arity = coreFuncArity x

@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\title{Super Fast, Super Quick}
+\title{Fast Haskell}
 
 \author{Neil Mitchell and Colin Runciman \inst{1}}
 
@@ -16,7 +16,23 @@ This approach gives fast-ish compilation times and dead quick code.
 
 \section{Introduction}
 
-We describe the problem.
+Haskell can be used to write high level specifications of programs, which can run. Take for example the task of counting the number of words in a file read from the input. In Haskell this program is a single line:
+
+\begin{code}
+main = print . length . words =<< getContents
+\end{code}
+
+Compared to a C program to perform this task (see Figure \ref{fig:c_words}), the Haskell version is clearly more concise, more specification orientated and clearly correct. Unfortunately with all these good points,  it is also three times slower than the C version.
+
+There are several reasons that the Haskell version does not perform at the same speed as the C version:
+
+\begin{description}
+\item[Intermediate Lists] One of the reasons for the slowdown in the Haskell version is that many intermediate lists are produced and consumed as the program proceeds. The |getContents| function produces a list of characters, |words| consumes this list and produces a list of a list of characters, |length| then consumes the outermost list. The equivalent C program has no allocation.
+\item[Higher Order Arguments] The |words| function is defined using the function |span|, which takes a predicate and splits the input list when the predicate becomes true. The predicate is passed as a higher order function, which is constant on all applications.
+\item[Laziness] The Haskell program proceeds in a lazy manner, demanding one character from |getContents|, then processing it with each of the functions in the pipeline. At each stage, a lazy thunk for the remainder of the function is created.
+\end{description}
+
+
 
 
 \end{document}

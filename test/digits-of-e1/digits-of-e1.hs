@@ -46,6 +46,6 @@ e = toDigits eContFrac
 
 main = do
     [digits] <- getArgs
-    print (take (read digits) e)
+    print (sum (take (read digits) e))
 
 

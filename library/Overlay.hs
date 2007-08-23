@@ -143,3 +143,7 @@ foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Show''showList 
 
 -- things which are way too verbose in Yhc, and GHC has as primitives
 foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Integral''mod :: a
+foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Integral''mod :: a
+foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Integral''div :: a
+foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Num''signum :: a
+foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Num''abs :: a

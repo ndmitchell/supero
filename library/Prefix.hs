@@ -36,6 +36,7 @@ prelude_seq = seq
 prelude_error x = error (map toEnum x)
 
 aDD_W = (+) :: Int -> Int -> Int
+mUL_W = (*) :: Int -> Int -> Int
 sUB_W = (-) :: Int -> Int -> Int
 eQ_W = (==) :: Int -> Int -> Bool
 nE_W = (/=) :: Int -> Int -> Bool
@@ -46,6 +47,7 @@ lE_W = (<=) :: Int -> Int -> Bool
 qUOT = quot :: Int -> Int -> Int
 rEM = rem :: Int -> Int -> Int
 nEG_W = negate :: Int -> Int
+yHC_Primitive_primIntAbs = abs :: Int -> Int
 yHC_Primitive_primIntSignum = signum :: Int -> Int
 yHC_Primitive_primIntegerAdd = (+) :: Integer -> Integer -> Integer
 yHC_Primitive_primIntegerEq = (==) :: Integer -> Integer -> Bool
@@ -60,13 +62,21 @@ yHC_Primitive_primIntegerQuot = quot :: Integer -> Integer -> Integer
 yHC_Primitive_primIntegerQuotRem = quotRem :: Integer -> Integer -> (Integer, Integer)
 yHC_Primitive_primIntegerRem = rem :: Integer -> Integer -> Integer
 yHC_Primitive_primIntFromInteger = fromInteger :: Integer -> Int
-
-
 yHC_Primitive_primIntegerLt = (<) :: Integer -> Integer -> Bool
 yHC_Primitive_primIntegerSub = (-) :: Integer -> Integer -> Integer
 
+
+lT_D = (<) :: Double -> Double -> Bool
+lE_D = (<=) :: Double -> Double -> Bool
+gT_D = (>) :: Double -> Double -> Bool
+gE_D = (>=) :: Double -> Double -> Bool
+
 -- things which Yhc decides should be hopelessly slow
 prelude_Int_Integral_mod = mod :: Int -> Int -> Int
+prelude_Integer_Integral_div = div :: Integer -> Integer -> Integer
+prelude_Integer_Integral_mod = mod :: Integer -> Integer -> Integer
+prelude_Integer_Num_signum = signum :: Integer -> Integer
+prelude_Integer_Num_abs = abs :: Integer -> Integer
 
 
 int_ x = x :: Int

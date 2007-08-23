@@ -171,7 +171,7 @@ tie x = do
                     name <- getName x
                     modify $ \s -> s{names = Map.insert key name (names s)}
                     let o = x
-                    x <- onf x
+                    x <- onf name x
                     addFunc (CoreFunc name params x)
                     return name
             return $ coreApp (CoreFun name) (map CoreVar args)
@@ -219,8 +219,10 @@ POSTCONDITIONS:
 
 -- for each let-rhs or case-on, optimise it once
 -- if you reach over (size n) then unpeel until you get to size n, and tie the remainder
-onf :: CoreExpr -> SS CoreExpr
-onf x = do
+--
+-- resultName is only passed to aid debugging
+onf :: CoreFuncName -> CoreExpr -> SS CoreExpr
+onf resultName x = do
         x <- coreSimplifyExprUniqueExt onfExt x
         
         -- if you are optimising a CAF, unfold it exactly ONCE

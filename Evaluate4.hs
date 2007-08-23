@@ -230,20 +230,15 @@ onf x = do
                     return body
                 _ -> return x
 
-        sfPrint $ show (setupEvil x, x)
-        sfPause
-
-        f (setupEvil x) x
+        f x
     where
-        f evil x = do
+        f x = do
             s <- get
             x <- unfold s x
             x <- coreSimplifyExprUniqueExt onfExt x
-            let r = anyEvil evil x
-            if not $ null r then unpeelEvil s r x else
-                if done s x
-                    then unpeel s x
-                    else f evil x
+            if done s x
+                then unpeel s x
+                else f x
 
 done s x = optimal s x || size x > maxSize
 
@@ -279,6 +274,8 @@ unpeel s x | done s x = descendM (unpeel s) x
            | otherwise = tie x
 
 
+{-
+
 unpeelEvil s evils x | x `notElem` universe x
 unpeelEvil s evils (CoreApp x xs) | x `elem` s = tie $ CoreApp x xs
 unpeelEvil s evils x = 
@@ -296,7 +293,7 @@ isEvil x = isCoreCon x || isCoreFun x || isCoreVar x
 anyEvil :: EvilState -> CoreExpr -> [CoreExpr]
 anyEvil st x = [y | (y,n) <- setupEvil x, val y < n]
     where val x = maximum $ 0 : [i | (y,i) <- st, y == x]
-
+-}
 
 
 ---------------------------------------------------------------------

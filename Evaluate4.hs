@@ -170,6 +170,7 @@ tie x = do
                 Nothing -> do
                     name <- getName x
                     modify $ \s -> s{names = Map.insert key name (names s)}
+                    let o = x
                     x <- onf x
                     addFunc (CoreFunc name params x)
                     return name
@@ -197,7 +198,7 @@ normalise x = (vars, evalState (uniqueBoundVarsFunc (CoreFunc "" vars x)) (1 :: 
 -- OPTIMISATION
 
 
-maxSize = 8
+maxSize = 5
 
 size x = fold (\_ i -> 1 + maximum (0:i)) $ transform f x
     where
@@ -234,11 +235,15 @@ onf x = do
     where
         f x = do
             s <- get
-            x <- unfold s x
-            x <- coreSimplifyExprUniqueExt onfExt x
-            if done s x
-                then unpeel s x
-                else f x
+            r <- protect x
+            case r of
+                Just x -> return x
+                Nothing -> do
+                    x <- unfold s x
+                    x <- coreSimplifyExprUniqueExt onfExt x
+                    if done s x
+                        then unpeel s x
+                        else f x
 
 done s x = optimal s x || size x > maxSize
 
@@ -274,27 +279,53 @@ unpeel s x | done s x = descendM (unpeel s) x
            | otherwise = tie x
 
 
-{-
+--------------------------------------------------------------------
+-- PROTECTION
 
-unpeelEvil s evils x | x `notElem` universe x
-unpeelEvil s evils (CoreApp x xs) | x `elem` s = tie $ CoreApp x xs
-unpeelEvil s evils x = 
-    where (cs,gen) = uniplate x
+-- if you see f (f a), then make it a let, and spit out
+-- all the code up until that point
+protect :: CoreExpr -> SS (Maybe CoreExpr)
+protect x = do
+    let evils = filter isEvil $ concatMap universe $ children x
+    if null evils then return Nothing else liftM Just (dump evils x)
 
 
+dump evils x = f (map (collectFreeVars &&& id) evils) x
+    where
+        f [] x = tie x
+        f evil x | map snd evil `disjoint` universe x = tie x
+                 | otherwise = do
+            let fv = collectFreeVars x
+                (now,later) = partition (\(fv2,e) -> null (fv2 \\ fv)) evil
+            binds <- mapM (\(_,e) -> do v <- getVar; return (v,e)) now
+            if null binds
+                then descendM (f evil) x
+                else descendM (f later) (CoreLet binds (rep binds x))
 
-type EvilState = [(CoreExpr,Int)]
+        rep vs x = case lookupRev x vs of
+            Nothing -> descend (rep vs) x
+            Just y -> CoreVar y
 
-setupEvil :: CoreExpr -> EvilState
-setupEvil x = [(y,n) | CoreApp y ys <- universe x, isEvil y, let n = length $ filter (== y) $ concatMap universe ys]
 
-isEvil x = isCoreCon x || isCoreFun x || isCoreVar x
+---------------------------------------------------------------------
+-- EVIL SPOTTING
 
-anyEvil :: EvilState -> CoreExpr -> [CoreExpr]
-anyEvil st x = [y | (y,n) <- setupEvil x, val y < n]
-    where val x = maximum $ 0 : [i | (y,i) <- st, y == x]
--}
+isEvil :: CoreExpr -> Bool
+isEvil = any (uncurry eqContexts) . tail . getContexts
 
+
+eqContexts :: CoreExpr -> CoreExpr -> Bool
+eqContexts (CoreVar "") _ = True
+eqContexts (CoreVar _) (CoreVar _) = True
+eqContexts x y = eq1 x y && and (zipWith eqContexts (children x) (children y))
+
+
+getContexts :: CoreExpr -> [(CoreExpr, CoreExpr)]
+getContexts x = (CoreVar "", x) :
+        [(context (map fst pre ++ [fst m] ++ map fst post), snd m)
+        | (pre,mid,post) <- splits (map (id &&& getContexts) children)
+        , m <- snd mid]
+    where (children,context) = uniplate x
 
 ---------------------------------------------------------------------
 -- SIMPLIFICATION RULES
@@ -308,6 +339,17 @@ onfExt cont x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase
             return (pat,rhs)
 
         f (lhs,rhs) = return (lhs,rhs)
+
+onfExt cont o@(CoreLet bind x) | not (null ctrs) && not (isCoreLetRec o) = do
+        (newbinds,oldbinds) <- mapAndUnzipM f ctrs
+        transformM cont $ coreLet (concat newbinds ++ other) $ replaceFreeVars oldbinds x
+    where
+        (ctrs,other) = partition (isCoreCon . fst . fromCoreApp . snd) bind
+
+        f (name,x) = do
+                vs <- replicateM (length tl) getVar
+                return (zip vs tl, (name, coreApp hd (map CoreVar vs)))
+            where (hd,tl) = fromCoreApp x
 
 -- be careful with letrec
 onfExt cont o@(CoreLet bind x) | not (null lam) && not (isCoreLetRec o) = do
@@ -380,3 +422,25 @@ blurVar = transform f
 
         g (PatCon x _) = PatCon x []
         g x = x
+
+-- are two constructors equal to depth 1
+eq1 :: CoreExpr -> CoreExpr -> Bool
+eq1 x y = length xs == length ys && _x vs == _y vs
+    where
+        vs = replicate (length xs) (CoreVar "")
+        (xs,_x) = uniplate x
+        (ys,_y) = uniplate y
+
+
+splits :: [a] -> [([a],a,[a])]
+splits [] = []
+splits (x:xs) = ([],x,xs) : [(x:a,b,c) | (a,b,c) <- splits xs]
+
+
+lookupRev :: Eq b => b -> [(a,b)] -> Maybe a
+lookupRev x ((a,b):xs) | x == b = Just a
+                       | otherwise = Nothing
+lookupRev _ _ = Nothing
+
+
+disjoint xs ys = all (`notElem` xs) ys

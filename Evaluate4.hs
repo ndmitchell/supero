@@ -223,10 +223,8 @@ normalise x = (vars, evalState (uniqueBoundVarsFunc (CoreFunc "" vars x)) (1 :: 
 
 maxSize = 5
 
-size x = fold (\_ i -> 1 + maximum (0:i)) $ transform f x
-    where
-        f (CoreLet bind x) = replaceFreeVars bind x
-        f x = x
+size :: CoreExpr -> Int
+size = fold (\_ i -> 1 + maximum (0:i))
 
 
 {-

@@ -109,6 +109,12 @@ prelude_Char_Show_showList :: [Int] -> [Int] -> [Int]
 prelude_Char_Show_showList value rest = str_ (show (map toEnum value :: [Char])) ++ rest
 
 
+prelude_Int_Show_showsPrec :: Int -> Int -> [Int] -> [Int]
+prelude_Int_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest
+
+prelude_Integer_Show_showsPrec :: Int -> Integer -> [Int] -> [Int]
+prelude_Integer_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest
+
 
 {- OLD PREFIX
 

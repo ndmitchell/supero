@@ -262,15 +262,56 @@ onf resultName x = do
             case r of
                 Just x -> return x
                 Nothing -> do
-                    x <- unfold s x
-                    x <- coreSimplifyExprUniqueExt onfExt x
-                    if done s x
-                        then unpeel s x
-                        else f x
+                    r <- onfStep s x
+                    case r of
+                        Nothing -> unpeel s x
+                        Just x -> do
+                            x <- coreSimplifyExprUniqueExt onfExt x
+                            if overflow x
+                                then unpeel s x
+                                else f x
 
-done s x = optimal s x || size x > maxSize
+overflow x = size x > maxSize
+
+-- done s x = optimal s x || size x > maxSize
 
 
+
+-- optimise to one step, Nothing says you are done already
+onfStep :: S -> CoreExpr -> SS (Maybe CoreExpr)
+onfStep s (CoreLet [] x) = onfStep s x
+
+onfStep s (CoreLet ((lhs,rhs):bind) x) = do
+    r <- onfStep s rhs
+    case r of
+        Just rhs2 -> return $ Just $ CoreLet ((lhs,rhs2):bind) x
+        Nothing -> do
+            r <- onfStep s $ coreLet bind x
+            case r of
+                Nothing -> return Nothing
+                Just x2 -> return $ Just $ CoreLet [(lhs,rhs)] x2
+
+onfStep s (CoreCase x xs) = do
+    r <- onfStep s x
+    case r of
+        Just x2 -> return $ Just $ CoreCase x2 xs
+        Nothing -> return Nothing
+
+onfStep s (CoreApp x xs) = do
+    r <- onfStep s x
+    case r of
+        Just x2 -> return $ Just $ coreApp x2 xs
+        Nothing -> return Nothing
+
+onfStep s (CoreFun x) | not (prim s x || caf s x) = do
+    CoreFunc _ params body <- uniqueBoundVarsFunc $ core s x
+    return $ Just $ coreLam params body
+
+onfStep _ _ = return Nothing
+
+
+
+{-
 optimal s (CoreLet bind x) = optimal s x
 optimal s (CoreCase on alts) = optimal s on
 optimal s (CoreApp x xs) = optimal s x
@@ -295,11 +336,16 @@ unfold s (CoreApp (CoreFun name) args)
     return $ coreApp (coreLam params body) args
 
 unfold s x = return x
+-}
 
 
 unpeel s (CoreFun x) | caf s x = tie (CoreFun x)
-unpeel s x | done s x = descendM (unpeel s) x
-           | otherwise = tie x
+unpeel s x | overflow x = descendM (unpeel s) x
+           | otherwise = do
+                r <- onfStep s x
+                case r of
+                    Nothing -> descendM (unpeel s) x
+                    Just _ -> tie x
 
 
 --------------------------------------------------------------------
@@ -310,7 +356,7 @@ unpeel s x | done s x = descendM (unpeel s) x
 protect :: CoreExpr -> SS (Maybe CoreExpr)
 protect x = do
     let evils = filter isEvil $ concatMap universe $ children x
-    if null evils then return Nothing else liftM Just (dump evils x)
+    if null evils then return Nothing else do liftM Just (dump (nub evils) x)
 
 
 dump evils x = f (map (collectFreeVars &&& id) evils) x

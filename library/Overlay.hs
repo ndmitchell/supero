@@ -113,6 +113,8 @@ global_Prelude''getContents =
         returnIO ((toEnum c :: Char) : cs)
 
 
+
+
 -- if we make a primitive IO, it adds a mkIO wrapper, so avoid that
 foreign import primitive get_char :: TIO Int
 
@@ -124,6 +126,7 @@ foreign import primitive global_System'_IO''hPutChar :: Handle -> Char -> TIO ()
 
 
 foreign import primitive global_System'_Environment''getArgs :: TIO [String]
+foreign import primitive global_Prelude''readFile :: a
 
 
 -- things which are just way too complex

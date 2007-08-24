@@ -393,13 +393,14 @@ isEvil = any (uncurry eqContexts) . tail . getContexts
 
 
 eqContexts :: CoreExpr -> CoreExpr -> Bool
-eqContexts (CoreVar "") _ = True
-eqContexts (CoreVar _) (CoreVar _) = True
-eqContexts x y = eq1 x y && and (zipWith eqContexts (children x) (children y))
+eqContexts x y = f (blurVar x) (blurVar y)
+    where
+        f (CoreVar "?") _ = True
+        f x y = eq1 x y && and (zipWith eqContexts (children x) (children y))
 
 
 getContexts :: CoreExpr -> [(CoreExpr, CoreExpr)]
-getContexts x = (CoreVar "", x) :
+getContexts x = (CoreVar "?", x) :
         [(context (map fst pre ++ [fst m] ++ map fst post), snd m)
         | (pre,mid,post) <- splits (map (id &&& getContexts) children)
         , m <- snd mid]

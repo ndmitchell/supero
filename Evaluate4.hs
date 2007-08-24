@@ -57,12 +57,13 @@ preOpt x = transformExpr f x
 
 evaluate :: (Int -> Core -> IO ()) -> Core -> IO Core
 evaluate out c = do
+    cafs <- return $ detectCafs c
     out 0 c
     c <- return $ preOpt c
     out 1 c
     c <- return $ smallSize c
     out 2 c
-    c <- liftM (coreReachable ["main"]) (eval c)
+    c <- liftM (coreReachable ["main"]) (eval cafs c)
     out 3 c
     c <- return $ coreFix c
     out 4 c
@@ -123,8 +124,8 @@ smallSize core = core{coreFuncs = fst $ execState (mapM_ f (coreFuncs core)) ([]
 ---------------------------------------------------------------------
 -- EVAL DRIVER
 
-eval :: Core -> IO Core
-eval core = do
+eval :: Set.Set CoreFuncName -> Core -> IO Core
+eval cafs core = do
     let s0 = S Map.empty id 1 1 (coreFuncMap fm) (`Set.member` primsSet) (`Set.member` cafs)
     sn <- sfRun (tieFunc (coreFuncMap fm "main")) s0
     case sn of
@@ -134,7 +135,14 @@ eval core = do
         fm = toCoreFuncMap core
         prims = filter isCorePrim (coreFuncs core)
         primsSet = Set.fromList $ map coreFuncName prims
-        cafs = Set.fromList [coreFuncName x | x <- coreFuncs core, isCaf (coreFuncMap fm) x]
+
+
+---------------------------------------------------------------------
+-- CAF DETECTION
+
+detectCafs :: Core -> Set.Set CoreFuncName
+detectCafs core = Set.fromList [coreFuncName x | x <- coreFuncs core, isCaf (coreFuncMap fm) x]
+    where fm = toCoreFuncMap core
 
 
 isCaf func (CoreFunc name [] body) = expensive $ coreSimplify body

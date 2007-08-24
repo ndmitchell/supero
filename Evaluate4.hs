@@ -270,14 +270,15 @@ onf resultName x = do
             case r of
                 Just x -> return x
                 Nothing -> do
-                    r <- onfStep s x
-                    case r of
-                        Nothing -> unpeel s x
-                        Just x -> do
-                            x <- coreSimplifyExprUniqueExt onfExt x
-                            if overflow x
-                                then unpeel s x
-                                else f x
+                   if overflow x
+                        then {- sfPrint (show x) >> sfPause >> -} unpeel s x
+                        else do
+                            r <- onfStep s x
+                            case r of
+                                Nothing -> unpeel s x
+                                Just x -> do
+                                    x <- coreSimplifyExprUniqueExt onfExt x
+                                    f x
 
 overflow x = size x > maxSize
 

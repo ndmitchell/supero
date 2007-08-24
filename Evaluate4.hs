@@ -203,9 +203,9 @@ tie x = do
                     modify $ \s -> s{names = Map.insert key name (names s)}
                     let o = x
                     x <- onf name x
-                    addFunc (CoreFunc name params x)
+                    addFunc (CoreFunc name (if null params then ["uncaf"] else params) x)
                     return name
-            return $ coreApp (CoreFun name) (map CoreVar args)
+            return $ coreApp (CoreFun name) (if null args then [CoreCon "()"] else map CoreVar args)
     where
         getName x = do
             s <- get

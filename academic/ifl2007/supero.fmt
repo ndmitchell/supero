@@ -47,7 +47,7 @@
 %format \< = "[\!["
 %format \> = "]\!]"
 
-%format _T = "\mathcal{T}"
+%format _E = "\mathcal{E}"
 %format _C = "\mathcal{C}"
 %format _D = "\mathcal{D}"
 %format _N = "\mathcal{N}"
@@ -58,8 +58,8 @@
 %format _T_ = "\mathcal{\overline{T}}"
 %format _C_ = "\mathcal{\overline{C}}"
 
-%format x_  = "\Varid{\overline{x}}"
-%format v_  = "\Varid{\overline{v}}"
+%format xs_  = "\Varid{\overline{xs}}"
+%format alts_  = "\Varid{\overline{alts}}"
 %format c_  = "\Varid{\overline{c}}"
 %format t_  = "\Varid{\overline{t}}"
 

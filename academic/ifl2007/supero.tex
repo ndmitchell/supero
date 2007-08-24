@@ -61,7 +61,7 @@ By using the optimiser developed in this paper we can eliminate all these overhe
 
 \subsection{Roadmap}
 
-This paper first introduces a Core language 
+This paper first introduces a Core language
 
 \section{Core Language}
 
@@ -106,13 +106,93 @@ In order to avoid inadvertant name clashes in generated code, we demand the inva
 
 \section{Optimisation}
 
+Our optimisation procedure takes as input a program in Core, and produces a program in Core that has the same effect as the original -- although hopefully which performs better. We do not make small changes to the original program, but instead evaluate the program at compile time, leaving a residual program which cannot be evaluated.
+
+Our optimisation proceeds by starting at the |main| function, and optimising the expression using the evaluation rules in Figure \ref{fig:evaluate}, and the simplification rules in Figure \ref{fig:simplify}. Once no more rules are applicable, the outermost element in the Core expression become part of the residual program. All the inner expressions are assigned names, which become functions in the residual program. Each of these new functions are then optimised as before.
+
+Each function in the resultant program has a uniquely generated name, an expression in the source program, and an expression in the residual program.
+
+The optimisation of an expression is performed with the |_E| function. This function proceeds much like evaluation at run time, but stops if the most next expression to reduce is either a free variable, or a primitive, or a CAF (constant applicative form -- see \ref{sec:caf} for more details).
+
+
+\begin{figure}[tb]
+\begin{code}
+_E\<case x of alts_  \> =  case _E\<x\> of alts_
+_E\<let v = e in x   \> =  let v = _E\<e\> in _E\<x\>
+_E\<x xs_            \> =  _E\<x\> xs_
+_E\<f                \> =  _E\<unfold f\>
+                           where f {-" \hbox{ is a non-primitive, non-CAF function} "-}
+_E\<x                \> =  x
+\end{code}
+\caption{Evaluate function, |_E|}
+\label{fig:evaluate}
+\end{figure}
+
+\begin{figure}[tb]
+\begin{code}
+case (case ... of ...) of ...
+case C ... of ...
+case v of {C ... -> ... v ...; ...}
+let v = e in ... where e {-" \hbox{ is a lambda, constructor, variable, used once etc.} "-}
+\end{code}
+\caption{Simplifications}
+\label{fig:simplify}
+\end{figure}
+
+To 
+
+
+The generated program is simply an associate between function names and expressions. We start from the expression in main, optim
+
+Take the procedure |main| and evaluate it. Then peel off one level of the residual program.
+
+
+
+
+
 The optimisation takes a Core language to a Core language. Works from one program to another. Describe the optimisation in detail, leaving out termination issues.
 
-\section{Termination}
+\subsection{Let Bindings}
+
+Let bindings are optimised and reduced if possible.
+
+\subsection{CAF's}
+\label{sec:caf}
+
+
+
+\subsection{Termination}
 
 How we bound the terminated language.
 
+\section{Small Examples}
+
+To show some examples of the kind of optimisations 
+
+\begin{code}
+map f xs = case  xs of
+                 []    -> []
+                 y:ys  -> f y : map f ys
+
+main xs = map (+1) (map (*2) xs)
+\end{code}
+
+\begin{code}
+main xs = map xs
+
+map xs = case  xs of
+               []    -> []
+               y:ys  -> (y*2)+1 : map ys
+\end{code}
+
+
+
+
+
+
 \section{Benchmarks Versus C}
+
+include details of getchar being redefined
 
 
 \section{Benchmarks Versus Haskell}
@@ -120,8 +200,6 @@ How we bound the terminated language.
 \section{Related Work}
 
 \section{Conclusion}
-
-
 
 
 \end{document}

@@ -1,17 +1,22 @@
 \documentclass{llncs}
 
+\usepackage{url}
+
+%include polycode.fmt
+%include supero.fmt
+
 \begin{document}
 
 \title{Fast Haskell}
 
-\author{Neil Mitchell and Colin Runciman \inst{1}}
+\author{Neil Mitchell and Colin Runciman}
 
 \institute{University of York, UK, \url{http://www.cs.york.ac.uk/~ndm}}
 
 \maketitle              % typeset the title of the contribution
 
 \begin{abstract}
-This approach gives fast-ish compilation times and dead quick code.
+Haskell is a high level functional language, with features like higher order functions and lazy evaluation, which allow succinct representations of programs. These high level features can result in poor runtime speed of generated code, if care is not taken. This paper presents a whole program approach to transformation, which enables significant speed ups.
 \end{abstract}
 
 \section{Introduction}
@@ -22,7 +27,27 @@ Haskell can be used to write high level specifications of programs, which can ru
 main = print . length . words =<< getContents
 \end{code}
 
-Compared to a C program to perform this task (see Figure \ref{fig:c_words}), the Haskell version is clearly more concise, more specification orientated and clearly correct. Unfortunately with all these good points,  it is also three times slower than the C version.
+Compared to a C program to perform this task (see Figure \ref{fig:c_words}), the Haskell version is more concise, more specification orientated and easier to convince others of its correctness. Unfortunately with all these good points,  it is also three times slower than the C version.
+
+\begin{figure}[tb]
+\begin{verbatim}
+int main()
+{
+	int i = 0;
+	int c, last_space = 1, this_space;
+	while ((c = getchar()) != EOF) {
+		this_space = isspace(c);
+		if (last_space && !this_space)
+			i++;
+		last_space = this_space;
+	}
+	printf("%i\n", i);
+	return 0;
+}
+\end{verbatim}
+\caption{Word counting in C}
+\label{fig:c_words}
+\end{figure}
 
 There are several reasons that the Haskell version does not perform at the same speed as the C version:
 
@@ -31,6 +56,70 @@ There are several reasons that the Haskell version does not perform at the same 
 \item[Higher Order Arguments] The |words| function is defined using the function |span|, which takes a predicate and splits the input list when the predicate becomes true. The predicate is passed as a higher order function, which is constant on all applications.
 \item[Laziness] The Haskell program proceeds in a lazy manner, demanding one character from |getContents|, then processing it with each of the functions in the pipeline. At each stage, a lazy thunk for the remainder of the function is created.
 \end{description}
+
+By using the optimiser developed in this paper we can eliminate all these overheads, resulting in a program that performs \textit{faster} than the equivalent C version. The central idea of the optimiser is that we attempt to evaluate as much of the program at compile time as possible, leaving a residual program consisting of only actions dependent on the input data.
+
+\subsection{Roadmap}
+
+This paper first introduces a Core language 
+
+\section{Core Language}
+
+\begin{figure}
+\begin{code}
+type FunName  = String
+type VarName  = String
+type ConName  = String
+
+type Core = [FunDef]
+
+data FunDef  =  FunDef FunName (Maybe Expr)
+
+data Expr  =  Fun   FunName
+           |  Con   ConName
+           |  Var   VarName
+           |  App   Expr [Expr]
+           |  Lam   [VarName] Expr
+           |  Let   [(VarName,Expr)] Expr
+           |  Case  Expr [(Pat, Expr)]
+           |  Lit   Lit
+
+data Lit = ... -- literal values
+
+data Pat = PatCon  ConName [VarName]
+         | PatLit  Lit
+         | PatDefault
+\end{code}
+\caption{Core syntax}
+\label{fig:core}
+\end{figure}
+
+All our optimisations operate on a fairly standard Core language, given in Figure \ref{fig:core}. This language is both higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. Full details on the Core language are given in \cite{me:yhc_core}.
+
+A program (the |Core| type) is a list of function definitions (the |FunDef| type). A function definition is either a primitive (in which case the associated expression is not present), or a definition introduced by the program. An expression (the |Expr| type) consists of many standard elements in a functional language, functions (|Fun|) and constructors (|Con|), application (|App|), case/let/lambda expressions and literals. A case expression associates a list of patterns with expressions to execute if the pattern is matched.
+
+To generate core representations of programs, it is natural to start with a full Haskell compiler, and we chose Yhc \cite{me:yhc_core}, a fork of nhc \cite{nhc}. The core language of Yhc, PosLambda, was intended only as an internal representation, and exposes certain details that are specific to the compiler. We have therefore introduced a new Core language to Yhc, to which PosLambda can easily be translated. All names are fully qualified. Haskell's type classes have been removed (see \S\ref{sec:dict}). Only top-level functions remain; all local functions have been lambda lifted. All constructor applications are fully saturated. Pattern matching occurs only in case expressions; alternatives match only the top level constructor and are exhaustive, including an |error| alternative if necessary.
+
+The primary difference between our Core language and that of a compiler such as GHC is that ours is untyped. The Core is generated from well-typed Haskell, and can be guaranteed not to go wrong with a type error. All the transformations we implement could be implemented equally in a typed Core language. We prefer to work in an untyped Core language for simplicity of implementation, but realise that the benefits of a closer guarantee of correctness from a typed Core may attract mature compilers to use a typed core.
+
+In order to avoid inadvertant name clashes in generated code, we demand the invariant that all variables in a program are unique.
+
+\section{Optimisation}
+
+The optimisation takes a Core language to a Core language. Works from one program to another. Describe the optimisation in detail, leaving out termination issues.
+
+\section{Termination}
+
+How we bound the terminated language.
+
+\section{Benchmarks Versus C}
+
+
+\section{Benchmarks Versus Haskell}
+
+\section{Related Work}
+
+\section{Conclusion}
 
 
 

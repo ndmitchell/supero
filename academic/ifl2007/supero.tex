@@ -27,6 +27,8 @@ Haskell can be used to write high level specifications of programs, which can ru
 main = print . length . words =<< getContents
 \end{code}
 
+The |getContents| function reads the input as a list of characters, |words| splits this list into a list of words, |length| counts the number of words, and finally |print| writes the value to the screen. The use of |(=<<)| is merely to do sequence the actions, and can be ignored for those unfamiliar with Haskell and monadic IO.
+
 Compared to a C program to perform this task (see Figure \ref{fig:c_words}), the Haskell version is more concise, more specification orientated and easier to convince others of its correctness. Unfortunately with all these good points,  it is also three times slower than the C version.
 
 \begin{figure}[tb]
@@ -58,6 +60,8 @@ There are several reasons that the Haskell version does not perform at the same 
 \end{description}
 
 By using the optimiser developed in this paper we can eliminate all these overheads, resulting in a program that performs \textit{faster} than the equivalent C version. The central idea of the optimiser is that we attempt to evaluate as much of the program at compile time as possible, leaving a residual program consisting of only actions dependent on the input data.
+
+Our goal is to make high-level Haskell programs perform as fast as low-level Haskell programs, eliminating the need to optimise Haskell programs in the kind of detail currently required for high performance programs. We require no annotations on any part of the program, even library functions, in contrast to other approaches.
 
 \subsection{Roadmap}
 
@@ -94,7 +98,7 @@ data Pat = PatCon  ConName [VarName]
 \label{fig:core}
 \end{figure}
 
-All our optimisations operate on a fairly standard Core language, given in Figure \ref{fig:core}. This language is both higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. Full details on the Core language are given in \cite{me:yhc_core}.
+All our optimisations operate on a standard Core language, given in Figure \ref{fig:core}. This language is both higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. Full details on the Core language are given in \cite{me:yhc_core}.
 
 A program (the |Core| type) is a list of function definitions (the |FunDef| type). A function definition is either a primitive (in which case the associated expression is not present), or a definition introduced by the program. An expression (the |Expr| type) consists of many standard elements in a functional language, functions (|Fun|) and constructors (|Con|), application (|App|), case/let/lambda expressions and literals. A case expression associates a list of patterns with expressions to execute if the pattern is matched.
 
@@ -130,16 +134,20 @@ _E\<x                \> =  x
 
 \begin{figure}[tb]
 \begin{code}
-case (case ... of ...) of ...
+case (case x of ...) of ...
+
 case C ... of ...
-case v of {C ... -> ... v ...; ...}
-let v = e in ... where e {-" \hbox{ is a lambda, constructor, variable, used once etc.} "-}
+
+case v of {C xs_ -> y; ...} => case v of {C xs_ -> y[v/C xs_]; ...}
+
+let v = e in x => x[v/e]
+   where e {-" \hbox{ is a lambda, constructor, variable, used once etc.} "-}
 \end{code}
 \caption{Simplifications}
 \label{fig:simplify}
 \end{figure}
 
-To 
+To
 
 
 The generated program is simply an associate between function names and expressions. We start from the expression in main, optim
@@ -154,7 +162,7 @@ The optimisation takes a Core language to a Core language. Works from one progra
 
 \subsection{Let Bindings}
 
-Let bindings are optimised and reduced if possible.
+Let bindings are optimised and reduced if possible. They encode sharing so simply inlining a let binding may duplicate an arbitrary amount of computation. 
 
 \subsection{CAF's}
 \label{sec:caf}
@@ -167,7 +175,7 @@ How we bound the terminated language.
 
 \section{Small Examples}
 
-To show some examples of the kind of optimisations 
+To show some examples of the kind of optimisations
 
 \begin{code}
 map f xs = case  xs of
@@ -192,12 +200,51 @@ map xs = case  xs of
 
 \section{Benchmarks Versus C}
 
-include details of getchar being redefined
+The most comprehensive inter-language benchmarking effort is the Programming Language Shootout \cite{shootout}, where a variety of tasks are benchmarked in multiple languages with multiple implementations. Unfortunately, in order to ensure a balanced comparison, many of the restrictions on the benchmarks directly harm lazy languages. Inspired by their approach, we have attempted to define some simpler benchmarks on which it is possible to directly compare Haskell to C.
 
+The set of benchmarks we have chosen are inspired by the Unix \texttt{wc} command -- namely character, word and line counting. In all cases we require to read a file from the standard input, and perform the computation. In order to ensure that we test computation speed, not IO speed (which is usually a product of the underlying buffering system, rather than the compilation prowess) we demand that all input is read using the standard C |getchar| function only. Any buffering improvements, such as chunked reading or memory mapping of files, could be performed equally in all compilers.
+
+All the C versions are transformed into state machines, where characters are read in a loop, and an accumulator is kept -- much the same as in Figure \ref{fig:c_words}. The Haskell versions all follow the same pattern as in the Introduction, merely replacing |words| with |lines|, or removing the |words| function for character counting.
+
+We performed all benchmarks on a Windows XP, 3GHz hyperthreaded, 1Gb RAM machine. The C versions used GCC version n.n with -O3. The pure Haskell version used GHC 6.6.1 with -O2. The Supero version was compiled using our optimiser, then written back as a Haskell file, and compiled once more with GHC 6.6.1 with -O2.
+
+The result of the benchmarks are given here.
+
+\subsection{Identified Haskell Speedups}
+
+In our exploration of the performance bottlenecks in the Haskell variant we identified two reasons for Hsakell underperforming.
+
+The first is that |isSpace| in Haskell is significantly more expensive than the C |isspace|. The solution we to use an FFI call to the C |isspace| in all cases, removing this source of variance. A GHC bug has been filed about the slow performance of |isspace|, so hopefully this will improve in time.
+
+The second is that the |words| function in Haskell performs two additional |isspace| tests per word read. We have transformed the |words| function to eliminate these unnecessary tests, and have submitted this code for inclusion in a future release of the standard libraries.
+
+\subsection{Potential Haskell Speedups}
+
+There are a number of reasons that the Haskell underperforms relative to the C version.
+
+Lack of strictness information
+
+Heap checks
+
+Stack checks
+
+\subsection{Haskell Outperforms C}
+
+The reason Haskell outperforms C is that the C has redundant flow information. By moving the boolean into the program counter you can go faster. Unfortunately releasing this flow control in C is challenging! Using the |goto| keyword is not appropriate, as typically this turns off many critical optimisations in the C compiler. It can be done, using a nested |while| loop, in a function, and using |return| to break from the inner loop. This solution would not scale to a three-valued control structure, but could be used to achieve higher performance in word counting -- at the cost of code complication and duplication.
 
 \section{Benchmarks Versus Haskell}
 
+The standard benchmark suite in Haskell is the nofib suite, and more recently the nobench suite has added a few benchmarks and removed many.
+
 \section{Related Work}
+
+Partial evaluation - not really that related.
+
+Supercompilation - quite related.
+
+Deforestation - quite related.
+
+Other transformations - we generalise SpecConstr, inlining etc.
 
 \section{Conclusion}
 

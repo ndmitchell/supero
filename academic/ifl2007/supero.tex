@@ -16,7 +16,7 @@
 \maketitle              % typeset the title of the contribution
 
 \begin{abstract}
-Haskell is a high level functional language, with features like higher order functions and lazy evaluation, which allow succinct representations of programs. These high level features can result in poor runtime speed of generated code, if care is not taken. This paper presents a whole program approach to transformation, which enables significant speed ups.
+Haskell is a high level functional language, with features like higher order functions and lazy evaluation, which allow succinct representations of programs. These high level features can result in poor runtime speed of generated code, if care is not taken. This paper presents a whole program approach to transformation, which enables substantial speed improvements relative to the GHC, a mature optimising compiler.
 \end{abstract}
 
 \section{Introduction}
@@ -147,9 +147,6 @@ let v = e in x => x[v/e]
 \label{fig:simplify}
 \end{figure}
 
-To
-
-
 The generated program is simply an associate between function names and expressions. We start from the expression in main, optim
 
 Take the procedure |main| and evaluate it. Then peel off one level of the residual program.
@@ -167,6 +164,7 @@ Let bindings are optimised and reduced if possible. They encode sharing so simpl
 \subsection{CAF's}
 \label{sec:caf}
 
+A CAF (constant applicative form) is a top level function of zero arguments. In Haskell, these CAF values can be expected to be cached, so that multiple uses of one CAF performs only one computation of the value.
 
 
 \subsection{Termination}

@@ -6,6 +6,13 @@
 %include polycode.fmt
 %include supero.fmt
 
+\newenvironment{fig}
+    {\begin{figure}[tbp]\hrule}
+    {\end{figure}}
+
+\newcommand{\figend}{\hrule}
+
+
 \begin{document}
 
 \title{Supero: Making Haskell Faster}
@@ -32,7 +39,8 @@ The |getContents| function reads the input as a list of characters, |words| spli
 
 Compared to a C program to perform this task (see Figure \ref{fig:c_words}), the Haskell version is more concise, more specification orientated and easier to convince others of its correctness. Unfortunately with all these good points,  it is also three times slower than the C version.
 
-\begin{figure}[tb]
+\begin{fig}
+\bigskip
 \begin{verbatim}
 int main()
 {
@@ -48,9 +56,10 @@ int main()
 	return 0;
 }
 \end{verbatim}
+\figend
 \caption{Word counting in C}
 \label{fig:c_words}
-\end{figure}
+\end{fig}
 
 There are several reasons that the Haskell version does not perform at the same speed as the C version:
 
@@ -70,137 +79,243 @@ Insert here
 
 \section{Core Language}
 
-\begin{figure}
+\begin{fig}
 \begin{code}
-type FunName  = String
-type VarName  = String
-type ConName  = String
+expr  =  v                                          {-" \text{  variable} "-}
+      |  c                                          {-" \text{  constructor} "-}
+      |  f                                          {-" \text{  function} "-}
+      |  x y                                        {-" \text{  application} "-}
+      |  \v -> x                                    {-" \text{  lambda abstraction} "-}
+      |  let v = x in y                             {-" \text{  let binding} "-}
+      |  case x of {p_1 -> y_1 ; ... ; p_n -> y_n}  {-" \text{  case expression} "-}
 
-type Core = [FunDef]
-
-data FunDef  =  FunDef FunName (Maybe Expr)
-
-data Expr  =  Fun   FunName
-           |  Con   ConName
-           |  Var   VarName
-           |  App   Expr [Expr]
-           |  Lam   [VarName] Expr
-           |  Let   [(VarName,Expr)] Expr
-           |  Case  Expr [(Pat, Expr)]
-           |  Lit   Lit
-
-data Lit = ... -- literal values
-
-data Pat  =  PatCon  ConName [VarName]
-          |  PatLit  Lit
-          |  PatDefault
+pat   =  c vs_
 \end{code}
+
+Where |v| ranges over variables, |C| ranges over constructors, |f| ranges over functions, |x|, |y| and |z| range over expressions and |p| ranges over patterns.
+\bigskip
+\figend
 \caption{Core syntax}
 \label{fig:core}
-\end{figure}
+\end{fig}
 
-All our optimisations operate on a standard Core language, given in Figure \ref{fig:core}, and documented more comprehensively in \cite{me:yhc_core}. This language is higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. All names are fully qualified. Haskell's type classes have been removed (see \S\ref{sec:dict}).
+All our optimisations operate on a standard Core language, documented in \cite{me:yhc_core}. The expression data type is given in Figure \ref{fig:core}. A program is a mapping of function names to expressions. Our Core language is higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. All names are fully qualified. Haskell's type classes have been removed by the dictionary transformation \cite{wadler:type_classes}.
 
-A program (the |Core| type) is a list of function definitions (the |FunDef| type). A function definition is either a primitive (in which case the associated expression is not present), or a definition introduced by the program. An expression (the |Expr| type) consists of many standard elements in a functional language, functions (|Fun|) and constructors (|Con|), application (|App|), case/let/lambda expressions and literals. A case expression associates a list of patterns with expressions to execute if the pattern is matched.
+The Yhc compiler, a fork of nhc \cite{nhc}, can output Core files using a single flag. Yhc can also link in all definitions from all required libraries, and can produce a single Core file representing the entire program.
 
-The Yhc compiler, a fork of nhc \cite{nhc}, can generate files in this core format with a simple flag. Yhc is also capable of linking together all definitions from all libraries, and can hence produce a Core file including all necessary library definitions.
+The primary difference between our Core language and that of the GHC compiler \cite{ghc_core} is that ours is untyped. The Core is generated from well-typed Haskell, and is guaranteed not to fail with a type error. All the transformations we implement could be implemented equally well in a typed Core language. We prefer to work in an untyped Core language for simplicity of implementation.
 
-The primary difference between our Core language and that of the GHC compiler is that ours is untyped. The Core is generated from well-typed Haskell, and can be guaranteed not to go wrong with a type error. All the transformations we implement could be implemented equally in a typed Core language. We prefer to work in an untyped Core language for simplicity of implementation, but realise that the benefits of a closer guarantee of correctness from a typed Core may attract mature compilers to use a typed core.
-
-In order to avoid accidental name clashes while performing transformations, we demand that all variables in a program are unique. All transformations may both assume this invariant, and must ensure it as a postcondition.
+In order to avoid accidental variable name clashes while performing transformations, we demand that all variables within a program are unique. All transformations may assume this invariant, and must ensure it as a postcondition.
 
 \section{Optimisation}
 
-Our optimisation procedure takes a Core program as input, and produces a new Core program that has the same effect as the original -- although hopefully which performs better. We do not make small changes to the original program, but instead evaluate some of the program at compile time, leaving a residual program to be run.
+Our optimisation procedure takes a Core program as input, and produces a new Core program, that has the same effect as the original -- hopefully with improved performance. We do not make small changes to the original program, but instead evaluate some of the program at compile time, leaving a residual program to be run.
 
-Each function in the output program is associated with an expression in the input program. The expression in the output program is an optimised version of the expression in the input program.
+Each function in the output program is associated with an expression in the input program. The expression in the output program is an optimised version of the expression in the input program. Our optimisation proceeds by starting at the |main| function, and optimising the expression associated with |main|. Once the expression has been optimised, the outermost element in the expression becomes part of the residual program. All the inner expressions are assigned names, which become functions in the residual program. Each of these new functions are then optimised as before.
 
-Our optimisation proceeds by starting at the |main| function, and optimising the expression associated with |main|. Once the expression has been optimised, the outermost element in the Core expression becomes part of the residual program. All the inner expressions are assigned names, which become functions in the residual program. Each of these new functions are then optimised as before.
-
-The optimisation of an expression is performed with the |_E| function in Figure \ref{fig:evaluate}, and the simplification rules in Figure \ref{fig:simplify}. This function proceeds much like evaluation at run time, but stops if the most next expression to reduce is either a free variable, or a primitive, or a CAF (constant applicative form -- see \ref{sec:caf} for more details).
-
-
-\begin{figure}[tb]
+\begin{fig}
 \begin{code}
-_E\<case x of alts_  \> =  case _E\<x\> of alts_
-_E\<let v = e in x   \> =  let v = _E\<e\> in _E\<x\>
-_E\<x xs_            \> =  _E\<x\> xs_
-_E\<f                \> =  _E\<unfold f\>
+_O\<case x of alts_  \> =  case _O\<x\> \? of alts_
+_O\<let v = x in y   \> =  let v = _O\<x\> \? in _O\<y\>
+_O\<x y              \> =  _O\<x\> \? y
+_O\<function         \> =  _O\<unfold f\>
                            where f {-" \hbox{ is a non-primitive, non-CAF function} "-}
-_E\<x                \> =  x
+_O\<x                \> =  x
 \end{code}
-\caption{Evaluate function, |_E|}
-\label{fig:evaluate}
-\end{figure}
+\figend
+\caption{Optimisation function, |_O|}
+\label{fig:optimise}
+\end{fig}
 
-\begin{figure}[tb]
+\begin{fig}
 \begin{code}
-case (case x of ...) of ...
+case (case x of {p_1 -> y_1 ; ... ; p_n -> y_n}) of alts_
+    => case x of  {  p_1  -> case y_1 of alts_
+                  ;  ...
+                  ;  p_n  -> case y_n of alts_ }
 
-case C ... of ...
+case c xs_ of {... ; c vs_ -> y ; ...}
+    => y[vs_/xs_]
 
-case v of {C xs_ -> y; ...} => case v of {C xs_ -> y[v/C xs_]; ...}
+case v of {... ; c vs_ -> x ; ...}
+    => case v of {... ; c vs_ -> x[v/c vs_]; ...}
 
-let v = e in x => x[v/e]
-   where e {-" \hbox{ is a lambda, constructor, variable, used once etc.} "-}
+case (let v = x in y) of alts_
+    => let v = x in case y of alts_
+
+(let v = x in y) xs_
+    => let v = x in y xs_
+
+(case x of {p_1 -> y_1 ; ... ; p_n -> y_n}) xs_
+    => case x of {p_1 -> y_1 xs_ ; ... ; p_n -> y_n xs_}
+
+(\v -> x) y
+    => let v = y in x
+
+let v = x in (case y of {p_1 -> y_1 ; ... ; p_n -> y_n})
+    => case y of  {  p_1  -> let v = x in y_1
+                  ;  ...
+                  ;  p_n  -> let v = x in y_n}
+    where v {-" \hbox{is not used in} "-} y
+
+let v = x in y
+    => y[v/x]
+    where x {-" \hbox{is a lambda, variable, or used once in } "-} y
+
+let v = c x_1 ... x_n in y
+    =>  let v_1 = x_1 in
+        ...
+        let v_n = x_n in
+        y[v/c x_1 ... x_n]
+    where v_1 ... v_n {-" \hbox{ are fresh} "-}
 \end{code}
-\caption{Simplifications}
+\figend
+\caption{Simplification rules}
 \label{fig:simplify}
-\end{figure}
+\end{fig}
 
+The optimisation of an expression is performed using the |_O| function in Figure \ref{fig:evaluate}, and the simplification rules in Figure \ref{fig:simplify}. We define |_OO| to be the fixed point of applying both |_O| and the simplification rules. The |_O| function proceeds much like evaluation at run time, but stops if the next expression to reduce is a free variable, a constructor, a primitive, or a CAF (constant applicative form -- see \S\ref{sec:caf} for more details). The one difference is that in a |let| expression the bound variable and the inner expression are \textit{both} optimised -- see \S\ref{sec:let}.
 
 Let us take a simple example:
 
 \begin{code}
-main xs = map inc xs
+main = \xs -> map inc xs
+
+map = \f -> \xs -> case  xs of
+                         []    -> []
+                         y:ys  -> f y : map f ys
+
+inc = \x -> x+1
+\end{code}
+
+This program defines a |main| function which increments each value in the list by one. Note that |f| is passed around at runtime, when it could be frozen in at compile time. By following the optimisation procedure we end up with:
+
+\begin{code}
+main = \xs -> case  xs of
+                    []    -> []
+                    y:ys  -> f0 y ys
+
+f0 = \y -> \ys -> (y+1) : main ys
+\end{code}
+
+And finally by performing some trivial inlining we can obtain:
+
+\begin{code}
+main = \xs -> case  xs of
+                    []    -> []
+                    y:ys  -> (y+1) : main ys
+\end{code}
+
+The residual program is now optimised -- there is no runtime passing of the |inc| function, only direct a arithmetic operation.
+
+Next we show another example, which has an instance of list deforestation \cite{wadler:deforestation}. Taking the program:
+
+\begin{code}
+main xs = map (+1) (map (*2) xs)
 
 map f xs = case  xs of
                  []    -> []
                  y:ys  -> f y : map f ys
-
-inc = (+1)
 \end{code}
 
-The residual program is still simple.
+This is transformed (after trivial inlining) into:
+
+\begin{code}
+main xs = case  xs of
+               []    -> []
+               y:ys  -> (y*2)+1 : main ys
+\end{code}
+
+Here the intermediate list has been removed, and the higher order functions have been specialised.
+
+
+\subsection{Termination}
+\label{sec:termination}
+
+The main problem with the method as presented so far is that it may not terminate. There are several ways to that non-termination can arise -- we consider, and eliminate, each one in turn.
+
+\subsubsection{Infinite Unfolding}
+
+Consider the definition:
+
+\begin{code}
+name = \x -> name x
+\end{code}
+
+This program would not terminate at runtime, but in a lazy language it is entirely possible that the resultant value would never be demanded, and the program would terminate. Also, while it is unlikely someone would write such a program, it is possible to arise by other transformations.
+
+If the expression |name x| was being optimised then the optimisation function |_OO| would not terminate. We can solve this problem by either bounding the number of unfoldings, or by keeping a list of previous values in the optimisation of an expression. In practice, this situation is rare, and either choice is acceptable. We choose to bound the number of unfoldings to an excessively large number -- resulting in a slight slow down at compilation time of an infinite unfolding, but not impacting either runtime or memory consumption in the common case.
+
+\subsubsection{Accumulating parameters}
+
+Consider the definition:
+
+\begin{code}
+reverseAcc = \xs -> \ys -> case  xs of
+                                 []    -> []
+                                 z:zs  -> reverseAcc zs (z:ys)
+\end{code}
+
+This function is the standard |reverse| function, with an accumulator. The problem is that successive iterations of the optimisation produce progressively larger subexpressions. Initially a function will be created for |reverseAcc _ _|, then for |reverseAcc _ (_:_)|, then |reverseAcc _ (_:_:_)|. If left unchecked there would be an infinite number of functions created in the residual program.
+
+The solution is to bound the size of the input expression associated with each function. The size of the expression being optimised can be reduced by lifting some aspect of the expression into a let binding, then placing this let binding in the residual program. By bounding the size of the expression, we bound the number of functions in the residual program.
+
+If the bound is too high, optimisation will take programs will take too long, the residual program will be excessively large and some functions will have too many arguments. If the bound is too low then we will have limited optimisation. We will come back to the issue of the size of this bound in the results sections \ref{sec:haskell_results}.
+
+\subsubsection{Direct Repetition}
+
+While the two changes presented above do guarantee termination, it is often useful to detect an expression which appears to be repeating, and preemptively bound it. Consider the |reverseAccumulator| example -- the recursive pattern is an instance of \textit{direct repetition}. An expression |x| is directly repeating if |x ~= alpha (alpha beta)| where |beta| is an expression, |alpha| is a non-identity function from an expression to an expression and |~=| is equality where all variables are considered equal.
+
+Some examples of expressions which have direct repetition:
+
+\begin{code}
+x:y:xs
+f (f x)
+case x_1 of {[] -> nil ; y:ys -> case x_2 of {[] -> nil ; z:zs -> cons}}
+\end{code}
+
+If direct repetition is encountered, then the repeating expression is lifted to a top-level let binding, and output directly into the residual program.
 
 \subsection{Let Bindings}
+\label{sec:let}
 
-Let bindings are optimised and reduced if possible. They encode sharing so simply inlining a let binding may duplicate an arbitrary amount of computation.
+The rule for let bindings in Figure \ref{fig:optimise} is curious. While all other rules simply follow evaluation order, the let rule optimises \textit{both} the bound expression and the inner expression. This is a critical choice, which enhances the optimisation performed by the system.
+
+In the Core language a let expression introduces a binding, which is shared. Given the expression |let v = x in y|, if |v| is referred to multiple times in |y|, then the expression |x| will only be computed once. It is important when applying |_OO| that shared let bindings are not unshared. Consider the following program:
+
+\begin{code}
+let v = expensive
+in v + v
+\end{code}
+
+If the expression |v| was unshared, then |expensive| would be computed twice, slowing down the runtime. Yet, by inlining certain let expressions, better optimisation can be achieved. Taking the following fragment from a previous example:
+
+\begin{code}
+let f = inc
+in f y : map f ys
+\end{code}
+
+If |f| is not inlined, then the recursive call to |map| would still contain a higher-order parameter. But at the same time, it is not easy to tell whether |inc| is expensive or not. The solution is to first optimise |inc|, leading to:
+
+\begin{code}
+let f = \x -> x + 1
+in f y : map f ys
+\end{code}
+
+After this optimisation, it is now clear that |f| is a lambda, so by inlining it there will be no additional computation.
 
 \subsection{CAF's}
 \label{sec:caf}
 
-A CAF (constant applicative form) is a top level function of zero arguments. In Haskell, these CAF values can be expected to be cached, so that multiple uses of one CAF performs only one computation of the value.
-
-
-\subsection{Termination}
-
-How we bound the terminated language.
-
-\section{Small Examples}
-
-To show some examples of the kind of optimisations
+A CAF (constant applicative form) is a top level function of zero arguments. In Haskell, these CAF values are computed at most once per program run, and retained. Consider the program:
 
 \begin{code}
-map f xs = case  xs of
-                 []    -> []
-                 y:ys  -> f y : map f ys
+caf = expensive
 
-main xs = map (+1) (map (*2) xs)
+main = caf + caf
 \end{code}
 
-\begin{code}
-main xs = map xs
-
-map xs = case  xs of
-               []    -> []
-               y:ys  -> (y*2)+1 : map ys
-\end{code}
-
-
-
-
-
+In this program |caf| would only be computed once. If a CAF function is inlined then this may result in a computation being performed more than would otherwise occur. To ensure that we do not duplicate computations, we never inline CAF's.
 
 \section{Benchmarks Versus C}
 
@@ -214,8 +329,7 @@ We performed all benchmarks on a Windows XP, 3GHz hyperthreaded, 1Gb RAM machine
 
 The result of the benchmarks are given here.
 
-\begin{figure}[tb]
-\begin{center}
+\begin{fig}
 \begin{barenv}
 \setwidth{20}
 \setdepth{0}
@@ -243,9 +357,10 @@ The result of the benchmarks are given here.
 \legend{2}{Supero}
 \legend{3}{GHC}
 \end{barenv}
-\end{center}
+\figend
 \caption{Example diagram}
-\end{figure}
+\label{fig:c_results}
+\end{fig}
 
 \subsection{Identified Haskell Speedups}
 
@@ -275,8 +390,7 @@ The standard benchmark suite in Haskell is the nofib suite, and more recently th
 
 For this task it is important to clarify what optimisations GHC is doing, and which are being performed by Supero. We can broadly divide those optimisations that GHC is doing into those that benefit Supero generated code, and those which do not. Things like strictness analysis and the low-level code optimisations benefit both Supero and GHC. On the other hand, things like |foldr|/|build| fusion, which rely on precisely named functions, are of no benefit to Supero. Since Supero changes all the identifiers, and does not use any GHC provided library functions, any GHC transformation relying on named identifiers will not apply. The other optimisation that GHC benefits from, but which is not applied to Supero code, is dictionary specialisation. In order for Supero to draw with GHC, it would be necessary to perform all of these transformations in the Supero optimiser.
 
-\begin{figure}[tb]
-\begin{center}
+\begin{fig}
 \begin{barenv}
 \setwidth{20}
 \setdepth{0}
@@ -298,9 +412,10 @@ For this task it is important to clarify what optimisations GHC is doing, and wh
 \bar{78}{1}[queens]
 \bar{0}{0}
 \end{barenv}
-\end{center}
+\figend
 \caption{Time relative to GHC being 100}
-\end{figure}
+\label{fig:haskell_results}
+\end{fig}
 
 
 \section{Related Work}

@@ -1,13 +1,14 @@
 \documentclass{llncs}
 
 \usepackage{url}
+\usepackage{bar}
 
 %include polycode.fmt
 %include supero.fmt
 
 \begin{document}
 
-\title{Fast Haskell}
+\title{Supero: Making Haskell Faster}
 
 \author{Neil Mitchell and Colin Runciman}
 
@@ -90,50 +91,33 @@ data Expr  =  Fun   FunName
 
 data Lit = ... -- literal values
 
-data Pat = PatCon  ConName [VarName]
-         | PatLit  Lit
-         | PatDefault
+data Pat  =  PatCon  ConName [VarName]
+          |  PatLit  Lit
+          |  PatDefault
 \end{code}
 \caption{Core syntax}
 \label{fig:core}
 \end{figure}
 
-All our optimisations operate on a standard Core language, given in Figure \ref{fig:core}. This language is both higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. All names are fully qualified. Haskell's type classes have been removed (see \S\ref{sec:dict}). Full details on the Core language are given in \cite{me:yhc_core}.
+All our optimisations operate on a standard Core language, given in Figure \ref{fig:core}, and documented more comprehensively in \cite{me:yhc_core}. This language is higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. All names are fully qualified. Haskell's type classes have been removed (see \S\ref{sec:dict}).
 
 A program (the |Core| type) is a list of function definitions (the |FunDef| type). A function definition is either a primitive (in which case the associated expression is not present), or a definition introduced by the program. An expression (the |Expr| type) consists of many standard elements in a functional language, functions (|Fun|) and constructors (|Con|), application (|App|), case/let/lambda expressions and literals. A case expression associates a list of patterns with expressions to execute if the pattern is matched.
 
 The Yhc compiler, a fork of nhc \cite{nhc}, can generate files in this core format with a simple flag. Yhc is also capable of linking together all definitions from all libraries, and can hence produce a Core file including all necessary library definitions.
 
-The primary difference between our Core language and that of a compiler such as GHC is that ours is untyped. The Core is generated from well-typed Haskell, and can be guaranteed not to go wrong with a type error. All the transformations we implement could be implemented equally in a typed Core language. We prefer to work in an untyped Core language for simplicity of implementation, but realise that the benefits of a closer guarantee of correctness from a typed Core may attract mature compilers to use a typed core.
+The primary difference between our Core language and that of the GHC compiler is that ours is untyped. The Core is generated from well-typed Haskell, and can be guaranteed not to go wrong with a type error. All the transformations we implement could be implemented equally in a typed Core language. We prefer to work in an untyped Core language for simplicity of implementation, but realise that the benefits of a closer guarantee of correctness from a typed Core may attract mature compilers to use a typed core.
 
-In order to avoid inadvertant name clashes in generated code, we demand the invariant that all variables in a program are unique. All transformations duplicate bound names if appropriate.
+In order to avoid accidental name clashes while performing transformations, we demand that all variables in a program are unique. All transformations may both assume this invariant, and must ensure it as a postcondition.
 
 \section{Optimisation}
 
-Our optimisation procedure takes as input a program in Core, and produces a program in Core that has the same effect as the original -- although hopefully which performs better. We do not make small changes to the original program, but instead evaluate the program at compile time, leaving a residual program which cannot be evaluated.
+Our optimisation procedure takes a Core program as input, and produces a new Core program that has the same effect as the original -- although hopefully which performs better. We do not make small changes to the original program, but instead evaluate some of the program at compile time, leaving a residual program to be run.
 
-Our optimisation proceeds by starting at the |main| function, and optimising the expression using the evaluation rules in Figure \ref{fig:evaluate}, and the simplification rules in Figure \ref{fig:simplify}. Once no more rules are applicable, the outermost element in the Core expression become part of the residual program. All the inner expressions are assigned names, which become functions in the residual program. Each of these new functions are then optimised as before.
+Each function in the output program is associated with an expression in the input program. The expression in the output program is an optimised version of the expression in the input program.
 
-Each function in the resultant program has a uniquely generated name, an expression in the source program, and an expression in the residual program. If 
+Our optimisation proceeds by starting at the |main| function, and optimising the expression associated with |main|. Once the expression has been optimised, the outermost element in the Core expression becomes part of the residual program. All the inner expressions are assigned names, which become functions in the residual program. Each of these new functions are then optimised as before.
 
-Let us take a simple example:
-
-\begin{code}
-main xs = map inc xs
-
-map f xs = case  xs of
-                 []    -> []
-                 y:ys  -> f y : map f ys
-
-inc = (+1)
-\end{code}
-
-The residual program is still simple.
-
-
-
-
-The optimisation of an expression is performed with the |_E| function. This function proceeds much like evaluation at run time, but stops if the most next expression to reduce is either a free variable, or a primitive, or a CAF (constant applicative form -- see \ref{sec:caf} for more details).
+The optimisation of an expression is performed with the |_E| function in Figure \ref{fig:evaluate}, and the simplification rules in Figure \ref{fig:simplify}. This function proceeds much like evaluation at run time, but stops if the most next expression to reduce is either a free variable, or a primitive, or a CAF (constant applicative form -- see \ref{sec:caf} for more details).
 
 
 \begin{figure}[tb]
@@ -164,15 +148,20 @@ let v = e in x => x[v/e]
 \label{fig:simplify}
 \end{figure}
 
-The generated program is simply an associate between function names and expressions. We start from the expression in main, optim
 
-Take the procedure |main| and evaluate it. Then peel off one level of the residual program.
+Let us take a simple example:
 
+\begin{code}
+main xs = map inc xs
 
+map f xs = case  xs of
+                 []    -> []
+                 y:ys  -> f y : map f ys
 
+inc = (+1)
+\end{code}
 
-
-The optimisation takes a Core language to a Core language. Works from one program to another. Describe the optimisation in detail, leaving out termination issues.
+The residual program is still simple.
 
 \subsection{Let Bindings}
 
@@ -225,6 +214,39 @@ We performed all benchmarks on a Windows XP, 3GHz hyperthreaded, 1Gb RAM machine
 
 The result of the benchmarks are given here.
 
+\begin{figure}[tb]
+\begin{center}
+\begin{barenv}
+\setwidth{20}
+\setdepth{0}
+\sethspace{0.05}
+\setstretch{6}
+\setnumberpos{empty}
+% \setxaxis{0}{1}{1}
+% \setxname{$n$}
+\setyaxis{0}{25}{5} \setyname{Seconds}
+\bar{6}{1}
+\bar{6.3}{2}[characters]
+\bar{12.5}{3}
+\bar{0}{0}
+\bar{6.2}{1}
+\bar{6.5}{2}[lines]
+\bar{17}{3}
+\bar{0}{0}
+\bar{7.3}{1}
+\bar{6.9}{2}[words]
+\bar{22}{3}
+\end{barenv}
+\vspace{0.5cm}
+\begin{barenv}
+\legend{1}{C}
+\legend{2}{Supero}
+\legend{3}{GHC}
+\end{barenv}
+\end{center}
+\caption{Example diagram}
+\end{figure}
+
 \subsection{Identified Haskell Speedups}
 
 In our exploration of the performance bottlenecks in the Haskell variant we identified two reasons for Hsakell underperforming.
@@ -253,6 +275,34 @@ The standard benchmark suite in Haskell is the nofib suite, and more recently th
 
 For this task it is important to clarify what optimisations GHC is doing, and which are being performed by Supero. We can broadly divide those optimisations that GHC is doing into those that benefit Supero generated code, and those which do not. Things like strictness analysis and the low-level code optimisations benefit both Supero and GHC. On the other hand, things like |foldr|/|build| fusion, which rely on precisely named functions, are of no benefit to Supero. Since Supero changes all the identifiers, and does not use any GHC provided library functions, any GHC transformation relying on named identifiers will not apply. The other optimisation that GHC benefits from, but which is not applied to Supero code, is dictionary specialisation. In order for Supero to draw with GHC, it would be necessary to perform all of these transformations in the Supero optimiser.
 
+\begin{figure}[tb]
+\begin{center}
+\begin{barenv}
+\setwidth{20}
+\setdepth{0}
+\sethspace{0.5}
+\setstretch{1}
+\setnumberpos{empty}
+% \setxaxis{0}{1}{1}
+% \setxname{$n$}
+\setyaxis{0}{100}{10} \setyname{Relative to GHC}
+\bar{0}{0}
+\bar{75}{1}[digits-of-e2]
+\bar{0}{0}
+\bar{90}{1}[digits-of-e1]
+\bar{0}{0}
+\bar{35}{1}[exp3\_8]
+\bar{0}{0}
+\bar{87}{1}[primes]
+\bar{0}{0}
+\bar{78}{1}[queens]
+\bar{0}{0}
+\end{barenv}
+\end{center}
+\caption{Time relative to GHC being 100}
+\end{figure}
+
+
 \section{Related Work}
 
 Partial evaluation - not really that related.
@@ -265,5 +315,10 @@ Other transformations - we generalise SpecConstr, inlining etc.
 
 \section{Conclusion}
 
+\paragraph{Acknowledgements} Thanks to Simon Peyton Jones, Simon Marlow and Tim Chevalier for help understanding the low-level details of GHC.
+
+\bibliographystyle{plain}
+
+\bibliography{supero}
 
 \end{document}

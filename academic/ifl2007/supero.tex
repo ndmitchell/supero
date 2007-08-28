@@ -65,7 +65,7 @@ Our goal is to make high-level Haskell programs perform as fast as low-level Has
 
 \subsection{Roadmap}
 
-This paper first introduces a Core language
+Insert here
 
 \section{Core Language}
 
@@ -98,15 +98,15 @@ data Pat = PatCon  ConName [VarName]
 \label{fig:core}
 \end{figure}
 
-All our optimisations operate on a standard Core language, given in Figure \ref{fig:core}. This language is both higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. Full details on the Core language are given in \cite{me:yhc_core}.
+All our optimisations operate on a standard Core language, given in Figure \ref{fig:core}. This language is both higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. All names are fully qualified. Haskell's type classes have been removed (see \S\ref{sec:dict}). Full details on the Core language are given in \cite{me:yhc_core}.
 
 A program (the |Core| type) is a list of function definitions (the |FunDef| type). A function definition is either a primitive (in which case the associated expression is not present), or a definition introduced by the program. An expression (the |Expr| type) consists of many standard elements in a functional language, functions (|Fun|) and constructors (|Con|), application (|App|), case/let/lambda expressions and literals. A case expression associates a list of patterns with expressions to execute if the pattern is matched.
 
-To generate core representations of programs, it is natural to start with a full Haskell compiler, and we chose Yhc \cite{me:yhc_core}, a fork of nhc \cite{nhc}. The core language of Yhc, PosLambda, was intended only as an internal representation, and exposes certain details that are specific to the compiler. We have therefore introduced a new Core language to Yhc, to which PosLambda can easily be translated. All names are fully qualified. Haskell's type classes have been removed (see \S\ref{sec:dict}). Only top-level functions remain; all local functions have been lambda lifted. All constructor applications are fully saturated. Pattern matching occurs only in case expressions; alternatives match only the top level constructor and are exhaustive, including an |error| alternative if necessary.
+The Yhc compiler, a fork of nhc \cite{nhc}, can generate files in this core format with a simple flag. Yhc is also capable of linking together all definitions from all libraries, and can hence produce a Core file including all necessary library definitions.
 
 The primary difference between our Core language and that of a compiler such as GHC is that ours is untyped. The Core is generated from well-typed Haskell, and can be guaranteed not to go wrong with a type error. All the transformations we implement could be implemented equally in a typed Core language. We prefer to work in an untyped Core language for simplicity of implementation, but realise that the benefits of a closer guarantee of correctness from a typed Core may attract mature compilers to use a typed core.
 
-In order to avoid inadvertant name clashes in generated code, we demand the invariant that all variables in a program are unique.
+In order to avoid inadvertant name clashes in generated code, we demand the invariant that all variables in a program are unique. All transformations duplicate bound names if appropriate.
 
 \section{Optimisation}
 
@@ -114,7 +114,24 @@ Our optimisation procedure takes as input a program in Core, and produces a prog
 
 Our optimisation proceeds by starting at the |main| function, and optimising the expression using the evaluation rules in Figure \ref{fig:evaluate}, and the simplification rules in Figure \ref{fig:simplify}. Once no more rules are applicable, the outermost element in the Core expression become part of the residual program. All the inner expressions are assigned names, which become functions in the residual program. Each of these new functions are then optimised as before.
 
-Each function in the resultant program has a uniquely generated name, an expression in the source program, and an expression in the residual program.
+Each function in the resultant program has a uniquely generated name, an expression in the source program, and an expression in the residual program. If 
+
+Let us take a simple example:
+
+\begin{code}
+main xs = map inc xs
+
+map f xs = case  xs of
+                 []    -> []
+                 y:ys  -> f y : map f ys
+
+inc = (+1)
+\end{code}
+
+The residual program is still simple.
+
+
+
 
 The optimisation of an expression is performed with the |_E| function. This function proceeds much like evaluation at run time, but stops if the most next expression to reduce is either a free variable, or a primitive, or a CAF (constant applicative form -- see \ref{sec:caf} for more details).
 
@@ -159,7 +176,7 @@ The optimisation takes a Core language to a Core language. Works from one progra
 
 \subsection{Let Bindings}
 
-Let bindings are optimised and reduced if possible. They encode sharing so simply inlining a let binding may duplicate an arbitrary amount of computation. 
+Let bindings are optimised and reduced if possible. They encode sharing so simply inlining a let binding may duplicate an arbitrary amount of computation.
 
 \subsection{CAF's}
 \label{sec:caf}
@@ -232,7 +249,9 @@ The reason Haskell outperforms C is that the C has redundant flow information. B
 
 \section{Benchmarks Versus Haskell}
 
-The standard benchmark suite in Haskell is the nofib suite, and more recently the nobench suite has added a few benchmarks and removed many.
+The standard benchmark suite in Haskell is the nofib suite, and more recently the nobench suite has added a few benchmarks and removed many. A typical Haskell program is huge, because of factors like dictionaries etc. Because of this, we have limited our focus to a small number of benchmarks drawn from the smallest section of the nobench suite. We have deliberate chosen programs which do not do large amounts of IO, but instead are compute bound programs.
+
+For this task it is important to clarify what optimisations GHC is doing, and which are being performed by Supero. We can broadly divide those optimisations that GHC is doing into those that benefit Supero generated code, and those which do not. Things like strictness analysis and the low-level code optimisations benefit both Supero and GHC. On the other hand, things like |foldr|/|build| fusion, which rely on precisely named functions, are of no benefit to Supero. Since Supero changes all the identifiers, and does not use any GHC provided library functions, any GHC transformation relying on named identifiers will not apply. The other optimisation that GHC benefits from, but which is not applied to Supero code, is dictionary specialisation. In order for Supero to draw with GHC, it would be necessary to perform all of these transformations in the Supero optimiser.
 
 \section{Related Work}
 

@@ -371,7 +371,7 @@ The results are given in Figure \ref{fig:c_results}. In all the benchmarks C and
 As part of our benchmarks, we have identified two bottlenecks in the Haskell version of word counting -- both of which are fixed in our benchmark results.
 
 \paragraph{Slow \textsf{isSpace} function}
- 
+
 The first issue is that |isSpace| in Haskell is 79\perc more expensive than |isspace| in C. The simplest solution is to use a FFI (Foreign Function Interface) \cite{haskell_ffi} call to the C |isspace| function in all cases, removing this factor from the benchmark. A GHC bug (number 1473) has been filed about the slow performance of |isSpace|.
 
 \begin{fig}
@@ -423,7 +423,7 @@ Unfortunately, in C it is quite challenging to capture the required flow control
 
 \section{Benchmarks Versus Haskell}
 
-The standard set of Haskell benchmarks is the nofib suite \cite{nofib}. The nofib suite is divided into three categories of increasing size: imaginary, spectral and real. Many small Haskell programs increase in size substantially once the libraries are included, particularly when type classes are involved. Because of the relatively large size of even small examples, we have limited our focus to five benchmarks drawn from the imaginary section. We have deliberately chosen programs which do not perform large amounts of IO, but instead are compute bound programs. 
+The standard set of Haskell benchmarks is the nofib suite \cite{nofib}. The nofib suite is divided into three categories of increasing size: imaginary, spectral and real. Many small Haskell programs increase in size substantially once the libraries are included, particularly when type classes are involved. Because of the relatively large size of even small examples, we have limited our focus to five benchmarks drawn from the imaginary section. We have deliberately chosen programs which do not perform large amounts of IO, but instead are compute bound programs.
 The benchmarks are: digits-of-e1 and digits-of-e2, both of which compute the digits of |e|, by different methods; exp3\_8 performs |3^8| using peano numbers and the |Num| class; primes computes a list of prime numbers; and queens counts the possible safe layouts of queen pieces on a chess board. All benchmarks were run with parameters to ensure runtimes of between 3 and 5 seconds for GHC.
 
 \begin{fig}
@@ -494,23 +494,31 @@ Supero has no special purpose optimisations which rely on named functions or des
 
 Table \ref{tab:haskell_results} includes a column indicating the size bound that was applied to expressions. Out of the five benchmarks, both primes and queens could be run at any greater bound and would still produce the same program -- the direct repetition criteria bounds the expressions on its own. For the remaining programs, a bound was chosen which to ensure that the compilation process was quick (under two seconds). By increasing the termination bound the size of the generated program would increase, but potentially the generated program would execute faster.
 
-The existence of a termination bound with the present degree of sensitivity is a cause for concern. In a large program it is likely that different parts of the program would require different bounds on the size of the generated expression -- something not currently possible. We suspect that the most promising direction is to augment the direct repetition criteria, and hope to obtain termination in all practical cases without resorting to a depth bound. 
-
-\subsection{GHC recompilation issues}
-
-unboxed types, rank-2 types, polymorphic recursion
+The existence of a termination bound with the present degree of sensitivity is a cause for concern. In a large program it is likely that different parts of the program would require different bounds on the size of the generated expression -- something not currently possible. We suspect that the most promising direction is to augment the direct repetition criteria, and hope to obtain termination in all practical cases without resorting to a depth bound.
 
 \section{Related Work}
 
-Partial evaluation - not really that related.
+\paragraph{Partial evaluation} There has been a lot of work on partial evaluation \cite{partial_evaluation}, where a program is specialised with respect to some static data. Typically the emphasis is on determining which variable can be entirely computed at compile time, and which must remain in the residual program. Partial evaluation is particularly appropriate for specialising an interpreter with a partial program to generate a compiler automatically, often with an order of magnitude speedup, known as the First Futanama Projection \cite{futanama:projections}. The difference between our work that partial evaluation is that we do fold back definitions, and perform no binding time analysis. Our method is certainly less appropriate for specialising an interpreter, but in the absence of static data, is still able to show improvements.
 
-Supercompilation - quite related.
+\paragraph{Deforestation} The deforestation technique \cite{wadler:deforestation} removes intermediate lists in computations. This technique has been extended in many ways to encompass higher order deforestation \cite{higher_order_deforestation} and work on non-list types \cite{non_list_deforestation}. Probably the most practically motivated work on deforestation has come from those attempting to restrict deforestation, in particular shortcut deforestation \cite{short_cut_deforestation}, and newer approaches such as stream fusion \cite{stream_fusion}. In this work certain named functions are automatically fused together. By rewriting library functions in terms of these special functions, fusion occurs. Fusion is limited to cases where the correct underlying function is used -- sometimes this requires unnatural definitions.
 
-Deforestation - quite related.
+\paragraph{GRIN} The GRIN approach \cite{grin} is currently being implemented in the JHC compiler \cite{JHC}, with promising initial results. GRIN works by first translating to a monadic intermediate language, then repeatedly performing a series of optimisations, using whole program transformation. The intermediate language is at a much lower level than our Core language, so it is able to express detailed optimisations that we are unable to.
 
-Other transformations - we generalise SpecConstr, inlining etc.
+\paragraph{Other Transformations} Our work makes use of, or subsumes many other transformations in functional programming. One of the central operations within our optimisation in inlining, a technique that has been used extensively within GHC \cite{spj:inlining}. We generalise the constructor specialisation technique \cite{spj:specconstr}, by allowing specialisation on any arbitrary expression, including constructors. One optimisation we do not currently support is the use of user provided transformation rules \cite{spj:rules}, which can be used to automatically replace certain expressions with others -- for example |sort . nub| removes duplicates then sorts a list, but can be done asymptotically faster in a single operation.
 
-\section{Conclusion}
+\paragraph{Lower Level Optimisations} Our optimisation works at the Core level, but once optimal Core has been generated there is still some work before optimal machine code has been produced. One critical pair of optimisations are strictness analysis \cite{strictness} and unboxing \cite{spj:unboxing} -- detecting that a value is always used strictly, then removing the indirection that laziness requires. In GHC both of these optimisations are done at the Core level, using a Core language extended with the unboxed kind. After this lower level Core has been generated, it is then transformed in to STG machine instructions \cite{spj:stg}, before being transformed into assembly code. There is still work being done to modify the lowest levels to take advantage of the current generation of microprocessors \cite{dynamic tagging}. We rely on GHC to perform all these optimisations after Supero generates a residual program.
+
+\section{Conclusion and Future Work}
+
+We have introduced an optimiser, which is capable of outperforming the GHC compiler in a limited number of benchmarks. Our optimiser is simple (only 300 lines of Haskell), and yet is able to replicate many of the performance enhancements of GHC in a more general way. While our initial results are promising, they are still incomplete. There are three main obstacles that need to be tackled:
+
+\begin{description}
+\item[Termination] While we our confident that our compiler terminates, it is only by use of a crude depth bound whose appropriate value varies for different programs. In order to increase the applicability of our optimiser, we would like to either remove the depth bound, or reduce our reliance upon it.
+\item[Benchmarks] We have presented eight benchmarks, and showed promising results on all of them. However, eight benchmarks is not nearly enough. We would like to obtain results on all the remaining benchmarks in the nofib suite.
+\item[Performance] The performance results present in \S\ref{sec:haskell_results} are not the best we have achieved -- during experimentation we were able to obtain a 50\% speed up in the primes benchmark. We suspect that much better performance can be obtained.
+\end{description}
+
+The shootout has shown that low-level Haskell can compete with with low-level imperative language such as C. Our goal is that Haskell programs can be written in a high-level declarative style, yet still perform competitively.
 
 \paragraph{Acknowledgements} Thanks to Simon Peyton Jones, Simon Marlow and Tim Chevalier for help understanding the low-level details of GHC.
 

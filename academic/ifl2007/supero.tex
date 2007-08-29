@@ -423,11 +423,11 @@ Unfortunately, in C it is quite challenging to capture the required flow control
 
 \section{Benchmarks Versus Haskell}
 
-The standard benchmark suite in Haskell is the nofib suite, and more recently the nobench suite has added a few benchmarks and removed many. A typical Haskell program is huge, because of factors like dictionaries etc. Because of this, we have limited our focus to a small number of benchmarks drawn from the smallest section of the nobench suite. We have deliberate chosen programs which do not do large amounts of IO, but instead are compute bound programs.
-
-For this task it is important to clarify what optimisations GHC is doing, and which are being performed by Supero. We can broadly divide those optimisations that GHC is doing into those that benefit Supero generated code, and those which do not. Things like strictness analysis and the low-level code optimisations benefit both Supero and GHC. On the other hand, things like |foldr|/|build| fusion, which rely on precisely named functions, are of no benefit to Supero. Since Supero changes all the identifiers, and does not use any GHC provided library functions, any GHC transformation relying on named identifiers will not apply. The other optimisation that GHC benefits from, but which is not applied to Supero code, is dictionary specialisation. In order for Supero to draw with GHC, it would be necessary to perform all of these transformations in the Supero optimiser.
+The standard set of Haskell benchmarks is the nofib suite \cite{nofib}. The nofib suite is divided into three categories of increasing size: imaginary, spectral and real. Many small Haskell programs increase in size substantially once the libraries are included, particularly when type classes are involved. Because of the relatively large size of even small examples, we have limited our focus to five benchmarks drawn from the imaginary section. We have deliberately chosen programs which do not perform large amounts of IO, but instead are compute bound programs. 
+The benchmarks are: digits-of-e1 and digits-of-e2, both of which compute the digits of |e|, by different methods; exp3\_8 performs |3^8| using peano numbers and the |Num| class; primes computes a list of prime numbers; and queens counts the possible safe layouts of queen pieces on a chess board. All benchmarks were run with parameters to ensure runtimes of between 3 and 5 seconds for GHC.
 
 \begin{fig}
+\vspace{7mm}
 \begin{barenv}
 \setwidth{20}
 \setdepth{0}
@@ -436,11 +436,11 @@ For this task it is important to clarify what optimisations GHC is doing, and wh
 \setnumberpos{empty}
 % \setxaxis{0}{1}{1}
 % \setxname{$n$}
-\setyaxis{0}{100}{10} \setyname{Relative to GHC}
-\bar{0}{0}
-\bar{75}{1}[digits-of-e2]
+\setyaxis{0}{100}{10} \setyname{Time relative to GHC}
 \bar{0}{0}
 \bar{90}{1}[digits-of-e1]
+\bar{0}{0}
+\bar{75}{1}[digits-of-e2]
 \bar{0}{0}
 \bar{35}{1}[exp3\_8]
 \bar{0}{0}
@@ -449,11 +449,56 @@ For this task it is important to clarify what optimisations GHC is doing, and wh
 \bar{78}{1}[queens]
 \bar{0}{0}
 \end{barenv}
+\vspace{3mm}
 \figend
-\caption{Time relative to GHC being 100}
+\caption{Runtime, relative to GHC being 100.}
 \label{fig:haskell_results}
 \end{fig}
 
+\begin{table}[tb]
+\hrule
+\vspace{3mm}
+
+\begin{tabular}{lrrrrr}
+\textbf{Program} & \hspace{5mm}\textbf{Source} & \hspace{5mm}\textbf{Residual} & \hspace{5mm}\textbf{Bound} & \hspace{5mm}\textbf{Size} & \hspace{5mm}\textbf{Time} \\
+digits-of-e1 &  521 & 1676 & 13 & 110 & 90 \\
+digits-of-e2 & 1235 &  515 & 12 &  99 & 75 \\
+exp3\_8      &  380 & 1138 &  5 & 104 & 35 \\
+primes       &  422 &  356 & 12 & 101 & 87 \\
+queens       &  637 & 4265 &  8 & 116 & 78 \\
+\end{tabular}
+\vspace{2mm}
+
+\textbf{Program} is the name of the program; \textbf{Source} is the number of lines of pretty printed source code including all libraries; \textbf{Residual} is the number of lines after optimisation; \textbf{Bound} is the termination bound used; \textbf{Size} is the size of the resultant binary relative to the GHC produced binary being 100; \textbf{Time} is the runtime relative to GHC being 100.
+
+\vspace{4mm}
+\hrule
+\vspace{2mm}
+\caption{Result on the nofib suite.}
+\label{tab:haskell_results}
+\end{table}
+
+The results of these benchmarks are given in Figure \ref{fig:haskell_results}, along with detailed breakdowns in Table \ref{tab:haskell_results}. In all benchmarks Supero performs at least 10\% faster than GHC, and in one case is nearly three times faster. The resultant executable binaries were at most 10\% larger than those from GHC alone, and in one case was even marginally smaller.
+
+\subsection{GHC's optimisations}
+
+For these benchmarks it is important to clarify which optimisations are being performed by GHC, and which are performed by Supero. If you were to simply take the Core output from Yhc Core and compile it using GHC Core, you would not get the same performance results as GHC compiled code. There are two particular places where GHC has special optimisations that work in a range of special cases, but which Supero is unable to take advantage of.
+
+\paragraph{Dictionary Removal} Functions which make use of type classes are given an additional dictionary argument, which is passed to all functions. In practice, GHC specialises many such functions by creating code with a particular dictionary frozen in. This optimisation is specific to type classes -- a tuple of higher order functions will not be similarly specialised. After compilation with Yhc, the type classes have already been converted to tuples, so unless Supero is able to remove the dictionaries it will loose to GHC. One particular benchmark where dictionary removal is critical is digits-of-e2.
+
+\paragraph{List Fusion} GHC relies on names of functions, particularly |foldr|/|build| \cite{spj:rules}, to apply special optimisation rules such as list fusion. Many of GHC's library functions, for example |iterate|, are defined in terms of |foldr| to take advantage of these special properties. After transformation with Yhc, these names are destroyed, and so no rule based optimisation will be performed. One example where list fusion is critical is primes, although it occurs in most of the benchmarks to some extent.
+
+Supero has no special purpose optimisations which rely on named functions or desugaring knowledge. The one place where no GHC specific optimisations apply is the exp3\_8 benchmark, which operates solely on peano numbers -- a type GHC has no inbuilt knowledge of. This property explains the performance advantages shown by Supero in exp3\_8, while GHC was limited to basic inline/simplify transformations, Supero managed to perform some limited fusion.
+
+\subsection{Termination Bound}
+
+Table \ref{tab:haskell_results} includes a column indicating the size bound that was applied to expressions. Out of the five benchmarks, both primes and queens could be run at any greater bound and would still produce the same program -- the direct repetition criteria bounds the expressions on its own. For the remaining programs, a bound was chosen which to ensure that the compilation process was quick (under two seconds). By increasing the termination bound the size of the generated program would increase, but potentially the generated program would execute faster.
+
+The existence of a termination bound with the present degree of sensitivity is a cause for concern. In a large program it is likely that different parts of the program would require different bounds on the size of the generated expression -- something not currently possible. We suspect that the most promising direction is to augment the direct repetition criteria, and hope to obtain termination in all practical cases without resorting to a depth bound. 
+
+\subsection{GHC recompilation issues}
+
+unboxed types, rank-2 types, polymorphic recursion
 
 \section{Related Work}
 

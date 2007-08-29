@@ -163,6 +163,13 @@
     howpublished =  "\url{http://darcs.haskell.org/nofib/}"
 }
 
+@misc{jhc,
+    title =         "jhc: John's Haskell Compiler",
+    author =        "John Meacham",
+    year =          "2007",
+    howpublished =  "\url{http://repetae.net/john/computer/jhc/}",
+}
+
 @inproceedings{esc_haskell,
     author =        "Dana N. Xu",
     title =         "Extended static checking for {H}askell",
@@ -251,6 +258,16 @@
     pages =         "357--375",
 }
 
+@inproceedings{grin,
+    author = "Urban Boquist and Thomas Johnsson",
+    title = "The {GRIN} Project: A Highly Optimising Back End for Lazy Functional Languages",
+    booktitle = "Proc IFL '96",
+    pages = "58--84",
+    year = "1996",
+}
+
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% SEMINAL PAPERS
@@ -336,7 +353,7 @@
     booktitle = "Proc FPCA '91",
     month = "August",
     volume = "523",
-    series = "LNCS"
+    series = "LNCS",
     publisher = "Springer-Verlag",
     address = "Cambridge, Massachussets, USA",
     editor = "J. Hughes",
@@ -344,7 +361,106 @@
     year = "1991",
 }
 
+@inproceedings{marlow:pointer_tagging,
+   author = {Simon Marlow and Alexey {Rodriguez Yakushev} and Simon {Peyton Jones}},
+   title = {Faster laziness using dynamic pointer tagging},
+   booktitle = {Proc. ICFP '07},
+   year = {2007},
+   month = {October},
+   location = {Freiburg, Germany},
+   publisher = {ACM Press}
+}
 
+@inproceedings{spj:awkward_squad,
+  author = "Simon {Peyton Jones}",
+  title = "Tackling the Awkward Squad: monadic input/output, concurrency, exceptions, and foreign-language calls in Haskell",
+  booktitle = "Engineering theories of software construction, Marktoberdorf Summer School",
+  year = "2002"
+}
+
+
+
+@inproceedings{spj:specconstr,
+   author = {Simon {Peyton Jones}},
+   title = {Constructor specialisation for {H}askell programs},
+   booktitle = {Proc. ICFP '07},
+   year = {2007},
+   month = {October},
+   location = {Freiburg, Germany},
+   publisher = {ACM Press}
+}
+
+@article{spj:inlining,
+   author = {Simon {Peyton Jones} and Simon Marlow},
+   title = {Secrets of the Glasgow Haskell Compiler inliner},
+   journal = {JFP},
+   year = {2002},
+   month = {July},
+   pages = {393--434},
+   volume = {12},
+}
+
+@inproceedings{gill:shortcut_deforestation,
+    pages = "223--232",
+    year = "1993",
+    title = "A Short Cut to Deforestation",
+    author = "Andrew Gill and John Launchbury and Simon {Peyton Jones}",
+    month = "June",
+    booktitle = "Proc FPCA '93",
+}
+
+@inproceedings{coutts:stream_fusion,
+    author = {Duncan Coutts and Roman Leshchinskiy and Don Stewart},
+    title  = {Stream Fusion: From Lists to Streams to Nothing at All},
+    booktitle = {Proc ICFP '07},
+    year   = 2007,
+    month  = apr,
+}
+
+@inproceedings{coutts:string_fusion,
+    author = {Duncan Coutts and Don Stewart and Roman Leshchinskiy},
+    title  = {Rewriting Haskell Strings},
+    booktitle = {Proc PADL 2007},
+    year   = 2007,
+    month  = jan,
+    pages  = {50--64},  
+    publisher = {Springer-Verlag},
+}
+
+@book{jones:partial_evaluation,
+   author = "Neil D. Jones and Carsten K. Gomard and Peter Sestoft",
+   title = "Partial Evaluation and Automatic Program Generation",
+   publisher = "Prentice-Hall International",
+   year = "1993",
+}
+
+@article{futanama:projections,
+    author = "Yoshihiko Futamura",
+    title = "Partial Evaluation of Computation Process - An Approach to a Compiler-Compiler",
+    journal = "Higher-Order and Symbolic Computation",
+    volume = "12",
+    number = "4",
+    pages = "381--391",
+    year = "1999",
+}
+
+
+@phdthesis{marlow:higher_order_deforestation,
+   author = {Simon Marlow},
+   title = {Deforestation for Higher-Order Functional Programs},
+   year = {1996},
+   school = {University of Glasgow}
+}
+
+@article{spj:stg,
+    author = "Simon {Peyton Jones}",
+    title = "Implementing Lazy Functional Languages on Stock Hardware: The Spineless Tagless G-Machine",
+    journal = "JFP",
+    volume = "2",
+    number = "2",
+    pages = "127--202",
+    year = "1992",
+}
 
 
 

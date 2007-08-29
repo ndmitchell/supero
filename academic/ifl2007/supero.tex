@@ -11,7 +11,8 @@
     {\end{figure}}
 
 \newcommand{\figend}{\hrule}
-
+\newcommand{\perc}{\%
+    }
 
 \begin{document}
 
@@ -29,7 +30,7 @@ Haskell is a high level functional language, with features like higher order fun
 
 \section{Introduction}
 
-Haskell can be used to write high level specifications of programs, which can run. Take for example the task of counting the number of words in a file read from the input. In Haskell this program is a single line:
+Haskell \cite{haskell} can be used to write high level specifications of programs, which can run. Take for example the task of counting the number of words in a file read from the input. In Haskell this program is a single line:
 
 \begin{code}
 main = print . length . words =<< getContents
@@ -319,17 +320,23 @@ In this program |caf| would only be computed once. If a CAF function is inlined 
 
 \section{Benchmarks Versus C}
 
-The most comprehensive inter-language benchmarking effort is the Programming Language Shootout \cite{shootout}, where a variety of tasks are benchmarked in multiple languages with multiple implementations. Unfortunately, in order to ensure a balanced comparison, many of the restrictions on the benchmarks directly harm lazy languages. Inspired by their approach, we have attempted to define some simpler benchmarks on which it is possible to directly compare Haskell to C.
+The most comprehensive inter-language benchmarking effort is the Programming Language Shootout \cite{shootout}. In the shootout a variety of programming tasks are implemented in many languages and benchmarked against each other. Unfortunately, in order to ensure a balanced comparison, many restrictions are placed on the programs -- some of which severely hamper lazy languages. Inspired by their attempt, we have attempted to define some simpler benchmarks on which it is possible to directly compare Haskell to C.
 
-The set of benchmarks we have chosen are inspired by the Unix \texttt{wc} command -- namely character, word and line counting. In all cases we require to read a file from the standard input, and perform the computation. In order to ensure that we test computation speed, not IO speed (which is usually a product of the underlying buffering system, rather than the compilation prowess) we demand that all input is read using the standard C |getchar| function only. Any buffering improvements, such as chunked reading or memory mapping of files, could be performed equally in all compilers.
+The set of benchmarks we have chosen are inspired by the Unix \texttt{wc} command -- namely character, word and line counting. In all cases we require the program to read from the standard input, and write out the number of elements in the file. In order to ensure that we test computation speed, not IO speed (which is usually a product of buffering strategy, rather than optimisation prowess) we demand that all input is read using the standard C |getchar| function only. Any buffering improvements, such as reading in blocks or memory mapping of files, could be performed equally in all compilers.
 
-All the C versions are transformed into state machines, where characters are read in a loop, and an accumulator is kept -- much the same as in Figure \ref{fig:c_words}. The Haskell versions all follow the same pattern as in the Introduction, merely replacing |words| with |lines|, or removing the |words| function for character counting.
+All the C versions are implemented following a similar pattern to Figure \ref{fig:c_words}. Characters are read in a loop, with an accumulator recording the current value. Depending on the program, the body of the loop decides when to increment the accumulator. The Haskell versions all follow the same pattern as in the Introduction, merely replacing |words| with |lines|, or removing the |words| function for character counting.
 
-We performed all benchmarks on a Windows XP, 3GHz hyperthreaded, 1Gb RAM machine. The C versions used GCC version n.n with -O3. The pure Haskell version used GHC 6.6.1 with -O2. The Supero version was compiled using our optimiser, then written back as a Haskell file, and compiled once more with GHC 6.6.1 with -O2.
-
-The result of the benchmarks are given here.
+We performed all benchmarks on a Windows XP, 3GHz processor, 1Gb RAM machine. All benchmarks were run over a 50Mb log file, repeated 10 times, and the lowest value was taken. The C versions used GCC \cite{gcc} version 3.4.2 with -O3. The Haskell version used GHC \cite{ghc} 6.6.1 with -O2. The Supero version was compiled using our optimiser, then written back as a Haskell file, and compiled once more with GHC 6.6.1 and -O2.
 
 \begin{fig}
+\vspace{7mm}
+\makebox[33mm][r]{
+    \begin{barenv}
+    \legend{1}{C$\;\;\;\;\;\;$}
+    \legend{2}{Supero$\;\;\;\;\;\;$}
+    \legend{3}{GHC$\;\;\;\;\;\;$}
+    \end{barenv}
+}
 \begin{barenv}
 \setwidth{20}
 \setdepth{0}
@@ -351,38 +358,68 @@ The result of the benchmarks are given here.
 \bar{6.9}{2}[words]
 \bar{22}{3}
 \end{barenv}
-\vspace{0.5cm}
-\begin{barenv}
-\legend{1}{C}
-\legend{2}{Supero}
-\legend{3}{GHC}
-\end{barenv}
+\vspace{7mm}
 \figend
-\caption{Example diagram}
+\caption{Benchmarks with C, Supero and GHC}
 \label{fig:c_results}
 \end{fig}
 
+The results are given in Figure \ref{fig:c_results}. In all the benchmarks C and Supero are within 10\% of each other, while GHC trails further behind.
+
 \subsection{Identified Haskell Speedups}
 
-In our exploration of the performance bottlenecks in the Haskell variant we identified two reasons for Hsakell underperforming.
+As part of our benchmarks, we have identified two bottlenecks in the Haskell version of word counting -- both of which are fixed in our benchmark results.
 
-The first is that |isSpace| in Haskell is significantly more expensive than the C |isspace|. The solution we to use an FFI call to the C |isspace| in all cases, removing this source of variance. A GHC bug has been filed about the slow performance of |isspace|, so hopefully this will improve in time.
+\paragraph{Slow \textsf{isSpace} function}
+ 
+The first issue is that |isSpace| in Haskell is 79\perc more expensive than |isspace| in C. The simplest solution is to use a FFI (Foreign Function Interface) \cite{haskell_ffi} call to the C |isspace| function in all cases, removing this factor from the benchmark. A GHC bug (number 1473) has been filed about the slow performance of |isSpace|.
 
-The second is that the |words| function in Haskell performs two additional |isspace| tests per word read. We have transformed the |words| function to eliminate these unnecessary tests, and have submitted this code for inclusion in a future release of the standard libraries.
+\begin{fig}
+\begin{code}
+words :: String -> [String]
+words s = case  dropWhile isSpace s of
+                ""  ->  []
+                x   ->  w : words y
+                        where (w, y) = break isSpace x
 
-\subsection{Potential Haskell Speedups}
+words' s = case  dropWhile isSpace s of
+                 []    ->  []
+                 x:xs  ->  (x:w) : drop1 z
+                           where (w, z) = break isSpace xs
 
-There are a number of reasons that the Haskell underperforms relative to the C version.
+drop1 []      = []
+drop1 (x:xs)  = words xs
+\end{code}
+\figend
+\caption{The |words| function from the Haskell standard libraries, and an improved |words'|.}
+\label{fig:words}
+\end{fig}
 
-Lack of strictness information
+\paragraph{Inefficient \textsf{words} function}
 
-Heap checks
+The second issue is that the |words| function in Haskell performs two additional |isspace| tests per word. The code for |words| is given in Figure \ref{fig:words}. By appealing to the definitions of |dropWhile| and |break| it is possible to show that in |words| the first character of |x| is not a space, and that if |y| is non-empty then the first character is a space. The revised |words'| function takes advantage of this knowledge to reduce the number of |isSpace| tests.
 
-Stack checks
+\subsection{Potential Supero Speedups}
 
-\subsection{Haskell Outperforms C}
+We have identified three reasons why the code generated by Supero underperforms relative to the C version in some benchmarks. All of these stem from using GHC as a backend, and cannot be solved at the level of Core transformations. We suspect that by fixing these problems, the Supero execution time would improve by between 5\% and 15\%.
 
-The reason Haskell outperforms C is that the C has redundant flow information. By moving the boolean into the program counter you can go faster. Unfortunately releasing this flow control in C is challenging! Using the |goto| keyword is not appropriate, as typically this turns off many critical optimisations in the C compiler. It can be done, using a nested |while| loop, in a function, and using |return| to break from the inner loop. This solution would not scale to a three-valued control structure, but could be used to achieve higher performance in word counting -- at the cost of code complication and duplication.
+\paragraph{Strictness inference}
+
+The GHC compiler is overly conservative when determining strictness for functions which use the FFI (GHC bug 1592). The |getchar| is treated as though it may raise an exception, and terminate the program, so otherwise strict arguments become potentially unevaluated. If GHC permitted some way to mark an FFI function as not generating exceptions, then this problem could be solved. The lacking of strictness information means that in the line and word counting programs, every time the accumulator is incremented, the number is first unboxed and then reboxed \cite{spj:unboxing}.
+
+\paragraph{Heap checks}
+
+The GHC compiler follows the standard STG machine \cite{spj:implementation} design, and inserts heap checks before allocating memory. The purpose of a heap check is to ensure that there is sufficient memory on the heap, so that allocation of memory is a cheap operation which is guaranteed to succeed. GHC also attempts to lift heap checks, so that if two branches of a case expression both have heap checks, then they are replaced with one shared heap check before the case expression. Unfortunately, in lifting the heap checks, a tail-recursive function which allocates memory only upon exit can have the heap test executed on every iteration (GHC bug 1498). This particular problem effects the character counting example, but if the strictness problems were solved, it would apply equally to all the benchmarks.
+
+\paragraph{Stack checks}
+
+The final source of extra computation relative to the C version are stack checks. Before using the stack to store arguments to a function call, a test is performed to check that there is sufficient space on the stack. Unlike the heap checks, it is necessary to analyse a large part of the flow of control to determine that these checks are unnecessary. It is not immediately clear how to eliminate the stack checks within the current framework of GHC.
+
+\subsection{The Wordcount Benchmark: Supero outperforms C}
+
+The most curious result is that Supero outperforms C on wordcounting, by about 6\% -- even with the problems discussed! The C program presented in Figure \ref{fig:c_words} is not maximally efficient. The variable \verb"last_space" is a boolean, indicating whether the previous character was a space, or not. Each time round the loop a test is performed on \verb"last_space", even though its value was determined and tested previously. The way to optimise this code is to have two specialised variants of the loop, one for when \verb"last_space" is true, and one for where it is false. When the value of \verb"last_space" changed, the program would transition to the other loop. This pattern effectively encodes the boolean variable in the program counter, and is what the Haskell program has managed to generate from the high-level code.
+
+Unfortunately, in C it is quite challenging to capture the required flow control! The program needs two loops, where both loops can transition to the other. Using the |goto| keyword is not appropriate, as typically this turns off many critical optimisations in the C compiler. Tail recursion is certainly not appropriate, as it is not required by the C standard (nor supported in most compilers). The only way to express the necessary pattern is using nested while loops, but unlike newer imperative languages such as Java, C does not have named loops -- so the inner loop cannot break from the outer loop if it reaches the end of the file. The only solution is to place the nested while loops in a function, and use |return| to break from the inner loop. This solution would not scale to a three-valued control structure, and substantially increases the complexity of the code.
 
 \section{Benchmarks Versus Haskell}
 

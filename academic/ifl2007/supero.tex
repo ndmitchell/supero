@@ -112,7 +112,7 @@ In order to avoid accidental variable name clashes while performing transformati
 
 Our optimisation procedure takes a Core program as input, and produces a new Core program. Both programs must have the same effect, but hopefully the new program will perform better. We do not make small changes to the original program, but instead evaluate some of the program at compile time, leaving a residual program to be run.
 
-Each function in the output program is associated with an expression in the input program. The expression in the output program is an optimised version of the associated expression in the input program. Our optimisation proceeds by starting at the |main| function, and optimising the expression associated with |main|. Once the expression has been optimised, the outermost element in the expression becomes part of the residual program. All the inner expressions are assigned names, which become functions in the residual program. Each of these new functions are then optimised as before.
+Each function in the output program is associated with an expression in the input program. The expression in the output program is an optimised version of the associated expression in the input program. Our optimisation proceeds by starting at the |main| function, and optimising the expression associated with |main|. Once the expression has been optimised, the outermost element in the expression becomes part of the residual program. All the subexpressions are assigned names, which become functions in the residual program. If any expression (up to alpha renaming) already has a name in the residual program, then the same name is used. Each of these new functions are then optimised as before.
 
 \begin{fig}
 \begin{code}
@@ -281,7 +281,7 @@ If direct repetition is encountered, then the repeating expression is lifted to 
 \subsection{Let Bindings}
 \label{sec:let}
 
-The rule for let bindings in Figure \ref{fig:optimise} is curious. While all other rules simply follow evaluation order, the let rule optimises \textit{both} the bound expression and the inner expression. This is a critical choice, which enhances the optimisation performed by the system.
+The rule for let bindings in Figure \ref{fig:optimise} is curious. While all other rules simply follow evaluation order, the let rule optimises \textit{both} the bound expression and the inner expression. This is a critical choice, which enhances the optimisation performed by the system, without duplicating computation of let bindings.
 
 In the Core language a let expression introduces a binding, which is shared. Given the expression |let v = x in y|, if |v| is referred to multiple times in |y|, then the expression |x| will only be computed once. It is important when applying |_OO| that shared let bindings are not unshared. Consider the following program:
 
@@ -380,7 +380,7 @@ The first issue is that |isSpace| in Haskell is 79\perc more expensive than |iss
 \begin{code}
 words :: String -> [String]
 words s = case  dropWhile isSpace s of
-                ""  ->  []
+                []  ->  []
                 x   ->  w : words y
                         where (w, y) = break isSpace x
 
@@ -505,7 +505,7 @@ The existence of a termination bound with the present degree of sensitivity is a
 
 \paragraph{Partial evaluation} There has been a lot of work on partial evaluation \cite{jones:partial_evaluation}, where a program is specialised with respect to some static data. Typically the emphasis is on determining which variable can be entirely computed at compile time, and which must remain in the residual program. Partial evaluation is particularly appropriate for specialising an interpreter with an expression tree to generate a compiler automatically, often with an order of magnitude speedup, known as the First Futamura Projection \cite{futanama:projections}. The difference between our work and partial evaluation is that we fold back definitions, and perform no binding time analysis. Our method is certainly less appropriate for specialising an interpreter, but in the absence of static data, is still able to show improvements.
 
-\paragraph{Deforestation} The deforestation technique \cite{wadler:deforestation} removes intermediate lists in computations. This technique has been extended in many ways to encompass higher order deforestation \cite{marlow:higher_order_deforestation} and work on other data types \cite{coutts:string_fusion}. Probably the most practically motivated work on deforestation has come from those attempting to restrict deforestation, in particular shortcut deforestation \cite{gill:shortcut_deforestation}, and newer approaches such as stream fusion \cite{coutts:stream_fusion}. In this work certain named functions are automatically fused together. By rewriting library functions in terms of these special functions, fusion occurs. Fusion is limited to cases where the correct underlying function is used -- sometimes requiring unnatural definitions.
+\paragraph{Deforestation} The deforestation technique \cite{wadler:deforestation} removes intermediate lists in computations. This technique has been extended in many ways to encompass higher order deforestation \cite{marlow:higher_order_deforestation} and work on other data types \cite{coutts:string_fusion}. Probably the most practically motivated work on deforestation has come from those attempting to restrict deforestation, in particular shortcut deforestation \cite{gill:shortcut_deforestation}, and newer approaches such as stream fusion \cite{coutts:stream_fusion}. In this work certain named functions are automatically fused together. By rewriting library functions in terms of these special functions, fusion occurs. Shortcut deforestation is limited to cases where the correct underlying function is used -- sometimes requiring unnatural definitions.
 
 \paragraph{GRIN} The GRIN approach \cite{grin} is currently being implemented in the jhc compiler \cite{jhc}, with promising initial results. GRIN works by first translating to a monadic intermediate language, then repeatedly performing a series of optimisations, using whole program transformation. The intermediate language is at a much lower level than our Core language, so it is able to express detailed optimisations that we are unable to.
 

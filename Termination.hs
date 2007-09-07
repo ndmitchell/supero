@@ -5,15 +5,42 @@ import Yhc.Core
 import Yhc.Core.UniqueId
 import Yhc.Core.FreeVar3
 import Control.Monad
+import Data.List
 import CoreUtil
 
 
 type Subst = [(CoreVarName,CoreExpr)]
+type SubstPair = [(CoreVarName,(CoreExpr,CoreExpr))]
 
 -- | Most specific generalisation
---   I tried to understand the book, failed, so guessed instead.
-msg :: UniqueIdM m => CoreExpr -> CoreExpr -> m (CoreExpr, Subst, Subst)
-msg x y = lca x y
+--
+--   Taken from "An Algorithm of Generalization in Positive Supercompilation"
+--   by Sorensen and Gluck, Algorithm 4.6
+msg :: UniqueIdM m => CoreExpr -> CoreExpr -> m (CoreExpr, SubstPair)
+msg x y = do v <- getVar ; f (CoreVar v) [(v,(x,y))]
+    where
+        -- rule 1
+        f :: UniqueIdM m => CoreExpr -> SubstPair -> m (CoreExpr, SubstPair)
+        f expr bind | not $ null match = do
+                let xc = children x
+                    yc = children y
+                vs <- replicateM (length xc) getVar
+                let expr2 = replaceFreeVars [(v, snd (uniplate x) (map CoreVar vs))] expr
+                    bind2 = zip vs (zip xc yc) ++ miss ++ rest
+                f expr2 bind2
+            where
+                (match,miss) = partition (\(_,(x,y)) -> x `eq1` y) bind
+                (v,(x,y)):rest = match
+
+        -- rule 2
+        f expr bind | not $ null match = f
+                  (replaceFreeVars [(x,CoreVar y)] expr)
+                  (filter ((/=) y . fst) bind)
+            where
+                match = [(x,y) | (x,(s1,t1)) <- bind, (y,(s2,t2)) <- bind, x /= y, s1 == s2, t1 == t2]
+                (x,y):_ = match
+
+        f expr bind = return (expr,bind)
 
 
 -- | Homeomorphic embedding

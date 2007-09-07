@@ -10,9 +10,10 @@ import CoreUtil
 
 type Subst = [(CoreVarName,CoreExpr)]
 
-msg :: CoreExpr -> CoreExpr -> (CoreExpr, Subst, Subst)
-msg = undefined
-
+-- | Most specific generalisation
+--   I tried to understand the book, failed, so guessed instead.
+msg :: UniqueIdM m => CoreExpr -> CoreExpr -> m (CoreExpr, Subst, Subst)
+msg x y = lca x y
 
 
 -- | Homeomorphic embedding

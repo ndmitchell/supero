@@ -12,7 +12,7 @@ import System.Environment
 import System.Cmd
 import System.Exit
 
-import Evaluate4
+import Evaluate5
 
 main = do
     [file] <- getArgs

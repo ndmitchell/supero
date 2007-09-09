@@ -71,3 +71,7 @@ lookupRev _ _ = Nothing
 
 
 disjoint xs ys = all (`notElem` xs) ys
+
+
+(~~) :: Show a => String -> a -> String
+(~~) lhs rhs = lhs ++ "\n" ++ show rhs

@@ -67,7 +67,7 @@ evaluate out c = do
     out 0 c
     c <- return $ preOpt c
     out 1 c
-    c <- liftM (coreReachable ["main"]) (eval cafs c)
+    c <- {- liftM (coreReachable ["main"]) -} (eval cafs c)
     out 3 c
     c <- return $ coreFix c
     out 4 c
@@ -158,7 +158,7 @@ tie rho x = do
                 Nothing -> do
                     name <- getName x
                     modify $ \s -> s{names = Map.insert key name (names s)}
-                    let o = x
+                    x <- deCaf x
                     x <- onf name rho x
                     addFunc (CoreFunc name (if null params then ["uncaf"] else params) x)
                     return name
@@ -172,6 +172,13 @@ tie rho x = do
         f s (CoreFun x) = if prim s x then "f" else x
         f s (CoreApp x y) = f s x
         f s _ = "f"
+
+        deCaf o@(CoreFun x) = do
+            s <- get
+            if not $ caf s x then return o else do
+                CoreFunc _ params body <- uniqueBoundVarsFunc $ core s x
+                return $ coreLam params body
+        deCaf x = return x
 
 
 
@@ -204,14 +211,18 @@ POSTCONDITIONS:
 -- resultName is only passed to aid debugging
 onf :: CoreFuncName -> Rho -> CoreExpr -> SS CoreExpr
 onf resultName rho x = do
-    -- x <- coreSimplifyExprUniqueExt onfExt x
+    x <- coreSimplifyExprUniqueExt onfExt x
     let whistle = filter (<<| x) rho
     if not $ null whistle then do
         (t,subs) <- msg (head whistle) x
-        error "here in onf"
+        sfPrint $ "\n\nonf whistle" ~~ x ~~ head whistle ~~ t ~~ subs
+        if isCoreVar t then
+            descendM (tie rho) x
+         else
+            descendM (tie rho) $ coreLet [(v,e) | (v,(_,e)) <- subs] t
      else do
         x2 <- unfold x
-        if x2 == x then
+        if x2 == x then do
             descendM (tie rho) x
          else
             onf resultName (x:rho) x2

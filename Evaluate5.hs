@@ -217,15 +217,27 @@ onf resultName rho x = do
         (t,subs) <- msg (head whistle) x
         sfPrint $ "\n\nonf whistle" ~~ x ~~ head whistle ~~ t ~~ subs
         if isCoreVar t then
-            descendM (tie rho) x
+            unpeel rho x
          else
-            descendM (tie rho) $ coreLet [(v,e) | (v,(_,e)) <- subs] t
+            unpeel rho $ coreLet [(v,e) | (v,(_,e)) <- subs] t
      else do
         x2 <- unfold x
         if x2 == x then do
-            descendM (tie rho) x
+            unpeel rho x
          else
             onf resultName (x:rho) x2
+
+
+-- unpeel at least one layer, but keep going if it makes no difference
+unpeel :: Rho -> CoreExpr -> SS CoreExpr
+unpeel rho x = do s <- get; descendM (f s) x
+    where
+        f s (CoreFun x) | caf s x = tie rho (CoreFun x)
+        f s x = do
+            x2 <- unfold x
+            if x2 == x
+                then descendM (f s) x
+                else tie rho x
 
 
 -- perform one unfolding, if you can

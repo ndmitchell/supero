@@ -1,5 +1,5 @@
 
-module Evaluate4(evaluate) where
+module Evaluate5(evaluate) where
 
 import Yhc.Core hiding (uniqueBoundVarsFunc)
 import Yhc.Core.FreeVar3
@@ -14,6 +14,7 @@ import StateFail
 import Data.List
 import Data.Maybe
 import Safe
+import Termination
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -48,6 +49,10 @@ type CoreExprInfo = CoreExpr
 type Info = [UnfoldId]
 
 
+type Rho = [CoreExpr]
+emptyRho = []
+
+
 ---------------------------------------------------------------------
 -- DRIVER
 
@@ -62,8 +67,6 @@ evaluate out c = do
     out 0 c
     c <- return $ preOpt c
     out 1 c
-    c <- return $ smallSize c
-    out 2 c
     c <- liftM (coreReachable ["main"]) (eval cafs c)
     out 3 c
     c <- return $ coreFix c
@@ -72,53 +75,6 @@ evaluate out c = do
 
 coreFix :: Core -> Core
 coreFix = coreReachable ["main"] . coreInline InlineCallOnce
-
-
-
--- make sure all function bodies have a size of <= 2
--- to make sure the size is not overflowed too fast
-smallSize core = core{coreFuncs = fst $ execState (mapM_ f (coreFuncs core)) ([], uniqueFuncsNext core)}
-    where
-        f (CoreFunc name args body) = do
-            body <- h name body
-            modify $ \(a,b) -> (CoreFunc name args body:a,b)
-        f x = modify $ \(a,b) -> (x:a,b)
-
-        h name x | size x <= 2 = return x
-                 | otherwise = do
-            body <- descendM (h name) x
-            let free = collectFreeVars body
-            (a,b) <- get
-            let newname = uniqueJoin name b
-            put (CoreFunc newname free body:a, b+1)
-            return $ coreApp (CoreFun newname) (map CoreVar free)
-
-
---------------------------------------------------------------------
--- CRAZY ORDERING
-
--- f (g a) > f a, where g is some nonempty wrapping
--- ignoring variable names
-
-
-(!>!) :: CoreExpr -> CoreExpr -> Bool
-(!>!) a b = ba /= bb && peel ba bb
-    where
-        ba = blurVar a
-        bb = blurVar b
-
-        -- peel away a common shell
-        peel a b | a == b = True
-        peel a b | nas == nbs && _a vs == _b vs =
-                inclusion a b || and (zipWith peel as bs)
-            where
-                vs = replicate nas (CoreVar "")
-                (nas, nbs) = (length as, length bs)
-                (as, _a) = uniplate a
-                (bs, _b) = uniplate b
-        peel a b = inclusion a b
-
-        inclusion a b = b `elem` universe a
 
 
 
@@ -185,12 +141,12 @@ addFunc func = modify $ \s -> s{funcs = funcs s . (func:)}
 tieFunc :: CoreFunc -> SS ()
 tieFunc func = do
     CoreFunc name args body <- uniqueBoundVarsFunc func
-    body <- tie body
+    body <- tie emptyRho body
     addFunc (CoreFunc name args body)
 
 
-tie :: CoreExpr -> SS CoreExpr
-tie x = do
+tie :: Rho -> CoreExpr -> SS CoreExpr
+tie rho x = do
     (args,CoreFunc _ params x) <- return $ normalise x
     case x of
         CoreVar y -> return $ CoreVar $ head args
@@ -203,7 +159,7 @@ tie x = do
                     name <- getName x
                     modify $ \s -> s{names = Map.insert key name (names s)}
                     let o = x
-                    x <- onf name x
+                    x <- onf name rho x
                     addFunc (CoreFunc name (if null params then ["uncaf"] else params) x)
                     return name
             return $ coreApp (CoreFun name) (if null args then [CoreCon "()"] else map CoreVar args)
@@ -230,12 +186,6 @@ normalise x = (vars, evalState (uniqueBoundVarsFunc (CoreFunc "" vars x)) (1 :: 
 -- OPTIMISATION
 
 
-maxSize = 5 :: Int
-
-size :: CoreExpr -> Int
-size = fold (\_ i -> 1 + maximum (0:i))
-
-
 {-
 POSTCONDITIONS:
 
@@ -246,166 +196,50 @@ POSTCONDITIONS:
 
 
 -- must invoke tie on all computations below the most optimal form
+-- must try and unfold at least once
 
 -- for each let-rhs or case-on, optimise it once
 -- if you reach over (size n) then unpeel until you get to size n, and tie the remainder
 --
 -- resultName is only passed to aid debugging
-onf :: CoreFuncName -> CoreExpr -> SS CoreExpr
-onf resultName x = do
-        x <- coreSimplifyExprUniqueExt onfExt x
-        
-        -- if you are optimising a CAF, unfold it exactly ONCE
-        s <- get
-        x <- case x of
-                CoreFun name | caf s name -> do
-                    CoreFunc _ [] body <- uniqueBoundVarsFunc $ core s name
-                    return body
-                _ -> return x
-
-        f x
-    where
-        f x = do
-            s <- get
-            r <- protect x
-            case r of
-                Just x -> return x
-                Nothing -> do
-                   if overflow x
-                        then {- sfPrint (show x) >> sfPause >> -} unpeel s x
-                        else do
-                            r <- onfStep s x
-                            case r of
-                                Nothing -> unpeel s x
-                                Just x -> do
-                                    x <- coreSimplifyExprUniqueExt onfExt x
-                                    f x
-
-overflow x = size x > maxSize
-
--- done s x = optimal s x || size x > maxSize
+onf :: CoreFuncName -> Rho -> CoreExpr -> SS CoreExpr
+onf resultName rho x = do
+    -- x <- coreSimplifyExprUniqueExt onfExt x
+    let whistle = filter (<<| x) rho
+    if not $ null whistle then do
+        (t,subs) <- msg (head whistle) x
+        error "here in onf"
+     else do
+        x2 <- unfold x
+        if x2 == x then
+            descendM (tie rho) x
+         else
+            onf resultName (x:rho) x2
 
 
+-- perform one unfolding, if you can
+unfold :: CoreExpr -> SS CoreExpr
+unfold (CoreCase on alts) = do on <- unfold on; return $ CoreCase on alts
+unfold (CoreApp x xs) = do x <- unfold x; return $ CoreApp x xs
 
--- optimise to one step, Nothing says you are done already
-onfStep :: S -> CoreExpr -> SS (Maybe CoreExpr)
-onfStep s (CoreLet [] x) = onfStep s x
+unfold (CoreLet ((v,e):bind) x) = do
+    e2 <- unfold e
+    if e == e2 then do
+        x <- unfold $ coreLet bind x
+        return $ CoreLet [(v,e)] x
+     else do
+        return $ CoreLet ((v,e2):bind) x
 
-onfStep s (CoreLet ((lhs,rhs):bind) x) = do
-    r <- onfStep s rhs
-    case r of
-        Just rhs2 -> return $ Just $ CoreLet ((lhs,rhs2):bind) x
-        Nothing -> do
-            r <- onfStep s $ coreLet bind x
-            case r of
-                Nothing -> return Nothing
-                Just x2 -> return $ Just $ CoreLet [(lhs,rhs)] x2
+unfold (CoreFun x) = do
+    s <- get
+    if prim s x || caf s x then return $ CoreFun x else do
+        CoreFunc _ params body <- uniqueBoundVarsFunc $ core s x
+        return $ coreLam params body
 
-onfStep s (CoreCase x xs) = do
-    r <- onfStep s x
-    case r of
-        Just x2 -> return $ Just $ CoreCase x2 xs
-        Nothing -> return Nothing
-
-onfStep s (CoreApp x xs) = do
-    r <- onfStep s x
-    case r of
-        Just x2 -> return $ Just $ coreApp x2 xs
-        Nothing -> return Nothing
-
-onfStep s (CoreFun x) | not (prim s x || caf s x) = do
-    CoreFunc _ params body <- uniqueBoundVarsFunc $ core s x
-    return $ Just $ coreLam params body
-
-onfStep _ _ = return Nothing
+unfold x = return x
 
 
 
-{-
-optimal s (CoreLet bind x) = optimal s x
-optimal s (CoreCase on alts) = optimal s on
-optimal s (CoreApp x xs) = optimal s x
-optimal s (CoreFun x) = prim s x || caf s x
-optimal s _ = True
-
-
-unfold s (CoreLet bind x) = do
-    bind <- mapM (\(a,b) -> (,) a <$> unfold s b) bind
-    x <- unfold s x
-    return $ CoreLet bind x
-
-unfold s (CoreCase on alts) = do
-    on <- unfold s on
-    return $ CoreCase on alts
-
-unfold s (CoreFun x) = unfold s (CoreApp (CoreFun x) [])
-
-unfold s (CoreApp (CoreFun name) args)
-    | not (prim s name) && not (caf s name) = do
-    CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
-    return $ coreApp (coreLam params body) args
-
-unfold s x = return x
--}
-
-
-unpeel s (CoreFun x) | caf s x = tie (CoreFun x)
-unpeel s x | overflow x = descendM (unpeel s) x
-           | otherwise = do
-                r <- onfStep s x
-                case r of
-                    Nothing -> descendM (unpeel s) x
-                    Just _ -> tie x
-
-
---------------------------------------------------------------------
--- PROTECTION
-
--- if you see f (f a), then make it a let, and spit out
--- all the code up until that point
-protect :: CoreExpr -> SS (Maybe CoreExpr)
-protect x = do
-    let evils = filter isEvil $ concatMap universe $ children x
-    if null evils then return Nothing else do liftM Just (dump (nub evils) x)
-
-
-dump evils x = f (map (collectFreeVars &&& id) evils) x
-    where
-        f [] x = tie x
-        f evil x | map snd evil `disjoint` universe x = tie x
-                 | otherwise = do
-            let fv = collectFreeVars x
-                (now,later) = partition (\(fv2,e) -> null (fv2 \\ fv)) evil
-            binds <- mapM (\(_,e) -> do v <- getVar; return (v,e)) now
-            if null binds
-                then descendM (f evil) x
-                else descendM (f later) (CoreLet binds (rep binds x))
-
-        rep vs x = case lookupRev x vs of
-            Nothing -> descend (rep vs) x
-            Just y -> CoreVar y
-
-
----------------------------------------------------------------------
--- EVIL SPOTTING
-
-isEvil :: CoreExpr -> Bool
-isEvil = any (uncurry eqContexts) . tail . getContexts
-
-
-eqContexts :: CoreExpr -> CoreExpr -> Bool
-eqContexts x y = f (blurVar x) (blurVar y)
-    where
-        f (CoreVar "?") _ = True
-        f x y = eq1 x y && and (zipWith eqContexts (children x) (children y))
-
-
-getContexts :: CoreExpr -> [(CoreExpr, CoreExpr)]
-getContexts x = (CoreVar "?", x) :
-        [(context (map fst pre ++ [fst m] ++ map fst post), snd m)
-        | (pre,mid,post) <- splits (map (id &&& getContexts) children)
-        , m <- snd mid]
-    where (children,context) = uniplate x
 
 ---------------------------------------------------------------------
 -- SIMPLIFICATION RULES

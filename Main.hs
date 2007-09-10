@@ -7,12 +7,15 @@ import Generate
 --import Firstify.Firstify
 --import Report
 import Safe
+import CoreUtil
 import Data.List
 import Data.Char
 import System.Directory
 import System.Environment
 import System.Cmd
 import System.Exit
+import System.Time
+import Control.Arrow
 
 import Evaluate5
 
@@ -36,12 +39,18 @@ optimise file = do
     return ()
 
 
+data Mode = C | GHC | Supero
+            deriving (Show,Ord,Eq)
+
+show_ x = map toLower $ show x
+
+
 benchmark :: Int -> FilePath -> IO ()
 benchmark i file = do
     settings <- readSettings
-    let vals = lookupJustDef [] "" settings ++
-               lookupJustDef [] file settings
-        obj = lookupJustDef "obj" "obj" vals
+    settings <- return $ lookupJustDef [] "" settings ++
+                         lookupJustDef [] file settings
+    let obj = lookupJustDef "obj" "obj" settings
 
     -- first compile the Supero
     ensureDirectory $ obj ++ "/bin"
@@ -61,12 +70,40 @@ benchmark i file = do
               "-odir " ++ obj ++ "/ghc"
 
     -- then compile C
-    b <- doesFileExist $ "test/" ++ file ++ "/" ++ file ++ ".c"
-    when b $ do
+    hasC <- doesFileExist $ "test/" ++ file ++ "/" ++ file ++ ".c"
+    when hasC $ do
         ensureDirectory $ obj ++ "/c"
         system_ $ "gcc -optc-O3 test/" ++ file ++ "/" ++ file ++ ".c " ++
                   "-odir " ++ obj ++ "/c " ++
                   "-o " ++ obj ++ "/bin/c_.exe"
+
+    -- now run the benchmarks, by default twice each
+    let count x = replicate (read $ lookupJustDef "2" ("repeat_" ++ show_ x) settings) x
+        todo = concat $ transpose [count GHC, if hasC then count C else [], count Supero]
+
+    let pStdin = lookupJustDef "" "stdin" settings
+        pTextfile = lookupJustDef defaultTextFile "textfile" settings
+        pArgs = lookupJustDef "" "args" settings
+
+    res <- flip mapM todo $ \p -> do
+        tBegin <- getClockTime
+        system_ $
+            (if pStdin == "textfile" then "type " ++ pTextfile ++ " | " else "") ++
+            "obj/bin/" ++ show_ p ++ "_.exe " ++ pArgs ++
+            " > output.txt"
+        tEnd <- getClockTime
+        let tTime = diffClockTimes tBegin tEnd
+        output <- readFile "output.txt"
+        putStrLn $ show p ++ " " ++ show tTime
+        return (output,(p,tTime))
+
+    let (outs,times) = unzip res
+    when (length (nub outs) > 1) $ error $ "Outputs do not all match:\n" ++ show outs
+    let summary = map (id &&& minimum) $ groupBy ((==) `on` fst) $ sort times
+    print summary
+
+
+defaultTextFile = "C:/Windows/net.log"
 
 
 readSettings :: IO [(String,[(String,String)])]
@@ -119,4 +156,5 @@ ensureDirectory = createDirectoryIfMissing True
 system_ cmd = do
     res <- system cmd
     when (res /= ExitSuccess) $ error $ "ERROR: System call failed\n" ++ cmd
+
 

@@ -7,6 +7,7 @@ import Generate
 --import Firstify.Firstify
 --import Report
 import Data.List
+import Data.Char
 import System.Directory
 import System.Environment
 import System.Cmd
@@ -15,8 +16,12 @@ import System.Exit
 import Evaluate5
 
 main = do
-    [file] <- getArgs
-    optimise file
+    args <- getArgs
+    let (numbers,names) = partition (all isDigit) args
+    if null numbers then
+        mapM_ optimise names
+     else
+        mapM_ (benchmark (read $ head numbers)) names
 
 
 optimise :: FilePath -> IO ()
@@ -30,6 +35,33 @@ optimise file = do
     core <- return $ coreReachable ["main"] $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
     evaluate (output file) core
     return ()
+
+
+benchmark :: Int -> FilePath -> IO ()
+benchmark i file = do
+    settings <- readSettings
+    return ()
+
+
+readSettings :: IO [(String,[(String,String)])]
+readSettings = do
+    liftM2 (++) (readSettingsFile "settings.txt")
+                (readSettingsFile "test/settings.txt")
+
+
+readSettingsFile :: FilePath -> IO [(String,[(String,String)])]
+readSettingsFile file = do
+    b <- doesFileExist file
+    if not b then return [] else do
+        src <- readFile file
+        let lns = filter (not . null) (lines src) ++ [":"]
+        return $ f [":"] [] lns
+    where
+        f :: [String] -> [(String,String)] -> [String] -> [(String,[(String,String)])]
+        f keys vals ((':':names):rest) = map (flip (,) vals) keys ++ f (words names) [] rest
+        f keys vals (x:rest) = f keys ((key,val):vals) rest
+            where (key:val:_) = words x
+        f keys vals [] = []
 
 
 output file n core = do

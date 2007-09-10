@@ -1,0 +1,12 @@
+:charcount linecount wordcount
+repeat_ghc 1
+stdin textfile
+
+:primes
+args 8000
+
+:exp3_8
+args 9
+
+:queens
+args 12

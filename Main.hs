@@ -6,6 +6,7 @@ import Control.Monad
 import Generate
 --import Firstify.Firstify
 --import Report
+import Safe
 import Data.List
 import Data.Char
 import System.Directory
@@ -26,10 +27,8 @@ main = do
 
 optimise :: FilePath -> IO ()
 optimise file = do
-    res <- system $ "yhc library/Overlay.hs --core"
-    when (res /= ExitSuccess) $ error "Failed to compile overlay"
-    res <- system $ "yhc test/" ++ file ++ "/" ++ file ++ ".hs --linkcore --hide"
-    when (res /= ExitSuccess) $ error "Failed to compile"
+    system_ $ "yhc library/Overlay.hs --core"
+    system_ $ "yhc test/" ++ file ++ "/" ++ file ++ ".hs --linkcore --hide"
     core <- loadCore ("test/" ++ file ++ "/ycr/" ++ file ++ ".yca")
     over <- loadCore "library/Overlay.ycr"
     core <- return $ coreReachable ["main"] $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
@@ -40,7 +39,34 @@ optimise file = do
 benchmark :: Int -> FilePath -> IO ()
 benchmark i file = do
     settings <- readSettings
-    return ()
+    let vals = lookupJustDef [] "" settings ++
+               lookupJustDef [] file settings
+        obj = lookupJustDef "obj" "obj" vals
+
+    -- first compile the Supero
+    ensureDirectory $ obj ++ "/bin"
+    ensureDirectory $ obj ++ "/supero"
+    system_ $ "ghc -O2 --make -fasm test/" ++ file ++ "/4.hs " ++
+              "-o " ++ obj ++ "/bin/supero_.exe " ++
+              "-hidir " ++ obj ++ "/supero " ++
+              "-odir " ++ obj ++ "/supero"
+
+    -- then compile ghc, using file_ if it exists
+    ensureDirectory $ obj ++ "/ghc"
+    b <- doesFileExist $ "test/" ++ file ++ "/" ++ file ++ "_.hs"
+    let haskell = "test/" ++ file ++ "/" ++ file ++ ['_'|b] ++ ".hs"
+    system_ $ "ghc -O2 --make -fasm " ++ haskell ++ " " ++
+              "-o " ++ obj ++ "/bin/ghc_.exe " ++
+              "-hidir " ++ obj ++ "/ghc " ++
+              "-odir " ++ obj ++ "/ghc"
+
+    -- then compile C
+    b <- doesFileExist $ "test/" ++ file ++ "/" ++ file ++ ".c"
+    when b $ do
+        ensureDirectory $ obj ++ "/c"
+        system_ $ "gcc -optc-O3 test/" ++ file ++ "/" ++ file ++ ".c " ++
+                  "-odir " ++ obj ++ "/c " ++
+                  "-o " ++ obj ++ "/bin/c_.exe"
 
 
 readSettings :: IO [(String,[(String,String)])]
@@ -87,3 +113,10 @@ liftMain = applyFuncCore f
     where
         f (CoreFunc "main" [] x) = CoreFunc "main" ["real"] (CoreApp x [CoreVar "real"])
         f x = x
+
+ensureDirectory = createDirectoryIfMissing True
+
+system_ cmd = do
+    res <- system cmd
+    when (res /= ExitSuccess) $ error $ "ERROR: System call failed\n" ++ cmd
+

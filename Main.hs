@@ -16,6 +16,11 @@ import Evaluate5
 
 main = do
     [file] <- getArgs
+    optimise file
+
+
+optimise :: FilePath -> IO ()
+optimise file = do
     res <- system $ "yhc library/Overlay.hs --core"
     when (res /= ExitSuccess) $ error "Failed to compile overlay"
     res <- system $ "yhc test/" ++ file ++ "/" ++ file ++ ".hs --linkcore --hide"
@@ -26,22 +31,6 @@ main = do
     evaluate (output file) core
     return ()
 
-{-
-    error "done"
-
-    putStrLn "Firstifying basic"
-    core <- return $ firstify core
-    output file 2 core
-    putStrLn $ unlines $ report core
-
-    core <- return $ firstifyDataPrepare core
-    output file 3 core
-
-    putStrLn "Firstifying scary"
-    core <- return $ firstifyData core
-    output file 4 core
-    putStrLn $ unlines $ report core
--}
 
 output file n core = do
     let sn = show n

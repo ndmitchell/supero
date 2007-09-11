@@ -15,6 +15,7 @@ import System.Environment
 import System.Cmd
 import System.Exit
 import System.Time
+import System.IO
 import Control.Arrow
 
 import Evaluate5
@@ -44,13 +45,29 @@ data Mode = C | GHC | Supero
 
 show_ x = map toLower $ show x
 
+showMode x = s ++ replicate (6 - length s) ' '
+    where s = show x
+
+showTime x = left2 ++ "." ++ right
+    where
+        s = show x
+        ss = replicate (3 - length s) '0' ++ s
+        (left,right) = splitAt (length ss - 2) ss
+        left2 = replicate (2 - length left) ' ' ++ left
+
+clockMilli (TOD a b) = (a * 100) + (b `div` 10000000000)
+
+
+showPerc x = replicate (3 - length s) ' ' ++ s ++ "%"
+    where s = show x
+
 
 benchmark :: Int -> FilePath -> IO ()
 benchmark i file = do
     settings <- readSettings
     settings <- return $ lookupJustDef [] "" settings ++
                          lookupJustDef [] file settings
-    let obj = lookupJustDef "obj" "obj" settings
+    let obj = lookupJustDef "obj" "obj" settings ++ "/" ++ file
 
     -- first compile the Supero
     ensureDirectory $ obj ++ "/bin"
@@ -74,11 +91,11 @@ benchmark i file = do
     when hasC $ do
         ensureDirectory $ obj ++ "/c"
         system_ $ "ghc -optc-O3 test/" ++ file ++ "/" ++ file ++ ".c " ++
-                  "-odir " ++ obj ++ "/c " ++
+                  "-odir " ++ obj ++ "/c/../../ " ++
                   "-o " ++ obj ++ "/bin/c_.exe"
 
     -- now run the benchmarks, by default twice each
-    let count x = replicate (read $ lookupJustDef "2" ("repeat_" ++ show_ x) settings) x
+    let count x = replicate (i * read (lookupJustDef "2" ("repeat_" ++ show_ x) settings)) x
         todo = concat $ transpose [count GHC, if hasC then count C else [], count Supero]
 
     let pStdin = lookupJustDef "" "stdin" settings
@@ -89,21 +106,32 @@ benchmark i file = do
         tBegin <- getClockTime
         system_ $
             (if pStdin == "textfile" then "type " ++ pTextfile ++ " | " else "") ++
-            "obj\\bin\\" ++ show_ p ++ "_.exe " ++ pArgs ++
+            slashes obj ++ "\\bin\\" ++ show_ p ++ "_.exe " ++ pArgs ++
             " > output.txt"
         tEnd <- getClockTime
-        let tTime = diffClockTimes tBegin tEnd
-        output <- readFile "output.txt"
-        putStrLn $ show p ++ " " ++ show tTime
+        let tTime = clockMilli tEnd - clockMilli tBegin
+        output <- readFileStrict "output.txt"
+        putStrLn $ showMode p ++ " = " ++ showTime tTime
         return (output,(p,tTime))
 
     let (outs,times) = unzip res
     when (length (nub outs) > 1) $ error $ "Outputs do not all match:\n" ++ show outs
-    let summary = map (id &&& minimum) $ groupBy ((==) `on` fst) $ sort times
-    print summary
+    let summary = map minimum $ groupBy ((==) `on` fst) $ sort times
+        ghcVal = lookupJust GHC summary
+    putStrLn $ replicate 10 '-'
+    putStr $ unlines [showMode p ++ " = " ++ showTime v ++ "  " ++ showPerc ((v * 100) `div` ghcVal)
+                     | (p,v) <- summary]
+    putStrLn $ replicate 10 '='
+    putStrLn ""
 
 
 defaultTextFile = "C:\\Windows\\WindowsUpdate.log"
+
+
+slashes = map f
+    where
+        f '/' = '\\'
+        f x = x
 
 
 readSettings :: IO [(String,[(String,String)])]
@@ -118,7 +146,7 @@ readSettingsFile file = do
     if not b then return [] else do
         src <- readFile file
         let lns = filter (not . null) (lines src) ++ [":"]
-        return $ f [":"] [] lns
+        return $ f [""] [] lns
     where
         f :: [String] -> [(String,String)] -> [String] -> [(String,[(String,String)])]
         f keys vals ((':':names):rest) = map (flip (,) vals) keys ++ f (words names) [] rest
@@ -158,3 +186,10 @@ system_ cmd = do
     when (res /= ExitSuccess) $ error $ "ERROR: System call failed\n" ++ cmd
 
 
+readFileStrict :: FilePath -> IO String
+readFileStrict file = do
+    h <- openFile file ReadMode
+    src <- hGetContents h
+    () <- length src `seq` return ()
+    hClose h
+    return src

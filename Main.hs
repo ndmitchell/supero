@@ -73,7 +73,7 @@ benchmark i file = do
     hasC <- doesFileExist $ "test/" ++ file ++ "/" ++ file ++ ".c"
     when hasC $ do
         ensureDirectory $ obj ++ "/c"
-        system_ $ "gcc -optc-O3 test/" ++ file ++ "/" ++ file ++ ".c " ++
+        system_ $ "ghc -optc-O3 test/" ++ file ++ "/" ++ file ++ ".c " ++
                   "-odir " ++ obj ++ "/c " ++
                   "-o " ++ obj ++ "/bin/c_.exe"
 
@@ -89,7 +89,7 @@ benchmark i file = do
         tBegin <- getClockTime
         system_ $
             (if pStdin == "textfile" then "type " ++ pTextfile ++ " | " else "") ++
-            "obj/bin/" ++ show_ p ++ "_.exe " ++ pArgs ++
+            "obj\\bin\\" ++ show_ p ++ "_.exe " ++ pArgs ++
             " > output.txt"
         tEnd <- getClockTime
         let tTime = diffClockTimes tBegin tEnd
@@ -103,7 +103,7 @@ benchmark i file = do
     print summary
 
 
-defaultTextFile = "C:/Windows/net.log"
+defaultTextFile = "C:\\Windows\\WindowsUpdate.log"
 
 
 readSettings :: IO [(String,[(String,String)])]

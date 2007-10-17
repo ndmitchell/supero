@@ -27,7 +27,7 @@ exprSize :: CoreExpr -> Int
 exprSize = length . universe
 
 exprSizeOld :: CoreExpr -> Int
-exprSizeOld = fold (\_ cs -> 1 + maximum (0:cs))
+exprSizeOld = para (\_ cs -> 1 + maximum (0:cs))
 
 comparing x = on compare x
 

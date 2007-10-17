@@ -102,6 +102,7 @@ benchmark i file = do
         pTextfile = lookupJustDef defaultTextFile "textfile" settings
         pArgs = lookupJustDef "" "args" settings
 
+    putStrLn $ "Benchmarking " ++ file
     res <- flip mapM todo $ \p -> do
         tBegin <- getClockTime
         system_ $
@@ -119,6 +120,7 @@ benchmark i file = do
     let summary = map minimum $ groupBy ((==) `on` fst) $ sort times
         ghcVal = lookupJust GHC summary
     putStrLn $ replicate 10 '-'
+    putStrLn $ "Results for " ++ file
     putStr $ unlines [showMode p ++ " = " ++ showTime v ++ "  " ++ showPerc ((v * 100) `div` ghcVal)
                      | (p,v) <- summary]
     putStrLn $ replicate 10 '='

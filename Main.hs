@@ -18,7 +18,7 @@ import System.Time
 import System.IO
 import Control.Arrow
 
-import Evaluate5
+import Evaluate6
 
 main = do
     args <- getArgs

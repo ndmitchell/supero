@@ -6,6 +6,7 @@ import Data.Maybe
 import System.Cmd
 import System.Directory
 import System.FilePath
+import System.Time
 import Safe
 
 import Options
@@ -27,7 +28,7 @@ nofib options comps benchs = do
         res <- c options{optObjLocation = optObjLocation options </> name </> takeBaseName b} b
         case res of
             Left err -> putStrLn $ "Doh: " ++ err
-            Right exec -> runBenchmark (takeBaseName b) exec
+            Right exec -> runBenchmark b exec
         | b <- benchs, (name,c) <- comps]
 
 
@@ -52,7 +53,44 @@ benchmarks (Options {optNofibLocation=root}) = do
 
 runBenchmark :: Benchmark -> FilePath -> IO ()
 runBenchmark bench exe = do
-    system exe
-    putStrLn "Done"
+    let l = lookupJust (takeBaseName bench) tests
+    r <- l bench exe
+    case r of
+        Left x -> putStrLn $ "Error:" ++ x
+        Right x -> putStrLn $ "Time: " ++ show x
 
 
+tests :: [(String, Benchmark -> FilePath -> IO (Either String Integer))]
+tests =
+    let a*b = (a,b) in
+    ["bernouilli" * checked "500"
+    ,"digits-of-e1" * checked "1000"
+    ,"x2n1" * checked "10000"
+    ]
+
+
+checked :: String -> Benchmark -> FilePath -> IO (Either String Integer)
+checked args bench exe = do
+    let stdout = exe <.> "stdout"
+        stderr = exe <.> "stderr"
+    removeFileSafe stdout
+    removeFileSafe stderr
+    begin <- getClockTime
+    system $ exe ++ " " ++ args ++ " > " ++ stdout ++ " 2> " ++ stderr
+    end <- getClockTime
+    let elapsed = diffMilliseconds end begin
+    expected <- readFile (bench </> takeBaseName bench <.> "stdout")
+    got <- readFile stdout
+    return $ if got /= expected then Left "Expected mismatch" else Right elapsed
+
+
+removeFileSafe x = do
+    b <- doesFileExist x
+    when b $ removeFile x
+
+
+diffMilliseconds :: ClockTime -> ClockTime -> Integer
+diffMilliseconds a b =
+        fromIntegral (tdSec res * 1000) +
+        fromIntegral (tdPicosec res `div` 1000000000)
+    where res = diffClockTimes a b

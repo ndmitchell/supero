@@ -1,9 +1,13 @@
 
 module Main where
 
+import Control.Monad
 import Data.List
 import Data.Maybe
 import System.Environment
+import System.Directory
+import System.FilePath
+import System.Cmd
 
 import Options
 import Nofib
@@ -28,6 +32,15 @@ main = do
 
 
 runGHC :: String -> Options -> Benchmark -> IO (Either String String)
-runGHC flag opts bench = do
-    error $ show (flag,opts,bench)
-
+runGHC flag (Options {optObjLocation=obj}) bench = do
+    let exe = obj </> "main.exe"
+    b <- doesFileExist exe
+    when (not b) $ do
+        createDirectoryIfMissing True obj
+        system $ "ghc --make " ++ (bench </> "Main") ++ " " ++ flag ++ " " ++
+                 " -odir " ++ obj ++ " -hidir " ++ obj ++ " -o " ++ exe ++
+                 "  > " ++ (obj </> "compile.stdout") ++
+                 " 2> " ++ (obj </> "compile.stderr")
+        return ()
+    b <- doesFileExist exe
+    return $ if b then Right exe else Left "Could not create executable"

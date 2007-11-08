@@ -8,6 +8,7 @@ import System.Directory
 import System.FilePath
 import System.Time
 import Safe
+import System.Info
 
 import Options
 
@@ -28,7 +29,7 @@ nofib options comps benchs = do
         res <- c options{optObjLocation = optObjLocation options </> name </> takeBaseName b} b
         case res of
             Left err -> putStrLn $ "Doh: " ++ err
-            Right exec -> runBenchmark b exec
+            Right exec -> runBenchmark name b exec
         | b <- benchs, (name,c) <- comps]
 
 
@@ -51,13 +52,16 @@ benchmarks (Options {optNofibLocation=root}) = do
 
 
 
-runBenchmark :: Benchmark -> FilePath -> IO ()
-runBenchmark bench exe = do
+runBenchmark :: String -> Benchmark -> FilePath -> IO ()
+runBenchmark compiler bench exe = do
     let l = lookupJust (takeBaseName bench) tests
     r <- l bench exe
     case r of
         Left x -> putStrLn $ "Error:" ++ x
-        Right x -> putStrLn $ "Time: " ++ show x
+        Right x -> do
+            when (compilerName /= "hugs") $
+                appendFile "results.txt" (compiler ++ " " ++ show x ++ "\n")
+            putStrLn $ "Time: " ++ show x
 
 
 tests :: [(String, Benchmark -> FilePath -> IO (Either String Integer))]

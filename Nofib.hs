@@ -1,11 +1,12 @@
 
-module Nofib(nofib) where
+module Nofib(nofib, Compiler, Benchmark) where
 
 import Control.Monad
 import Data.Maybe
 import System.Cmd
 import System.Directory
 import System.FilePath
+import Safe
 
 import Options
 
@@ -23,7 +24,7 @@ nofib options comps benchs = do
     benchs <- resolveBenchmarks options benchs
     sequence_ [do
         putStrLn $ "Running " ++ takeBaseName b ++ " with " ++ name
-        res <- c options b
+        res <- c options{optObjLocation = optObjLocation options </> name </> takeBaseName b} b
         case res of
             Left err -> putStrLn $ "Doh: " ++ err
             Right exec -> runBenchmark (takeBaseName b) exec
@@ -31,18 +32,27 @@ nofib options comps benchs = do
 
 
 resolveBenchmarks :: Options -> [Benchmark] -> IO [Benchmark]
-resolveBenchmarks (Options {optNofibLocation=root}) bs = do
-    let f x = liftM (filter ('.' `notElem`)) $ getDirectoryContents (root </> x)
-    tests <- liftM (zip folders) $ mapM f folders
+resolveBenchmarks opts want = do
+    found <- benchmarks opts
+    return $ concatMap (`lookupJust` found) want
 
-    let f "." = concatMap snd tests
-        f x | x `elem` folders = fromJust $ lookup x tests
-        f x = let res = [x | a <- concatMap snd tests, takeBaseName a == x]
-              in if null res then error $ "Nofib test not found, " ++ x else res
-    return $ concatMap f bs
+
+benchmarks :: Options -> IO [(String,[Benchmark])]
+benchmarks (Options {optNofibLocation=root}) = do
+        res <- mapM f folders
+        return $ (".",concatMap snd $ concat res) : 
+                 zipWith (\f r -> (f,concatMap snd r)) folders res ++
+                 concat res
+    where
+        f folder = do
+            res <- liftM (filter ('.' `notElem`)) $ getDirectoryContents (root </> folder)
+            return $ map (\x -> (x,[root </> folder </> x])) res
+
 
 
 runBenchmark :: Benchmark -> FilePath -> IO ()
 runBenchmark bench exe = do
     system exe
     putStrLn "Done"
+
+

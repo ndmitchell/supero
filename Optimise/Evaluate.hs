@@ -8,20 +8,14 @@ import Optimise.CAF
 
 import Yhc.Core hiding (uniqueBoundVarsFunc)
 import Yhc.Core.FreeVar3
-import Yhc.Core.UniqueId
-import Debug.Trace
 
 import Control.Monad.State
-import Control.Applicative
-import Control.Arrow
 import Data.List
 import Data.Maybe
 import Safe
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified Data.IntSet as IntSet
-import qualified Data.IntMap as IntMap
 
 ---------------------------------------------------------------------
 -- DATA TYPES

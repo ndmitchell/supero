@@ -55,6 +55,6 @@ tag x y = "<" ++ x ++ ">" ++ y ++ "</" ++ x ++ ">"
 
 
 css = unlines
-    ["table {border: 1px solid black;}"
+    ["td {border-right:10px solid white; font-size:10pt;}"
     ]
     

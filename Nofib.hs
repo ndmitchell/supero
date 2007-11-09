@@ -4,14 +4,13 @@ module Nofib(nofib, Compiler, Benchmark) where
 import Control.Monad
 import Data.Maybe
 import Data.List
-import System.Cmd
 import System.Directory
 import System.FilePath
 import System.Time
 import Safe
 import System.Info
 
-import Options
+import General
 
 
 folders = ["imaginary","spectral","real"]
@@ -100,7 +99,7 @@ checked args opts bench exe = do
     removeFileSafe stdout
     removeFileSafe stderr
     begin <- getClockTime
-    system $ exe ++ " " ++ args ++ " > " ++ stdout ++ " 2> " ++ stderr
+    system_ $ exe ++ " " ++ args ++ " > " ++ stdout ++ " 2> " ++ stderr
     end <- getClockTime
     let elapsed = diffMilliseconds end begin
     expected <- readFile (bench </> takeBaseName bench <.> "stdout")

@@ -7,9 +7,8 @@ import Data.Maybe
 import System.Environment
 import System.Directory
 import System.FilePath
-import System.Cmd
 
-import Options
+import General
 import Nofib
 import Report
 
@@ -36,11 +35,10 @@ runGHC flag (Options {optObjLocation=obj}) bench = do
     let exe = obj </> "main.exe"
     b <- doesFileExist exe
     when (not b) $ do
-        system $ "ghc --make " ++ (bench </> "Main") ++ " " ++ flag ++ " " ++
-                 " -odir " ++ obj ++ " -hidir " ++ obj ++ " -o " ++ exe ++
-                 "  > " ++ (obj </> "compile.stdout") ++
-                 " 2> " ++ (obj </> "compile.stderr")
-        return ()
+        system_ $ "ghc --make " ++ (bench </> "Main") ++ " " ++ flag ++ " " ++
+                  " -odir " ++ obj ++ " -hidir " ++ obj ++ " -o " ++ exe ++
+                  "  > " ++ (obj </> "compile.stdout") ++
+                  " 2> " ++ (obj </> "compile.stderr")
     b <- doesFileExist exe
     return $ if b then Right exe else Left "Could not create executable"
 
@@ -50,10 +48,9 @@ runYhc (Options {optObjLocation=obj}) bench = do
     let exe = obj </> "main.hbc"
     b <- doesFileExist exe
     when (not b) $ do
-        system $ "yhc " ++ (bench </> "Main") ++
-                 " --objdir=" ++ obj ++ " --hidir=" ++ obj ++
-                 "  > " ++ (obj </> "compile.stdout") ++
-                 " 2> " ++ (obj </> "compile.stderr")
-        return ()
+        system_ $ "yhc " ++ (bench </> "Main") ++
+                  " --objdir=" ++ obj ++ " --hidir=" ++ obj ++
+                  "  > " ++ (obj </> "compile.stdout") ++
+                  " 2> " ++ (obj </> "compile.stderr")
     b <- doesFileExist exe
     return $ if b then Right ("yhi " ++ exe) else Left "Could not create executable"

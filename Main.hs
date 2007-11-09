@@ -11,8 +11,9 @@ import System.Cmd
 
 import Options
 import Nofib
+import Report
 
-compilers = [("yhc",undefined)
+compilers = [("yhc",runYhc)
             ,("ghc",runGHC "")
             ,("ghc1",runGHC "-O1")
             ,("ghc2",runGHC "-O2")
@@ -26,8 +27,7 @@ main = do
         comps = map (\c -> (c, fromJust $ lookup c compilers)) cs
     opts <- readOptions
     nofib opts comps ts
-
-
+    report
 
 
 
@@ -36,7 +36,6 @@ runGHC flag (Options {optObjLocation=obj}) bench = do
     let exe = obj </> "main.exe"
     b <- doesFileExist exe
     when (not b) $ do
-        createDirectoryIfMissing True obj
         system $ "ghc --make " ++ (bench </> "Main") ++ " " ++ flag ++ " " ++
                  " -odir " ++ obj ++ " -hidir " ++ obj ++ " -o " ++ exe ++
                  "  > " ++ (obj </> "compile.stdout") ++
@@ -44,3 +43,17 @@ runGHC flag (Options {optObjLocation=obj}) bench = do
         return ()
     b <- doesFileExist exe
     return $ if b then Right exe else Left "Could not create executable"
+
+
+runYhc :: Options -> Benchmark -> IO (Either String String)
+runYhc (Options {optObjLocation=obj}) bench = do
+    let exe = obj </> "main.hbc"
+    b <- doesFileExist exe
+    when (not b) $ do
+        system $ "yhc " ++ (bench </> "Main") ++
+                 " --objdir=" ++ obj ++ " --hidir=" ++ obj ++
+                 "  > " ++ (obj </> "compile.stdout") ++
+                 " 2> " ++ (obj </> "compile.stderr")
+        return ()
+    b <- doesFileExist exe
+    return $ if b then Right ("yhi " ++ exe) else Left "Could not create executable"

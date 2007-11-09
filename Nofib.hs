@@ -65,7 +65,7 @@ runBenchmark compiler bench exe = do
         Left x -> putStrLn $ "Error:" ++ x
         Right x -> do
             when (compilerName /= "hugs") $
-                appendFile "results.txt" (compiler ++ " " ++ show x ++ "\n")
+                appendFile "results.txt" (compiler ++ " " ++ takeBaseName bench ++ " " ++ show x ++ "\n")
             putStrLn $ "Time: " ++ show x
 
 

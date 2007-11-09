@@ -3,6 +3,7 @@ module Nofib(nofib, Compiler, Benchmark) where
 
 import Control.Monad
 import Data.Maybe
+import Data.List
 import System.Cmd
 import System.Directory
 import System.FilePath
@@ -47,14 +48,18 @@ benchmarks (Options {optNofibLocation=root}) = do
                  concat res
     where
         f folder = do
-            res <- liftM (filter ('.' `notElem`)) $ getDirectoryContents (root </> folder)
-            return $ map (\x -> (x,[root </> folder </> x])) res
+            res <- getDirectoryContents (root </> folder)
+            liftM concat $ mapM (g (root </> folder)) res
 
+        g root x = do
+            b <- doesDirectoryExist (root </> x)
+            return [(x, [root </> x]) | b && '.' `notElem` x]
 
 
 runBenchmark :: String -> Benchmark -> FilePath -> IO ()
 runBenchmark compiler bench exe = do
-    let l = lookupJust (takeBaseName bench) tests
+    let l = fromMaybe (error $ "Don't know how to benchmark " ++ takeBaseName bench) $
+                      lookup (takeBaseName bench) tests
     r <- l bench exe
     case r of
         Left x -> putStrLn $ "Error:" ++ x
@@ -69,6 +74,17 @@ tests =
     let a*b = (a,b) in
     ["bernouilli" * checked "500"
     ,"digits-of-e1" * checked "1000"
+    ,"digits-of-e2" * checked "2000"
+    ,"exp3_8" * checked "8"
+    ,"gen_regexps" * piped
+    ,"integrate" * checked "50000"
+    ,"paraffins" * checked "17"
+    ,"primes" * checked "1500"
+    ,"queens" * checked "10"
+    ,"rfib" * checked "30"
+    ,"tak" * checked "24 16 8"
+    ,"wheel-sieve1" * checked "100000"
+    ,"wheel-sieve2" * checked "20000"
     ,"x2n1" * checked "10000"
     ]
 
@@ -86,6 +102,11 @@ checked args bench exe = do
     expected <- readFile (bench </> takeBaseName bench <.> "stdout")
     got <- readFile stdout
     return $ if got /= expected then Left "Expected mismatch" else Right elapsed
+
+piped :: Benchmark -> FilePath -> IO (Either String Integer)
+piped bench exe = do
+    let stdin = bench </> takeBaseName bench <.> "stdin"
+    checked (" < " ++ stdin) bench exe
 
 
 removeFileSafe x = do

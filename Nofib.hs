@@ -23,14 +23,17 @@ type Compiler = Options -> Benchmark -> IO (Either String String)
 
 
 nofib :: Options -> [(String,Compiler)] -> [Benchmark] -> IO ()
-nofib options comps benchs = do
-    benchs <- resolveBenchmarks options benchs
+nofib opts comps benchs = do
+    benchs <- resolveBenchmarks opts benchs
     sequence_ [do
         putStrLn $ "Running " ++ takeBaseName b ++ " with " ++ name
-        res <- c options{optObjLocation = optObjLocation options </> name </> takeBaseName b} b
+        let objdir = optObjLocation opts </> name </> takeBaseName b
+            opts2 = opts{optObjLocation = objdir}
+        createDirectoryIfMissing True objdir
+        res <- c opts2 b
         case res of
             Left err -> putStrLn $ "Doh: " ++ err
-            Right exec -> runBenchmark name b exec
+            Right exec -> runBenchmark opts2 name b exec
         | b <- benchs, (name,c) <- comps]
 
 
@@ -56,11 +59,11 @@ benchmarks (Options {optNofibLocation=root}) = do
             return [(x, [root </> x]) | b && '.' `notElem` x]
 
 
-runBenchmark :: String -> Benchmark -> FilePath -> IO ()
-runBenchmark compiler bench exe = do
+runBenchmark :: Options -> String -> Benchmark -> FilePath -> IO ()
+runBenchmark opts compiler bench exe = do
     let l = fromMaybe (error $ "Don't know how to benchmark " ++ takeBaseName bench) $
                       lookup (takeBaseName bench) tests
-    r <- l bench exe
+    r <- l opts bench exe
     case r of
         Left x -> putStrLn $ "Error:" ++ x
         Right x -> do
@@ -69,7 +72,7 @@ runBenchmark compiler bench exe = do
             putStrLn $ "Time: " ++ show x
 
 
-tests :: [(String, Benchmark -> FilePath -> IO (Either String Integer))]
+tests :: [(String, Options -> Benchmark -> FilePath -> IO (Either String Integer))]
 tests =
     let a*b = (a,b) in
     ["bernouilli" * checked "500"
@@ -89,10 +92,11 @@ tests =
     ]
 
 
-checked :: String -> Benchmark -> FilePath -> IO (Either String Integer)
-checked args bench exe = do
-    let stdout = exe <.> "stdout"
-        stderr = exe <.> "stderr"
+checked :: String -> Options -> Benchmark -> FilePath -> IO (Either String Integer)
+checked args opts bench exe = do
+    let logs = optObjLocation opts </> "runtime"
+        stdout = logs <.> "stdout"
+        stderr = logs <.> "stderr"
     removeFileSafe stdout
     removeFileSafe stderr
     begin <- getClockTime
@@ -103,10 +107,10 @@ checked args bench exe = do
     got <- readFile stdout
     return $ if got /= expected then Left "Expected mismatch" else Right elapsed
 
-piped :: Benchmark -> FilePath -> IO (Either String Integer)
-piped bench exe = do
+piped :: Options -> Benchmark -> FilePath -> IO (Either String Integer)
+piped opts bench exe = do
     let stdin = bench </> takeBaseName bench <.> "stdin"
-    checked (" < " ++ stdin) bench exe
+    checked (" < " ++ stdin) opts bench exe
 
 
 removeFileSafe x = do

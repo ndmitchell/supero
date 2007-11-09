@@ -11,12 +11,13 @@ import System.FilePath
 import General
 import Nofib
 import Report
+import Optimise.All
 
 compilers = [("yhc",runYhc)
             ,("ghc",runGHC "")
             ,("ghc1",runGHC "-O1")
             ,("ghc2",runGHC "-O2")
-            ,("supero",undefined)
+            ,("supero",runSupero)
             ]
 
 
@@ -54,3 +55,8 @@ runYhc (Options {optObjLocation=obj}) bench = do
                   " 2> " ++ (obj </> "compile.stderr")
     b <- doesFileExist exe
     return $ if b then Right ("yhi " ++ exe) else Left "Could not create executable"
+
+
+runSupero :: Options -> Benchmark -> IO (Either String String)
+runSupero (Options {optObjLocation=obj}) bench = do
+    optimise bench obj

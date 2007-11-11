@@ -7,6 +7,7 @@ import Data.List
 import System.Directory
 import System.FilePath
 import System.Time
+import System.Cmd
 import Safe
 import System.Info
 
@@ -99,7 +100,7 @@ checked args opts bench exe = do
     removeFileSafe stdout
     removeFileSafe stderr
     begin <- getClockTime
-    system_ $ exe ++ " " ++ args ++ " > " ++ stdout ++ " 2> " ++ stderr
+    system $ exe ++ " " ++ args ++ " > " ++ stdout ++ " 2> " ++ stderr
     end <- getClockTime
     let elapsed = diffMilliseconds end begin
     expected <- readFile (bench </> takeBaseName bench <.> "stdout")

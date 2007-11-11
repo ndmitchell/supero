@@ -32,6 +32,8 @@ locate opts = do
 
 
 system_ cmd = do
+    putStr $ "Running " ++ head (words cmd) ++ "... "
     res <- system cmd
+    putStrLn "done"
     when (res /= ExitSuccess) $ error $ "ERROR: System call failed\n" ++ cmd
 

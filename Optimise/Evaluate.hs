@@ -136,14 +136,17 @@ onf resultName context x = do
             x2 <- unfold x
             if x2 == x then do
                 unpeel context x
-             else
-                onf resultName context{rho=x:rho context} x2
+             else do
+                context <- return context{currents=x:currents context, rho=x:rho context}
+                onf resultName context x2
 
 
 -- unpeel at least one layer, but keep going if it makes no difference
 unpeel :: Context -> CoreExpr -> SS CoreExpr
-unpeel context x = do s <- get; descendM (f s) x
+unpeel context2 x = do s <- get; descendM (f s) x
     where
+        context = context2{currents=[]}
+
         f s (CoreFun x) | caf s x = tie context (CoreFun x)
         f s x = do
             x2 <- unfold x

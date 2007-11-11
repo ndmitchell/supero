@@ -4,6 +4,7 @@ module Report(report) where
 import Safe
 import Data.List
 import Data.Maybe
+import System.Directory
 
 
 -- The MR sucks!
@@ -11,7 +12,8 @@ snub x = sort $ nub x
 
 report :: IO ()
 report = do
-    src <- readFile "results.txt"
+    b <- doesFileExist "results.txt"
+    src <- if not b then return "" else readFile "results.txt"
     let res = map (\[a,b,c] -> (a,b,c)) $ map words $ lines src
         (comps,tests,_) = unzip3 res
     comps <- return $ snub comps

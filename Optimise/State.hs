@@ -58,8 +58,17 @@ type SS a = StateIO S a
 
 
 data Context = Context
-        {current :: CoreExpr    -- the current expression under test
-        ,currents :: [CoreExpr] -- the list of expressions since last residuation
+        -- the current expression under test
+        {current :: CoreExpr
+        
+        -- the expressions since the last residuation
+        -- includes the result just after residuation
+        -- does not include the current expression
+        ,currents :: [CoreExpr]
+        
+        -- includes all expressions pre their unfoldings
+        -- a strict superset of currents
+        -- does not include current
         ,rho  :: [CoreExpr]     -- a list of all expressions ever
         }
 

@@ -19,7 +19,6 @@ compilers = [("yhc",runYhc)
             ,("ghc",runGHC "")
             ,("ghc1",runGHC "-O1")
             ,("ghc2",runGHC "-O2")
-            ,("supero",runSupero)
             ]
 
 
@@ -29,8 +28,8 @@ main = do
     (cs,args) <- return $ partition (`elem` map fst compilers) args
     (ts,args) <- return $ partition (`elem` map fst termination) args
 
-    let comps = map (\c -> (c, lookupJust c compilers)) cs
-        terms = map (\c -> (c, lookupJust c termination)) ts
+    let comps = map (\c -> (c, lookupJust c compilers)) cs ++
+                map (\c -> ("supero-" ++ c, runSupero $ lookupJust c termination)) ts
 
     opts <- readOptions
     nofib opts (headDef 1 (map read nums)) comps args
@@ -64,6 +63,6 @@ runYhc (Options {optObjLocation=obj}) bench = do
     return $ if b then Right ("yhi " ++ exe) else Left "Could not create executable"
 
 
-runSupero :: Options -> Benchmark -> IO (Either String String)
-runSupero (Options {optObjLocation=obj}) bench = do
-    optimise bench obj
+runSupero :: Termination -> Options -> Benchmark -> IO (Either String String)
+runSupero term (Options {optObjLocation=obj}) bench = do
+    optimise term bench obj

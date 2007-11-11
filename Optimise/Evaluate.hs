@@ -21,26 +21,29 @@ import qualified Data.Set as Set
 ---------------------------------------------------------------------
 -- DRIVER
 
-evaluate :: (Int -> Core -> IO ()) -> Core -> IO Core
-evaluate out c = do
+-- debug hook to optimise something other than main
+mainName = "main"
+
+evaluate :: Termination -> (Int -> Core -> IO ()) -> Core -> IO Core
+evaluate term out c = do
     out 0 c
-    c <- eval (detectCafs c) c
+    c <- eval term (detectCafs c) c
     out 1 c
     c <- return $ coreFix c
     out 2 c
     return c
 
 coreFix :: Core -> Core
-coreFix = coreReachable ["main"] . coreInline InlineCallOnce
+coreFix = coreReachable [mainName] . coreInline InlineFull
 
 
 ---------------------------------------------------------------------
 -- EVAL DRIVER
 
-eval :: Set.Set CoreFuncName -> Core -> IO Core
-eval cafs core = do
-    let s0 = S Map.empty [] 1 1 (coreFuncMap fm) (`Set.member` primsSet) (`Set.member` cafs) undefined
-    (_,sn) <- sioRun (tieFunc (coreFuncMap fm "main")) s0
+eval :: Termination -> Set.Set CoreFuncName -> Core -> IO Core
+eval term cafs core = do
+    let s0 = S Map.empty [] 1 1 (coreFuncMap fm) (`Set.member` primsSet) (`Set.member` cafs) term
+    (_,sn) <- sioRun (tieFunc (coreFuncMap fm mainName)) s0
     return $ core{coreFuncs = prims ++ funcs sn}
     where
         fm = toCoreFuncMap core
@@ -128,8 +131,9 @@ POSTCONDITIONS:
 -- resultName is only passed to aid debugging
 onf :: CoreFuncName -> Context -> CoreExpr -> SS CoreExpr
 onf resultName context x = do
+    s <- get
     x <- coreSimplifyExprUniqueExt onfExt x
-    r <- jonish context{current=x}
+    r <- (term s) context{current=x}
     case r of
         Just x -> unpeel context x
         Nothing -> do

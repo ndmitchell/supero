@@ -1,5 +1,5 @@
 
-module Optimise.All(optimise, termination) where
+module Optimise.All(optimise, termination, Termination) where
 
 import Yhc.Core
 import Control.Monad
@@ -7,12 +7,15 @@ import System.FilePath
 import System.Directory
 import Optimise.Evaluate
 import Optimise.Generate
-import Optimise.Termination
 import General
 
+-- just rexports
+import Optimise.Termination(termination)
+import Optimise.State(Termination)
 
-optimise :: FilePath -> FilePath -> IO (Either String String)
-optimise src obj = do
+
+optimise :: Termination -> FilePath -> FilePath -> IO (Either String String)
+optimise term src obj = do
     b <- doesFileExist (obj </> "Main.yca")
     when (not b) $ do
         system_ $ "yhc " ++ (src </> "Main") ++ " --linkcore" ++
@@ -22,7 +25,7 @@ optimise src obj = do
     core <- loadCore (obj </> "Main.yca")
     over <- loadOverlay
     core <- return $ coreReachable ["main"] $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
-    core <- evaluate (output obj) core
+    core <- evaluate term (output obj) core
     
     let exe = obj </> "main.exe"
     generate (obj </> "Main_.hs") core

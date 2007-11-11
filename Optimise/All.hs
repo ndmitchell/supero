@@ -1,5 +1,5 @@
 
-module Optimise.All(optimise) where
+module Optimise.All(optimise, termination) where
 
 import Yhc.Core
 import Control.Monad
@@ -7,6 +7,7 @@ import System.FilePath
 import System.Directory
 import Optimise.Evaluate
 import Optimise.Generate
+import Optimise.Termination
 import General
 
 

@@ -2,8 +2,10 @@
 module Main where
 
 import Control.Monad
+import Data.Char
 import Data.List
 import Data.Maybe
+import Safe
 import System.Environment
 import System.Directory
 import System.FilePath
@@ -23,10 +25,15 @@ compilers = [("yhc",runYhc)
 
 main = do
     args <- getArgs
-    let (cs,ts) = partition (`elem` map fst compilers) args
-        comps = map (\c -> (c, fromJust $ lookup c compilers)) cs
+    (nums,args) <- return $ partition (all isDigit) args
+    (cs,args) <- return $ partition (`elem` map fst compilers) args
+    (ts,args) <- return $ partition (`elem` map fst termination) args
+
+    let comps = map (\c -> (c, lookupJust c compilers)) cs
+        terms = map (\c -> (c, lookupJust c termination)) ts
+
     opts <- readOptions
-    nofib opts comps ts
+    nofib opts comps args
     report
 
 

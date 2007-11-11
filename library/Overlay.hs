@@ -130,19 +130,20 @@ foreign import primitive global_Prelude''readFile :: a
 
 
 -- things which are just way too complex
-foreign import primitive global_Prelude''Prelude'_Double''Prelude'_Show''showsPrec :: a -> Double -> ShowS
+foreign import primitive global_Prelude''Prelude'_Double''Prelude'_Read''readsPrec :: Int -> ReadS Double
+foreign import primitive global_Prelude''Prelude'_Double''Prelude'_Read''readList :: a
+foreign import primitive global_Prelude''Prelude'_Double''Prelude'_Show''showsPrec :: Int -> Double -> ShowS
 
 foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Read''readsPrec :: Int -> ReadS Int
 foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Read''readList :: a
-foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Show''showsPrec :: a
+foreign import primitive global_Prelude''Prelude'_Int''Prelude'_Show''showsPrec :: Int -> Int -> ShowS
 
 foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Read''readsPrec :: Int -> ReadS Integer
 foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Read''readList :: a
-foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Show''showsPrec :: a
+foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Show''showsPrec :: Int -> Integer -> ShowS
 
 foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Read''readsPrec :: Int -> ReadS Char
 foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Read''readList :: a
-
 foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Show''showsPrec :: a
 foreign import primitive global_Prelude''Prelude'_Char''Prelude'_Show''showList :: a
 

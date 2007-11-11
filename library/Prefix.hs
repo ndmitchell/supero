@@ -66,6 +66,8 @@ yHC_Primitive_primIntegerLt = (<) :: Integer -> Integer -> Bool
 yHC_Primitive_primIntegerSub = (-) :: Integer -> Integer -> Integer
 
 
+aDD_D = (+) :: Double -> Double -> Double
+sUB_D = (-) :: Double -> Double -> Double
 lT_D = (<) :: Double -> Double -> Bool
 lE_D = (<=) :: Double -> Double -> Bool
 gT_D = (>) :: Double -> Double -> Bool
@@ -95,25 +97,32 @@ data_Char_isSpace c = isspace (toEnum c) /= 0
 
 
 
+type ReadsPrec a = Int -> [Int] -> [(a,[Int])]
 
-prelude_Int_Read_readsPrec :: Int -> [Int] -> [(Int,[Int])]
+
+prelude_Int_Read_readsPrec :: ReadsPrec Int
 prelude_Int_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
 
-prelude_Integer_Read_readsPrec :: Int -> [Int] -> [(Integer,[Int])]
+prelude_Integer_Read_readsPrec :: ReadsPrec Integer
 prelude_Integer_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
 
-prelude_Char_Read_readsPrec :: Int -> [Int] -> [(Int,[Int])]
+prelude_Double_Read_readsPrec :: ReadsPrec Double
+prelude_Double_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
+
+prelude_Char_Read_readsPrec :: ReadsPrec Int
 prelude_Char_Read_readsPrec p s = [(chr_ (a :: Char), str_ b) | (a,b) <- readsPrec p (map toEnum s)]
 
 prelude_Char_Show_showList :: [Int] -> [Int] -> [Int]
 prelude_Char_Show_showList value rest = str_ (show (map toEnum value :: [Char])) ++ rest
-
 
 prelude_Int_Show_showsPrec :: Int -> Int -> [Int] -> [Int]
 prelude_Int_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest
 
 prelude_Integer_Show_showsPrec :: Int -> Integer -> [Int] -> [Int]
 prelude_Integer_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest
+
+prelude_Double_Show_showsPrec :: Int -> Double -> [Int] -> [Int]
+prelude_Double_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest
 
 
 {- OLD PREFIX

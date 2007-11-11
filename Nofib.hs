@@ -22,8 +22,8 @@ type Benchmark = String
 type Compiler = Options -> Benchmark -> IO (Either String String)
 
 
-nofib :: Options -> [(String,Compiler)] -> [Benchmark] -> IO ()
-nofib opts comps benchs = do
+nofib :: Options -> Int -> [(String,Compiler)] -> [Benchmark] -> IO ()
+nofib opts rep comps benchs = do
     benchs <- resolveBenchmarks opts benchs
     sequence_ [do
         putStrLn $ "Running " ++ takeBaseName b ++ " with " ++ name
@@ -33,7 +33,7 @@ nofib opts comps benchs = do
         res <- c opts2 b
         case res of
             Left err -> putStrLn $ "Doh: " ++ err
-            Right exec -> runBenchmark opts2 name b exec
+            Right exec -> replicateM_ rep $ runBenchmark opts2 name b exec
         | b <- benchs, (name,c) <- comps]
 
 

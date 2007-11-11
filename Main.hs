@@ -33,7 +33,7 @@ main = do
         terms = map (\c -> (c, lookupJust c termination)) ts
 
     opts <- readOptions
-    nofib opts comps args
+    nofib opts (headDef 1 (map read nums)) comps args
     report
 
 

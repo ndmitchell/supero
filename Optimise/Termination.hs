@@ -41,7 +41,7 @@ jonish context =
             return $ Just $ coreLet binds t
     where
         x = current context
-        whistle = filter (<<| x) (rhoCurrent context)
+        whistle = filter (<<| x) (rho context)
 
 
 type Subst = [(CoreVarName,CoreExpr)]

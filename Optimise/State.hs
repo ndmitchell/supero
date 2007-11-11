@@ -59,13 +59,11 @@ type SS a = StateIO S a
 
 data Context = Context
         {current :: CoreExpr    -- the current expression under test
-        ,current_ :: [CoreExpr] -- the list of expressions since last residuation
-        ,rhoCall :: [CoreExpr]  -- those which got expanded (were a CoreFun)
-        ,rhoCurrent :: [CoreExpr] -- as per currently
-        ,rho_ :: [CoreExpr]     -- a list of all expressions ever
+        ,currents :: [CoreExpr] -- the list of expressions since last residuation
+        ,rho  :: [CoreExpr]     -- a list of all expressions ever
         }
 
-emptyContext = Context (CoreVar "") [] [] [] []
+emptyContext = Context undefined [] []
 
 
 type Termination = Context -> SS (Maybe CoreExpr)

@@ -137,7 +137,7 @@ onf resultName context x = do
             if x2 == x then do
                 unpeel context x
              else
-                onf resultName context{rhoCurrent=x:rhoCurrent context} x2
+                onf resultName context{rho=x:rho context} x2
 
 
 -- unpeel at least one layer, but keep going if it makes no difference

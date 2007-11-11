@@ -55,13 +55,14 @@ loadOverlay = do
 
 
 transs = ensureInvariants [ConsecutiveFuncs, NoCorePos, NoRecursiveLet, NoCaseDefaultOne]
-       . transformExpr removeSeq
+       . transformExpr tweak
 
 
 -- cannot be done by Overlay since case _ converts to nothing when compiled
-removeSeq (CoreApp (CoreFun s) [x,y])
+tweak (CoreApp (CoreFun s) [x,y])
     | s == "Prelude;seq" || s == "SEQ" = CoreCase x [(PatDefault,y)]
-removeSeq x = x
+tweak (CoreFun "Prelude;otherwise") = CoreCon "Prelude;True"
+tweak x = x
 
 
 liftMain = applyFuncCore f

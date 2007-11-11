@@ -26,21 +26,14 @@ emptyRho = []
 ---------------------------------------------------------------------
 -- DRIVER
 
-preOpt x = transformExpr f x
-    where
-        f (CoreFun "Prelude;otherwise") = CoreCon "Prelude;True"
-        f x = x
-
 evaluate :: (Int -> Core -> IO ()) -> Core -> IO Core
 evaluate out c = do
     cafs <- return $ detectCafs c
     out 0 c
-    c <- return $ preOpt c
-    out 1 c
     c <- {- liftM (coreReachable ["main"]) -} (eval cafs c)
-    out 3 c
+    out 1 c
     c <- return $ coreFix c
-    out 4 c
+    out 2 c
     return c
 
 coreFix :: Core -> Core

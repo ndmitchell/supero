@@ -17,11 +17,6 @@ import Safe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
----------------------------------------------------------------------
--- DATA TYPES
-
-type Rho = [CoreExpr]
-emptyRho = []
 
 ---------------------------------------------------------------------
 -- DRIVER
@@ -63,12 +58,12 @@ addFunc func = modify $ \s -> s{funcs = func : funcs s}
 tieFunc :: CoreFunc -> SS ()
 tieFunc func = do
     CoreFunc name args body <- uniqueBoundVarsFunc func
-    body <- tie emptyRho body
+    body <- tie emptyContext body
     addFunc (CoreFunc name args body)
 
 
-tie :: Rho -> CoreExpr -> SS CoreExpr
-tie rho x = do
+tie :: Context -> CoreExpr -> SS CoreExpr
+tie context x = do
     (args,CoreFunc _ params x) <- return $ normalise x
     case x of
         CoreVar y -> return $ CoreVar $ head args
@@ -81,7 +76,7 @@ tie rho x = do
                     name <- getName x
                     modify $ \s -> s{names = Map.insert key name (names s)}
                     x <- deCaf x
-                    x <- onf name rho x
+                    x <- onf name context x
                     addFunc (CoreFunc name (if null params then ["uncaf"] else params) x)
                     return name
             return $ coreApp (CoreFun name) (if null args then [CoreCon "()"] else map CoreVar args)
@@ -131,10 +126,10 @@ POSTCONDITIONS:
 -- if you reach over (size n) then unpeel until you get to size n, and tie the remainder
 --
 -- resultName is only passed to aid debugging
-onf :: CoreFuncName -> Rho -> CoreExpr -> SS CoreExpr
-onf resultName rho x = do
+onf :: CoreFuncName -> Context -> CoreExpr -> SS CoreExpr
+onf resultName context x = do
     x <- coreSimplifyExprUniqueExt onfExt x
-    let whistle = filter (<<| x) rho
+    let whistle = filter (<<| x) (rhoResid context)
     if not $ null whistle then do
         (t,subs) <- msg (head whistle) x
         sioPrint $ "\n\nonf whistle" ~~ x ~~ head whistle ~~ t ~~ subs
@@ -143,27 +138,27 @@ onf resultName rho x = do
             freeNorm = collectFreeVars x
 
         if True || isCoreVar t || not (null (freeBinds \\ freeNorm)) then
-            unpeel rho x
+            unpeel context x
          else
-            unpeel rho $ coreLet binds t
+            unpeel context $ coreLet binds t
      else do
         x2 <- unfold x
         if x2 == x then do
-            unpeel rho x
+            unpeel context x
          else
-            onf resultName (x:rho) x2
+            onf resultName context{rhoResid=x:rhoResid context} x2
 
 
 -- unpeel at least one layer, but keep going if it makes no difference
-unpeel :: Rho -> CoreExpr -> SS CoreExpr
-unpeel rho x = do s <- get; descendM (f s) x
+unpeel :: Context -> CoreExpr -> SS CoreExpr
+unpeel context x = do s <- get; descendM (f s) x
     where
-        f s (CoreFun x) | caf s x = tie rho (CoreFun x)
+        f s (CoreFun x) | caf s x = tie context (CoreFun x)
         f s x = do
             x2 <- unfold x
             if x2 == x
                 then descendM (f s) x
-                else tie rho x
+                else tie context x
 
 
 -- perform one unfolding, if you can

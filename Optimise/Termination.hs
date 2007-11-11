@@ -30,7 +30,7 @@ jonish :: Context -> SS (Maybe CoreExpr)
 jonish context =
     if null whistle then return Nothing else do
         (t,subs) <- msg (head whistle) x
-        sioPrint $ "\n\nonf whistle" ~~ x ~~ head whistle ~~ t ~~ subs
+        -- sioPrint $ "\n\nonf whistle" ~~ x ~~ head whistle ~~ t ~~ subs
         let binds = [(v,e) | (v,(_,e)) <- subs]
             freeBinds = nub $ concatMap (collectFreeVars . snd) binds
             freeNorm = collectFreeVars x

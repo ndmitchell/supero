@@ -57,12 +57,12 @@ type SS a = StateIO S a
 -- TERMINATION
 
 
-data Context = Context {
-        current :: CoreExpr,
-        current_ :: [CoreExpr],
-        rho :: [CoreExpr],
-        rho_ :: [CoreExpr]
-    }
+data Context = Context
+        {current :: CoreExpr    -- the current expression under test
+        ,current_ :: [CoreExpr] -- the list of expressions since last residuation
+        ,rhoCall :: [CoreExpr]  -- a list of ones which got expanded
+        ,rho_ :: [CoreExpr]     -- a list of all expressions ever
+        }
 
 
 type Termination = S -> Context -> Maybe CoreExpr

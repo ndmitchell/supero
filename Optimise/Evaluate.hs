@@ -28,9 +28,8 @@ emptyRho = []
 
 evaluate :: (Int -> Core -> IO ()) -> Core -> IO Core
 evaluate out c = do
-    cafs <- return $ detectCafs c
     out 0 c
-    c <- {- liftM (coreReachable ["main"]) -} (eval cafs c)
+    c <- eval (detectCafs c) c
     out 1 c
     c <- return $ coreFix c
     out 2 c

@@ -129,24 +129,15 @@ POSTCONDITIONS:
 onf :: CoreFuncName -> Context -> CoreExpr -> SS CoreExpr
 onf resultName context x = do
     x <- coreSimplifyExprUniqueExt onfExt x
-    let whistle = filter (<<| x) (rhoResid context)
-    if not $ null whistle then do
-        (t,subs) <- msg (head whistle) x
-        sioPrint $ "\n\nonf whistle" ~~ x ~~ head whistle ~~ t ~~ subs
-        let binds = [(v,e) | (v,(_,e)) <- subs]
-            freeBinds = nub $ concatMap (collectFreeVars . snd) binds
-            freeNorm = collectFreeVars x
-
-        if True || isCoreVar t || not (null (freeBinds \\ freeNorm)) then
-            unpeel context x
-         else
-            unpeel context $ coreLet binds t
-     else do
-        x2 <- unfold x
-        if x2 == x then do
-            unpeel context x
-         else
-            onf resultName context{rhoResid=x:rhoResid context} x2
+    r <- jonssonish context{current=x}
+    case r of
+        Just x -> unpeel context x
+        Nothing -> do
+            x2 <- unfold x
+            if x2 == x then do
+                unpeel context x
+             else
+                onf resultName context{rhoCurrent=x:rhoCurrent context} x2
 
 
 -- unpeel at least one layer, but keep going if it makes no difference

@@ -61,11 +61,12 @@ data Context = Context
         {current :: CoreExpr    -- the current expression under test
         ,current_ :: [CoreExpr] -- the list of expressions since last residuation
         ,rhoCall :: [CoreExpr]  -- those which got expanded (were a CoreFun)
-        ,rhoResid :: [CoreExpr] -- those which got residuated
+        ,rhoCurrent :: [CoreExpr] -- as per currently
         ,rho_ :: [CoreExpr]     -- a list of all expressions ever
         }
 
 emptyContext = Context (CoreVar "") [] [] [] []
 
-type Termination = S -> Context -> Maybe CoreExpr
+
+type Termination = Context -> SS (Maybe CoreExpr)
 

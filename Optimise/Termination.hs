@@ -13,15 +13,35 @@ import Optimise.Util
 termination :: [(String,Termination)]
 termination =
     [("none",none)
+    ,("jonssonish",jonssonish)
     ]
 
 
-none _ c = Just $ current c
+none c = return $ Just $ current c
 
 
 
 ---------------------------------------------------------------------
 -- FROM THE BEFORE TIME
+
+
+
+jonssonish :: Context -> SS (Maybe CoreExpr)
+jonssonish context =
+    if null whistle then return Nothing else do
+        (t,subs) <- msg (head whistle) x
+        sioPrint $ "\n\nonf whistle" ~~ x ~~ head whistle ~~ t ~~ subs
+        let binds = [(v,e) | (v,(_,e)) <- subs]
+            freeBinds = nub $ concatMap (collectFreeVars . snd) binds
+            freeNorm = collectFreeVars x
+
+        if True || isCoreVar t || not (null (freeBinds \\ freeNorm)) then
+            return $ Just x
+         else
+            return $ Just $ coreLet binds t
+    where
+        x = current context
+        whistle = filter (<<| x) (rhoCurrent context)
 
 
 type Subst = [(CoreVarName,CoreExpr)]

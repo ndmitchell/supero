@@ -129,7 +129,7 @@ POSTCONDITIONS:
 onf :: CoreFuncName -> Context -> CoreExpr -> SS CoreExpr
 onf resultName context x = do
     x <- coreSimplifyExprUniqueExt onfExt x
-    r <- jonssonish context{current=x}
+    r <- jonish context{current=x}
     case r of
         Just x -> unpeel context x
         Nothing -> do

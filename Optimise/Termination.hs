@@ -13,7 +13,7 @@ import Optimise.Util
 termination :: [(String,Termination)]
 termination =
     [("none",none)
-    ,("jonssonish",jonssonish)
+    ,("jonish",jonish)
     ]
 
 
@@ -26,8 +26,8 @@ none c = return $ Just $ current c
 
 
 
-jonssonish :: Context -> SS (Maybe CoreExpr)
-jonssonish context =
+jonish :: Context -> SS (Maybe CoreExpr)
+jonish context =
     if null whistle then return Nothing else do
         (t,subs) <- msg (head whistle) x
         sioPrint $ "\n\nonf whistle" ~~ x ~~ head whistle ~~ t ~~ subs

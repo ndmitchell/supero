@@ -31,6 +31,15 @@ foreign import ccall unsafe "ctype.h iswspace" isspace :: CInt -> CInt
 typeRealWorld :: State# RealWorld -> State# RealWorld
 typeRealWorld x = x
 
+skipCAF :: State# RealWorld -> a -> a
+skipCAF _ x = x
+
+{-
+-- Not allowed by GHC, so do the inlining in Optimise.CAF
+argCAF :: State# RealWorld
+argCAF = realWorld#
+-}
+
 prelude_seq = seq
 
 prelude_error x = error (map toEnum x)

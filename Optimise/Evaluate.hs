@@ -17,6 +17,10 @@ import Safe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+-- Note on naming new functions:
+-- If the function is a CAF in the original, it must have the same name
+-- If the function is not a CAF, it must get a uniquely new name
+
 
 ---------------------------------------------------------------------
 -- DRIVER
@@ -27,10 +31,13 @@ mainName = "main"
 evaluate :: Termination -> (Int -> Core -> IO ()) -> Core -> IO Core
 evaluate term out c = do
     out 0 c
-    c <- eval term (detectCafs c) c
+    let cafs = detectCafs c
+    c <- eval term cafs c
     out 1 c
-    c <- return $ coreFix c
+    c <- return $ decaffeinate cafs c
     out 2 c
+    c <- return $ coreFix c
+    out 3 c
     return c
 
 coreFix :: Core -> Core
@@ -42,7 +49,7 @@ coreFix = coreReachable [mainName] . coreInline InlineFull
 
 eval :: Termination -> Set.Set CoreFuncName -> Core -> IO Core
 eval term cafs core = do
-    let s0 = S Map.empty [] 1 1 (coreFuncMap fm) (`Set.member` primsSet) (`Set.member` cafs) term
+    let s0 = S Map.empty [] (uniqueFuncsNext core) 1 (coreFuncMap fm) (`Set.member` primsSet) (`Set.member` cafs) term
     (_,sn) <- sioRun (tieFunc (coreFuncMap fm mainName)) s0
     return $ core{coreFuncs = prims ++ funcs sn}
     where
@@ -78,28 +85,22 @@ tie context x = do
                 Nothing -> do
                     name <- getName x
                     modify $ \s -> s{names = Map.insert key name (names s)}
-                    x <- deCaf x
                     x <- onf name context x
-                    addFunc (CoreFunc name (if null params then ["uncaf"] else params) x)
+                    addFunc (CoreFunc name params x)
                     return name
-            return $ coreApp (CoreFun name) (if null args then [CoreCon "()"] else map CoreVar args)
+            return $ coreApp (CoreFun name) (map CoreVar args)
     where
         getName x = do
             s <- get
-            put $ s{nameId = nameId s + 1}
-            return $ uniqueJoin (f s x) (nameId s)
+            case x of
+                CoreFun x | caf s x -> return x
+                _ -> do
+                    put $ s{nameId = nameId s + 1}
+                    return $ uniqueJoin (f s x) (nameId s)
 
         f s (CoreFun x) = if prim s x then "f" else x
         f s (CoreApp x y) = f s x
         f s _ = "f"
-
-        deCaf o@(CoreFun x) = do
-            s <- get
-            if not $ caf s x then return o else do
-                CoreFunc _ params body <- uniqueBoundVarsFunc $ core s x
-                return $ coreLam params body
-        deCaf x = return x
-
 
 
 -- name the variables so they are in normal form

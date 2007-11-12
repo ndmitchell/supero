@@ -1,5 +1,5 @@
 
-module Optimise.CAF(detectCafs) where
+module Optimise.CAF(detectCafs, decaffeinate) where
 
 import Yhc.Core
 import qualified Data.Set as Set
@@ -38,3 +38,25 @@ unsaturated func name args = f [] name (length args)
         g seen (CorePos _ x) extra = g seen x extra
         g _ _ _ = False
 
+
+decaffeinate :: Set.Set CoreFuncName -> Core -> Core
+decaffeinate cafs core =
+        core{coreFuncs = newPrims ++ map f (coreFuncs core)}
+    where
+        argCAF = "realWorld#"
+        newPrims = [prim "skipCAF" 2, prim "realWorld#" 0]
+        prim name arity = CorePrim name arity [] [] False []
+
+        fake = Set.fromList [name | CoreFunc name [] _ <- coreFuncs core
+                                  , name `Set.notMember` cafs]
+
+        f (CoreFunc name args body) = CoreFunc name 
+            (if faker then ["uncaf"] else args)
+            (if faker then CoreApp (CoreFun "skipCAF") [CoreVar "uncaf",bod] else bod)
+            where
+                faker = name `Set.member` fake
+                bod = transform g body
+        f x = x
+
+        g (CoreFun x) | x `Set.member` fake = CoreApp (CoreFun x) [CoreFun argCAF]
+        g x = x

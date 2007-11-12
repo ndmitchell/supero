@@ -17,11 +17,11 @@ import Optimise.State(Termination)
 optimise :: Termination -> FilePath -> FilePath -> IO (Either String String)
 optimise term src obj = do
     b <- doesFileExist (obj </> "Main.yca")
-    when (not b) $ do
-        system_ $ "yhc " ++ (src </> "Main") ++ " --linkcore" ++
-                  " --objdir=" ++ obj ++ " --hidir=" ++ obj ++
-                  "  > " ++ (obj </> "compileyhc.stdout") ++
-                  " 2> " ++ (obj </> "compileyhc.stderr")
+    when (not b) $
+        system_ ("yhc " ++ (src </> "Main") ++ " --linkcore" ++
+                 " --objdir=" ++ obj ++ " --hidir=" ++ obj)
+                (obj </> "compileyhc.stdout")
+                (obj </> "compileyhc.stderr")
     core <- loadCore (obj </> "Main.yca")
     over <- loadOverlay
     core <- return $ coreReachable ["main"] $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
@@ -29,10 +29,10 @@ optimise term src obj = do
     
     let exe = obj </> "main.exe"
     generate (obj </> "Main_.hs") core
-    system_ $ "ghc --make " ++ (obj </> "Main_.hs") ++ " -O2 " ++
-              " -odir " ++ obj ++ " -hidir " ++ obj ++ " -o " ++ exe ++
-              "  > " ++ (obj </> "compileghc.stdout") ++
-              " 2> " ++ (obj </> "compileghc.stderr")
+    system_ ("ghc --make " ++ (obj </> "Main_.hs") ++ " -O2 " ++
+             " -odir " ++ obj ++ " -hidir " ++ obj ++ " -o " ++ exe)
+            (obj </> "compileghc.stdout")
+            (obj </> "compileghc.stderr")
     return $ Right exe
     
 
@@ -54,7 +54,8 @@ loadOverlay = do
         i <- getModificationTime input
         o <- getModificationTime output
         return $ i > o
-    when build $ system_ $ "yhc " ++ input ++ "  --core"
+    when build $ system_ ("yhc " ++ input ++ "  --core")
+        "library/Overlay.stdout" "library/Overlay.stderr"
     loadCore output
 
 

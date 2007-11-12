@@ -31,9 +31,12 @@ locate opts = do
         (filterM doesDirectoryExist opts)
 
 
-system_ cmd = do
+system_ cmd stdout stderr = do
     putStr $ "Running " ++ head (words cmd) ++ "... "
-    res <- system cmd
+    res <- system $ cmd ++ " > " ++ stdout ++ " 2> " ++ stderr
     putStrLn "done"
-    when (res /= ExitSuccess) $ error $ "ERROR: System call failed\n" ++ cmd
+    when (res /= ExitSuccess) $ do
+        out <- readFile stdout
+        err <- readFile stderr
+        error $ "ERROR: System call failed\n" ++ cmd ++ "\n" ++ out ++ "\n" ++ err
 

@@ -66,12 +66,15 @@ eval term cafs core = do
 addFunc :: CoreFunc -> SS ()
 addFunc func = modify $ \s -> s{funcs = func : funcs s}
 
+
 tieFunc :: CoreFuncName -> SS ()
 tieFunc name = do
     s <- get
-    CoreFunc _ args body <- uniqueBoundVarsFunc $ core s name
-    body <- tie emptyContext body
-    addFunc (CoreFunc name args body)
+    when (CoreFun name `Map.notMember` names s) $ do
+        CoreFunc _ args body <- uniqueBoundVarsFunc $ core s name
+        modify $ \s -> s{names = Map.insert (CoreFun name) name (names s)}
+        body <- tie emptyContext body
+        addFunc (CoreFunc name args body)
 
 
 tie :: Context -> CoreExpr -> SS CoreExpr

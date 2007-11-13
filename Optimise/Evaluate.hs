@@ -42,7 +42,8 @@ evaluate term out c = do
     return c
 
 coreFix :: Core -> Core
-coreFix = coreReachable [mainName] . coreInline InlineFull
+coreFix = coreReachable [mainName] . coreInline (if agressive then InlineFull else InlineCallOnce)
+    where agressive = False
 
 
 ---------------------------------------------------------------------

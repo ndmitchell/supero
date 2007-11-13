@@ -51,7 +51,7 @@ coreFix = coreReachable [mainName] . coreInline InlineFull
 eval :: Termination -> Set.Set CoreFuncName -> Core -> IO Core
 eval term cafs core = do
     let s0 = S Map.empty [] (uniqueFuncsNext core) 1 (coreFuncMap fm) (`Set.member` primsSet) (`Set.member` cafs) term
-    (_,sn) <- sioRun (tieFunc (coreFuncMap fm mainName)) s0
+    (_,sn) <- sioRun (tieFunc mainName) s0
     return $ core{coreFuncs = prims ++ funcs sn}
     where
         fm = toCoreFuncMap core
@@ -66,9 +66,10 @@ eval term cafs core = do
 addFunc :: CoreFunc -> SS ()
 addFunc func = modify $ \s -> s{funcs = func : funcs s}
 
-tieFunc :: CoreFunc -> SS ()
-tieFunc func = do
-    CoreFunc name args body <- uniqueBoundVarsFunc func
+tieFunc :: CoreFuncName -> SS ()
+tieFunc name = do
+    s <- get
+    CoreFunc _ args body <- uniqueBoundVarsFunc $ core s name
     body <- tie emptyContext body
     addFunc (CoreFunc name args body)
 

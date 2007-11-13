@@ -2,6 +2,7 @@
 module Optimise.Evaluate(evaluate) where
 
 import Optimise.State
+import Optimise.Simplify
 import Optimise.Termination
 import Optimise.Util
 import Optimise.CAF
@@ -133,7 +134,7 @@ POSTCONDITIONS:
 onf :: CoreFuncName -> Context -> CoreExpr -> SS CoreExpr
 onf resultName context x = do
     s <- get
-    x <- coreSimplifyExprUniqueExt onfExt x
+    x <- coreSimplifyExprUniqueExt simplify x
     r <- (term s) context{current=x}
     case r of
         Just x -> unpeel context x
@@ -180,52 +181,3 @@ unfold (CoreFun x) = do
         return $ coreLam params body
 
 unfold x = return x
-
-
-
-
----------------------------------------------------------------------
--- SIMPLIFICATION RULES
-
-onfExt cont x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase (CoreLit $ CoreInt 0) alts) =
-        liftM (CoreCase (CoreVar on)) (mapM f alts)
-    where
-        f (pat@(PatCon c vs),rhs) = do
-            let lhs = coreApp (CoreCon c) (map CoreVar vs)
-            rhs <- transformM cont $ replaceFreeVars [(on,lhs)] rhs
-            return (pat,rhs)
-
-        f (lhs,rhs) = return (lhs,rhs)
-
-onfExt cont o@(CoreLet bind x) | not (null ctrs) && not (isCoreLetRec o) = do
-        (newbinds,oldbinds) <- mapAndUnzipM f ctrs
-        transformM cont $ coreLet (concat newbinds ++ other) $ replaceFreeVars oldbinds x
-    where
-        (ctrs,other) = partition (isCoreCon . fst . fromCoreApp . snd) bind
-
-        f (name,x) = do
-                vs <- replicateM (length tl) getVar
-                return (zip vs tl, (name, coreApp hd (map CoreVar vs)))
-            where (hd,tl) = fromCoreApp x
-
--- be careful with letrec
-onfExt cont o@(CoreLet bind x) | not (null lam) && not (isCoreLetRec o) = do
-        x <- replaceFreeVarsUnique lam x
-        transformM cont $ coreLet other x
-    where
-        (lam,other) = partition (isCoreLam . snd) bind
-
-onfExt cont (CoreApp (CoreFun x) [CoreLit (CoreInt a), CoreLit (CoreInt b)])
-        | isJust p = cont $ CoreCon $ if fromJust p a b then "Prelude;True" else "Prelude;False"
-    where
-        p = Map.lookup x intPrims
-
-onfExt cont x = return x
-
-
-intPrims :: Map.Map CoreFuncName (Int -> Int -> Bool)
-intPrims = Map.fromList
-    [("LT_W",(<))
-    ,("GT_W",(>))
-    ,("EQ_W",(==))
-    ]

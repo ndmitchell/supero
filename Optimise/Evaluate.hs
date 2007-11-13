@@ -157,7 +157,7 @@ unpeel context2 x = do s <- get; descendM (f s) x
     where
         context = context2{currents=[]}
 
-        f s (CoreFun x) | caf s x = tie context (CoreFun x)
+        f s (CoreFun x) | caf s x = tieFunc x >> return (CoreFun x)
         f s x = do
             x2 <- unfold x
             if x2 == x

@@ -99,7 +99,7 @@ tie context x = do
                     put $ s{nameId = nameId s + 1}
                     return $ uniqueJoin (f s x) (nameId s)
 
-        f s (CoreFun x) = if prim s x then "f" else x
+        f s (CoreFun x) | not $ prim s x = x
         f s (CoreApp x y) = f s x
         f s _ = "f"
 

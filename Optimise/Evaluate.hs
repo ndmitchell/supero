@@ -68,7 +68,7 @@ addFunc :: CoreFunc -> SS ()
 addFunc func = modify $ \s -> s{funcs = func : funcs s}
 
 
-tieFunc :: CoreFuncName -> SS ()
+tieFunc :: CoreFuncName -> SS CoreExpr
 tieFunc name = do
     s <- get
     when (CoreFun name `Map.notMember` names s) $ do
@@ -76,6 +76,7 @@ tieFunc name = do
         modify $ \s -> s{names = Map.insert (CoreFun name) name (names s)}
         body <- tie emptyContext body
         addFunc (CoreFunc name args body)
+    return $ CoreFun name
 
 
 tie :: Context -> CoreExpr -> SS CoreExpr
@@ -83,6 +84,7 @@ tie context x = do
     (args,CoreFunc _ params x) <- return $ normalise x
     case x of
         CoreVar y -> return $ CoreVar $ head args
+        CoreFun x -> tieFunc x
         x -> do
             s <- get
             let key = x
@@ -155,7 +157,7 @@ unpeel context2 x = do s <- get; descendM (f s) x
     where
         context = context2{currents=[]}
 
-        f s (CoreFun x) | caf s x = tieFunc x >> return (CoreFun x)
+        f s (CoreFun x) | caf s x = tieFunc x
         f s x = do
             x2 <- unfold x
             if x2 == x

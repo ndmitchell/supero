@@ -97,11 +97,8 @@ tie context x = do
     where
         getName x = do
             s <- get
-            case x of
-                CoreFun x | caf s x -> return x
-                _ -> do
-                    put $ s{nameId = nameId s + 1}
-                    return $ uniqueJoin (f s x) (nameId s)
+            put $ s{nameId = nameId s + 1}
+            return $ uniqueJoin (f s x) (nameId s)
 
         f s (CoreFun x) | not $ prim s x = x
         f s (CoreApp x y) = f s x

@@ -71,7 +71,7 @@ addFunc func = modify $ \s -> s{funcs = func : funcs s}
 tieFunc :: CoreFuncName -> SS CoreExpr
 tieFunc name = do
     s <- get
-    when (CoreFun name `Map.notMember` names s) $ do
+    when (not (prim s name) && CoreFun name `Map.notMember` names s) $ do
         CoreFunc _ args body <- uniqueBoundVarsFunc $ core s name
         modify $ \s -> s{names = Map.insert (CoreFun name) name (names s)}
         body <- tie emptyContext body
@@ -152,17 +152,10 @@ onf resultName context x = do
 
 
 -- unpeel at least one layer, but keep going if it makes no difference
+-- never residuate a CoreFun, since it won't be linked otherwise
 unpeel :: Context -> CoreExpr -> SS CoreExpr
-unpeel context2 x = do s <- get; descendM (f s) x
-    where
-        context = context2{currents=[]}
-
-        f s (CoreFun x) | caf s x = tieFunc x
-        f s x = do
-            x2 <- unfold x
-            if x2 == x
-                then descendM (f s) x
-                else tie context x
+unpeel context (CoreFun x) = tieFunc x
+unpeel context x = descendM (tie context{currents=[]}) x
 
 
 -- perform one unfolding, if you can

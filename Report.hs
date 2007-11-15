@@ -23,7 +23,8 @@ report = do
                  reportTest comps [(a,read c) | (a,b,c) <- res, b == test] ++
                  "</tr>"
 
-    let ans = "<html><head><style type='text/css'>" ++ css ++ "</style></head><body><table>" ++
+    let ans = "<html><head><title>Supero Performance Results</title>" ++
+              "<style type='text/css'>" ++ css ++ "</style></head><body><table>" ++
               "<tr><td></td>" ++ concatMap (tag "td") comps ++ "</tr>" ++
               concatMap f tests ++
               "</table></body></html>"
@@ -41,7 +42,7 @@ reportTest comps res = concatMap g vals
         f c = minimumMay [b | (a,b) <- res, a == c]
 
         g Nothing = "<td></td>"
-        g (Just x) = "<td style='background-color:rgb(255," ++ red ++ "," ++ red ++ ")'>" ++ dp2 val ++ "</td>"
+        g (Just x) = "<td style='text-align:right;background-color:rgb(255," ++ red ++ "," ++ red ++ ")'>" ++ dp2 val ++ "</td>"
             where
                 red = if val < 105 then "255" else
                       show $ round $ (255*) $ (1-) $ fromInteger (x - low) / fromInteger (high - low) 
@@ -57,6 +58,6 @@ tag x y = "<" ++ x ++ ">" ++ y ++ "</" ++ x ++ ">"
 
 
 css = unlines
-    ["td {border-right:10px solid white; font-size:10pt;}"
+    ["td {border-right:10px solid white; font-size:10pt; font-family:sans-serif;}"
     ]
     

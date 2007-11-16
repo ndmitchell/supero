@@ -4,6 +4,7 @@ module Nofib(nofib, Compiler, Benchmark) where
 import Control.Monad
 import Data.Maybe
 import Data.List
+import Data.Char
 import System.Directory
 import System.FilePath
 import System.Time
@@ -65,7 +66,7 @@ runBenchmark opts compiler bench exe = do
                       lookup (takeBaseName bench) tests
     r <- l opts bench exe
     case r of
-        Left x -> putStrLn $ "Error:" ++ x
+        Left x -> putStrLn $ "Error: " ++ x
         Right x -> do
             when (compilerName /= "hugs") $
                 appendFile "results.txt" (compiler ++ " " ++ takeBaseName bench ++ " " ++ show x ++ "\n")
@@ -74,8 +75,10 @@ runBenchmark opts compiler bench exe = do
 
 tests :: [(String, Options -> Benchmark -> FilePath -> IO (Either String Integer))]
 tests =
-    let a*b = (a,b) in
-    ["bernouilli" * checked "500"
+    let a*b = (a,b)
+        noSpaces = filter (not . isSpace)
+    in
+    ["bernouilli" * checkedBy (\a b -> noSpaces a == noSpaces b) "500"
     ,"digits-of-e1" * checked "1000"
     ,"digits-of-e2" * checked "2000"
     ,"exp3_8" * checked "8"
@@ -92,8 +95,10 @@ tests =
     ]
 
 
-checked :: String -> Options -> Benchmark -> FilePath -> IO (Either String Integer)
-checked args opts bench exe = do
+checked = checkedBy (==)
+
+checkedBy :: (String -> String -> Bool) -> String -> Options -> Benchmark -> FilePath -> IO (Either String Integer)
+checkedBy comp args opts bench exe = do
     let logs = optObjLocation opts </> "runtime"
         stdout = logs <.> "stdout"
         stderr = logs <.> "stderr"
@@ -105,7 +110,8 @@ checked args opts bench exe = do
     let elapsed = diffMilliseconds end begin
     expected <- readFile' (bench </> takeBaseName bench <.> "stdout")
     got <- readFile' stdout
-    return $ if got /= expected then Left "Expected mismatch" else Right elapsed
+    return $ if got `comp` expected then Right elapsed
+             else Left $ "Result wrong:\nExpected: " ++ expected ++ "\nGot: " ++ got ++ "\n"
 
 piped :: Options -> Benchmark -> FilePath -> IO (Either String Integer)
 piped opts bench exe = do

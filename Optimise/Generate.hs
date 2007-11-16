@@ -52,14 +52,14 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
 ghcIO :: Core -> Core
 ghcIO = applyFuncCore (mapUnderCore f)
     where
-        f (CoreFun "realWorld") = CoreFun "realWorld#"
+        f (CoreFun "realWorld") = CoreFun "WORLD"
         f (CoreApp (CoreCon "Overlay;NIO") [x,y]) =
-            CoreApp (CoreCon "(#") [x, CoreVar " :: State# RealWorld ,",y,CoreVar " #)"]
+            CoreApp (CoreCon "PAIR_WORLD(") [x, CoreVar ",",y,CoreVar ")"]
         
         f (CoreCase on alts) = CoreCase on [(g a,b) | (a,b) <- alts]
         f x = x
 
-        g (PatCon "Overlay;NIO" [x,y]) = PatCon "(#" [x," :: State# RealWorld ,",y," #)"]
+        g (PatCon "Overlay;NIO" [x,y]) = PatCon "PAIR_WORLD(" [x," ,",y," )"]
         g x = x
 
 

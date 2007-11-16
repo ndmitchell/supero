@@ -41,6 +41,11 @@ argCAF = realWorld#
 -}
 #define argCAF realWorld#
 
+
+#define PAIR_WORLD(a,b) (# a :: State# RealWorld, b #)
+#define WORLD realWorld#
+
+
 prelude_seq = seq
 
 prelude_error x = error (map toEnum x)

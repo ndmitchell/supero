@@ -7,6 +7,7 @@ import System.IO
 import System.Environment
 import System.Exit
 import Foreign.C.Types
+import Data.Char(ord,chr)
 
 
 -- low level imports
@@ -32,69 +33,72 @@ skipCAF :: State# RealWorld -> a -> a
 skipCAF _ x = x
 
 
-#ifdef BOXED_IO
+-- IO Subsystem
+-- Unboxed IO is more efficient, but requires a certain level of
+-- optimisation, so provide a BOXED_IO fallback
+
+#if 1 || defined(BOXED_IO)
 
 data RW_Box = RW_Box (State# RealWorld)
 type RW_Pair a = (RW_Box, a)
 
-main = undefined -- IO main_generated
+fromIO :: IO a -> (RW_Box -> RW_Pair a)
+fromIO a (RW_Box r) = case unIO a r of (# r, x #) -> (RW_Box r, x)
 
-overlay_errorIO :: [Int] -> RW_Box -> RW_Pair a
-overlay_errorIO x r = undefined {- case unIO (putStrLn ("ERROR: " ++ map toEnum x)) r of
-                           (# r, _ #) -> unIO exitFailure r -}
+toIO :: (RW_Box -> RW_Pair a) -> IO a
+toIO f = IO $ \r -> case f (RW_Box r) of (RW_Box r, x) -> (# r, x #)
 
-overlay_get_char = undefined {- unIO $ do
-    c <- getchar
-    return $ fromIntegral c -}
-
--- system_Environment_getArgs :: State# RealWorld -> (# State# RealWorld, [[Int]] #)
-system_Environment_getArgs r = undefined {- case (unIO getArgs) r of
-                                (# r, s #) -> (# r, map str_ s #) -}
-
-system_IO_hPutChar h c = undefined -- unIO $ hPutChar h (toEnum c)
-
-typeRealWorld :: RW_Box -> RW_Box
-typeRealWorld x = x
-
-#define PAIR_WORLD0  RW_Box
+#define PAIR_WORLD0     (,)
 #define PAIR_WORLD(a,b) (a, b)
 #define WORLD (RW_Box realWorld#)
 
-
 #else
 
-main = IO main_generated
+type RW_Box = State# RealWorld
+type RW_Pair a = (# RW_Box, a #)
 
-overlay_errorIO :: [Int] -> State# RealWorld -> (# State# RealWorld, a #)
-overlay_errorIO x r = case unIO (putStrLn ("ERROR: " ++ map toEnum x)) r of
-                           (# r, _ #) -> unIO exitFailure r
+fromIO :: IO a -> (RW_Box -> RW_Pair a)
+fromIO = unIO
 
-overlay_get_char = unIO $ do
-    c <- getchar
-    return $ fromIntegral c
+toIO :: (RW_Box -> RW_Pair a) -> IO a
+toIO = IO
 
-system_IO_hPutChar h c = unIO $ hPutChar h (toEnum c)
-
-system_Environment_getArgs :: State# RealWorld -> (# State# RealWorld, [[Int]] #)
-system_Environment_getArgs r = case (unIO getArgs) r of
-                                (# r, s #) -> (# r, map str_ s #)
-
-typeRealWorld :: State# RealWorld -> State# RealWorld
-typeRealWorld x = x
-
-#define PAIR_WORLD0 (error "INVALID")
+#define PAIR_WORLD0 (error "INVALID, PAIR_WORLD0 disallowed with unboxed IO")
 #define PAIR_WORLD(a,b) (# a :: State# RealWorld, b #)
 #define WORLD realWorld#
 
 #endif
 
 
+-- IO functions not dependent on the IO primitives
+main :: IO ()
+main = toIO main_generated
+
+typeRealWorld :: RW_Box -> RW_Box
+typeRealWorld x = x
+
+overlay_get_char :: RW_Box -> RW_Pair Int
+overlay_get_char = fromIO $ do
+    c <- getchar
+    return $ fromIntegral c
+
+system_IO_hPutChar :: Handle -> Int -> RW_Box -> RW_Pair ()
+system_IO_hPutChar h c = fromIO $ hPutChar h (chr c)
+
+overlay_errorIO :: [Int] -> RW_Box -> RW_Pair a
+overlay_errorIO x r = case fromIO (putStrLn ("ERROR: " ++ map chr x)) r of
+                           PAIR_WORLD(r, _) -> fromIO exitFailure r
+
+system_Environment_getArgs :: RW_Box -> RW_Pair [[Int]]
+system_Environment_getArgs r = case (fromIO getArgs) r of
+                                    PAIR_WORLD(r, s) -> PAIR_WORLD(r, map str_ s)
+
 
 
 -- Primitives
 prelude_seq = seq
 
-prelude_error x = error (map toEnum x)
+prelude_error x = error (map chr x)
 
 aDD_W = (+) :: Int -> Int -> Int
 mUL_W = (*) :: Int -> Int -> Int
@@ -143,13 +147,14 @@ prelude_Integer_Num_abs = abs :: Integer -> Integer
 
 
 int_ x = x :: Int
-chr_ x = fromEnum x
+chr_ x = ord x
 str_ x = map chr_ x
 
 
 system_IO_stdin = stdin
 system_IO_stdout = stdout
 
+data_Char_isSpace :: Int -> Bool
 data_Char_isSpace c = isspace (toEnum c) /= 0
 
 
@@ -158,20 +163,20 @@ type ReadsPrec a = Int -> [Int] -> [(a,[Int])]
 
 
 prelude_Int_Read_readsPrec :: ReadsPrec Int
-prelude_Int_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
+prelude_Int_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map chr s)]
 prelude_Int_Read_readList = undefined
 
 prelude_Integer_Read_readsPrec :: ReadsPrec Integer
-prelude_Integer_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
+prelude_Integer_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map chr s)]
 
 prelude_Double_Read_readsPrec :: ReadsPrec Double
-prelude_Double_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
+prelude_Double_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map chr s)]
 
 prelude_Char_Read_readsPrec :: ReadsPrec Int
-prelude_Char_Read_readsPrec p s = [(chr_ (a :: Char), str_ b) | (a,b) <- readsPrec p (map toEnum s)]
+prelude_Char_Read_readsPrec p s = [(chr_ (a :: Char), str_ b) | (a,b) <- readsPrec p (map chr s)]
 
 prelude_Char_Show_showList :: [Int] -> [Int] -> [Int]
-prelude_Char_Show_showList value rest = str_ (show (map toEnum value :: [Char])) ++ rest
+prelude_Char_Show_showList value rest = str_ (show (map chr value :: [Char])) ++ rest
 
 prelude_Int_Show_showsPrec :: Int -> Int -> [Int] -> [Int]
 prelude_Int_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest

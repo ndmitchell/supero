@@ -168,6 +168,7 @@ prelude_Int_Read_readList = undefined
 
 prelude_Integer_Read_readsPrec :: ReadsPrec Integer
 prelude_Integer_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map chr s)]
+prelude_Integer_Read_readList = undefined
 
 prelude_Double_Read_readsPrec :: ReadsPrec Double
 prelude_Double_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map chr s)]

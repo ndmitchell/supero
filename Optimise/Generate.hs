@@ -53,8 +53,9 @@ ghcIO :: Core -> Core
 ghcIO = applyFuncCore (mapUnderCore f)
     where
         f (CoreFun "realWorld") = CoreFun "WORLD"
-        f (CoreApp (CoreCon "Overlay;NIO") [x,y]) =
+        f (CoreApp (CoreCon "PAIR_WORLD0") [x,y]) =
             CoreApp (CoreCon "PAIR_WORLD(") [x, CoreVar ",",y,CoreVar ")"]
+        f (CoreCon "Overlay;NIO") = CoreCon "PAIR_WORLD0"
         
         f (CoreCase on alts) = CoreCase on [(g a,b) | (a,b) <- alts]
         f x = x

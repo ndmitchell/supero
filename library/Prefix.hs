@@ -9,9 +9,59 @@ import System.Exit
 import Foreign.C.Types
 
 
+-- low level imports
 import GHC.Base                 (realWorld#)
 import GHC.IOBase               (IO(IO), unIO, unsafePerformIO)
 import GHC.Prim                 (State#,RealWorld)
+
+
+-- FFI replacements for Haskell stuff
+foreign import ccall unsafe "stdio.h getchar" getchar :: IO CInt
+foreign import ccall unsafe "ctype.h iswspace" isspace :: CInt -> CInt
+
+
+-- CAF removal stuff
+{-
+-- Not allowed by GHC, so use the CPP
+argCAF :: State# RealWorld
+argCAF = realWorld#
+-}
+#define argCAF realWorld#
+
+skipCAF :: State# RealWorld -> a -> a
+skipCAF _ x = x
+
+
+#ifdef BOXED_IO
+
+data RW_Box = RW_Box (State# RealWorld)
+type RW_Pair a = (RW_Box, a)
+
+main = undefined -- IO main_generated
+
+overlay_errorIO :: [Int] -> RW_Box -> RW_Pair a
+overlay_errorIO x r = undefined {- case unIO (putStrLn ("ERROR: " ++ map toEnum x)) r of
+                           (# r, _ #) -> unIO exitFailure r -}
+
+overlay_get_char = undefined {- unIO $ do
+    c <- getchar
+    return $ fromIntegral c -}
+
+-- system_Environment_getArgs :: State# RealWorld -> (# State# RealWorld, [[Int]] #)
+system_Environment_getArgs r = undefined {- case (unIO getArgs) r of
+                                (# r, s #) -> (# r, map str_ s #) -}
+
+system_IO_hPutChar h c = undefined -- unIO $ hPutChar h (toEnum c)
+
+typeRealWorld :: RW_Box -> RW_Box
+typeRealWorld x = x
+
+#define PAIR_WORLD0  RW_Box
+#define PAIR_WORLD(a,b) (a, b)
+#define WORLD (RW_Box realWorld#)
+
+
+#else
 
 main = IO main_generated
 
@@ -25,27 +75,23 @@ overlay_get_char = unIO $ do
 
 system_IO_hPutChar h c = unIO $ hPutChar h (toEnum c)
 
-foreign import ccall unsafe "stdio.h getchar" getchar :: IO CInt
-foreign import ccall unsafe "ctype.h iswspace" isspace :: CInt -> CInt
+system_Environment_getArgs :: State# RealWorld -> (# State# RealWorld, [[Int]] #)
+system_Environment_getArgs r = case (unIO getArgs) r of
+                                (# r, s #) -> (# r, map str_ s #)
 
 typeRealWorld :: State# RealWorld -> State# RealWorld
 typeRealWorld x = x
 
-skipCAF :: State# RealWorld -> a -> a
-skipCAF _ x = x
-
-{-
--- Not allowed by GHC, so do the inlining in Optimise.CAF
-argCAF :: State# RealWorld
-argCAF = realWorld#
--}
-#define argCAF realWorld#
-
-
+#define PAIR_WORLD0 (error "INVALID")
 #define PAIR_WORLD(a,b) (# a :: State# RealWorld, b #)
 #define WORLD realWorld#
 
+#endif
 
+
+
+
+-- Primitives
 prelude_seq = seq
 
 prelude_error x = error (map toEnum x)
@@ -104,10 +150,6 @@ str_ x = map chr_ x
 system_IO_stdin = stdin
 system_IO_stdout = stdout
 
-system_Environment_getArgs :: State# RealWorld -> (# State# RealWorld, [[Int]] #)
-system_Environment_getArgs r = case (unIO getArgs) r of
-                                (# r, s #) -> (# r, map str_ s #)
-
 data_Char_isSpace c = isspace (toEnum c) /= 0
 
 
@@ -117,6 +159,7 @@ type ReadsPrec a = Int -> [Int] -> [(a,[Int])]
 
 prelude_Int_Read_readsPrec :: ReadsPrec Int
 prelude_Int_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
+prelude_Int_Read_readList = undefined
 
 prelude_Integer_Read_readsPrec :: ReadsPrec Integer
 prelude_Integer_Read_readsPrec p s = [(a, str_ b) | (a,b) <- readsPrec p (map toEnum s)]
@@ -138,26 +181,3 @@ prelude_Integer_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest
 
 prelude_Double_Show_showsPrec :: Int -> Double -> [Int] -> [Int]
 prelude_Double_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest
-
-
-{- OLD PREFIX
-
-inlinePerformIO :: IO a -> a
-inlinePerformIO (IO m) = case m realWorld# of (# _, r #) -> r
-
-main = main_generated `seq` (return () :: IO ())
-
-overlay_get_char = unIO $ do
-    c <- getchar
-    return $ fromIntegral c
-
-overlay_token = 0 :: Int
-
-overlay_put_char h c = inlinePerformIO (hPutChar h (toEnum c) >>
-overlay_get_char h   = inlinePerformIO (getCharIO h)
-
--# NOINLINE getCharIO #-
-getCharIO h = do
-   c <- getchar
-   return $ if c == (-1) then h `seq` (-1) else fromIntegral c
--}

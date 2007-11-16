@@ -103,8 +103,8 @@ checked args opts bench exe = do
     system $ exe ++ " " ++ args ++ " > " ++ stdout ++ " 2> " ++ stderr
     end <- getClockTime
     let elapsed = diffMilliseconds end begin
-    expected <- readFile (bench </> takeBaseName bench <.> "stdout")
-    got <- readFile stdout
+    expected <- readFile' (bench </> takeBaseName bench <.> "stdout")
+    got <- readFile' stdout
     return $ if got /= expected then Left "Expected mismatch" else Right elapsed
 
 piped :: Options -> Benchmark -> FilePath -> IO (Either String Integer)

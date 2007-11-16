@@ -1,7 +1,7 @@
 
 module General(
     Options(..), readOptions,
-    system_
+    system_, readFile'
     ) where
 
 import System.Directory
@@ -9,6 +9,7 @@ import Control.Monad
 import Safe
 import System.Cmd
 import System.Exit
+import System.IO
 
 
 data Options = Options {
@@ -40,3 +41,11 @@ system_ cmd stdout stderr = do
         err <- readFile stderr
         error $ "ERROR: System call failed\n" ++ cmd ++ "\n" ++ out ++ "\n" ++ err
 
+readFile' :: FilePath -> IO String
+readFile' file = do
+    h <- openFile file ReadMode
+    s <- hGetContents h
+    length s `seq` hClose h
+    return s
+
+    

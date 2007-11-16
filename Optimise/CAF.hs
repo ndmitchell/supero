@@ -43,8 +43,7 @@ decaffeinate :: Set.Set CoreFuncName -> Core -> Core
 decaffeinate cafs core =
         core{coreFuncs = newPrims ++ map f (coreFuncs core)}
     where
-        argCAF = "realWorld#"
-        newPrims = [prim "skipCAF" 2, prim "realWorld#" 0]
+        newPrims = [prim "skipCAF" 2, prim "argCAF" 0]
         prim name arity = CorePrim name arity [] [] False []
 
         fake = Set.fromList [name | CoreFunc name [] _ <- coreFuncs core
@@ -58,5 +57,5 @@ decaffeinate cafs core =
                 bod = transform g body
         f x = x
 
-        g (CoreFun x) | x `Set.member` fake = CoreApp (CoreFun x) [CoreFun argCAF]
+        g (CoreFun x) | x `Set.member` fake = CoreApp (CoreFun x) [CoreFun "argCAF"]
         g x = x

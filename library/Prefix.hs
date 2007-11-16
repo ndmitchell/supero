@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fffi -fglasgow-exts -cpp #-}
+{-# OPTIONS_GHC -fffi -fglasgow-exts -cpp -pgmPcpphs -optP--cpp #-}
 
 module Main(main) where
 
@@ -39,6 +39,7 @@ skipCAF _ x = x
 argCAF :: State# RealWorld
 argCAF = realWorld#
 -}
+#define argCAF realWorld#
 
 prelude_seq = seq
 

@@ -176,7 +176,10 @@ prelude_Char_Read_readsPrec :: ReadsPrec Int
 prelude_Char_Read_readsPrec p s = [(chr_ (a :: Char), str_ b) | (a,b) <- readsPrec p (map chr s)]
 
 prelude_Char_Show_showList :: [Int] -> [Int] -> [Int]
-prelude_Char_Show_showList value rest = str_ (show (map chr value :: [Char])) ++ rest
+prelude_Char_Show_showList value rest = str_ (show (map chr value)) ++ rest
+
+prelude_Char_Show_showsPrec :: Int -> Int -> [Int] -> [Int]
+prelude_Char_Show_showsPrec prec i rest = str_ (showsPrec prec (chr i) []) ++ rest
 
 prelude_Int_Show_showsPrec :: Int -> Int -> [Int] -> [Int]
 prelude_Int_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest

@@ -130,13 +130,35 @@ yHC_Primitive_primIntFromInteger = fromInteger :: Integer -> Int
 yHC_Primitive_primIntegerLt = (<) :: Integer -> Integer -> Bool
 yHC_Primitive_primIntegerSub = (-) :: Integer -> Integer -> Integer
 
-
 aDD_D = (+) :: Double -> Double -> Double
 sUB_D = (-) :: Double -> Double -> Double
 lT_D = (<) :: Double -> Double -> Bool
 lE_D = (<=) :: Double -> Double -> Bool
 gT_D = (>) :: Double -> Double -> Bool
 gE_D = (>=) :: Double -> Double -> Bool
+eQ_D = (==) :: Double -> Double -> Bool
+mUL_D = (*) :: Double -> Double -> Double
+nEG_D = (negate) :: Double -> Double
+nE_D = (/=) :: Double -> Double -> Bool
+sLASH_D = (/) :: Double -> Double -> Double
+yHC_Primitive_primDecodeDouble = decodeFloat :: Double -> (Integer,Int)
+yHC_Primitive_primDoubleACos = acos :: Double -> Double
+yHC_Primitive_primDoubleASin = asin :: Double -> Double
+yHC_Primitive_primDoubleATan = atan :: Double -> Double
+yHC_Primitive_primDoubleAbs = abs :: Double -> Double
+yHC_Primitive_primDoubleCos = cos :: Double -> Double
+yHC_Primitive_primDoubleExp = exp :: Double -> Double
+yHC_Primitive_primDoubleFromInteger = fromInteger :: Integer -> Double
+yHC_Primitive_primDoubleLog = log :: Double -> Double
+yHC_Primitive_primDoublePow = (**) :: Double -> Double -> Double
+yHC_Primitive_primDoubleSignum = signum :: Double -> Double
+yHC_Primitive_primDoubleSin = sin :: Double -> Double
+yHC_Primitive_primDoubleSqrt = sqrt :: Double -> Double
+yHC_Primitive_primDoubleTan = tan :: Double -> Double
+yHC_Primitive_primEncodeDouble = encodeFloat :: Integer -> Int -> Double
+
+
+
 
 -- things which Yhc decides should be hopelessly slow
 prelude_Int_Integral_mod = mod :: Int -> Int -> Int

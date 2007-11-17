@@ -99,5 +99,12 @@ fixName = map (rep ' ' '_') . unwords . f . words . map (rep '.' ' ' . rep ';' '
                    _ -> [x]
 
 
-fixType ('!':xs) = '!' : fixName xs
-fixType xs = fixName xs
+fixType ('!':xs) = '!' : fixType xs
+fixType xs = unwords $ map f $ words $ concatMap spaces xs
+    where
+        spaces x | x `elem` "()" = [' ',x,' ']
+        spaces x = [x]
+
+        f x | x `elem` ["(",")"] = x
+            | "Prelude." `isPrefixOf` x = drop 8 x
+            | otherwise = fixName x

@@ -16,9 +16,11 @@ import Optimise.State(Termination)
 
 optimise :: Termination -> FilePath -> FilePath -> IO (Either String String)
 optimise term src obj = do
-    b <- doesFileExist (obj </> "Main.yca")
-    when (not b) $
-        system_ ("yhc " ++ (src </> "Main") ++ " --linkcore" ++
+    srcMain <- haskellFile (src </> "Main")
+    let dest = obj </> "Main.yca"
+    b <- recompile srcMain dest
+    when b $
+        system_ ("yhc " ++ srcMain ++ " --linkcore" ++
                  " --objdir=" ++ obj ++ " --hidir=" ++ obj)
                 (obj </> "compileyhc.stdout")
                 (obj </> "compileyhc.stderr")

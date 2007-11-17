@@ -1,10 +1,12 @@
 
 module General(
     Options(..), readOptions,
-    system_, readFile'
+    system_, readFile',
+    haskellFile, recompile
     ) where
 
 import System.Directory
+import System.FilePath
 import Control.Monad
 import Safe
 import System.Cmd
@@ -48,4 +50,20 @@ readFile' file = do
     length s `seq` hClose h
     return s
 
-    
+
+recompile :: FilePath -> FilePath -> IO Bool
+recompile from to = do
+    b <- doesFileExist to
+    if not b then return True else do
+        f <- getModificationTime from
+        t <- getModificationTime to
+        return $ f > t
+
+
+haskellFile :: FilePath -> IO FilePath
+haskellFile s = do
+    hs <- doesFileExist (s <.> "hs")
+    lhs <- doesFileExist (s <.> "lhs")
+    if hs then return $ s <.> "hs"
+     else if lhs then return $ s <.> "lhs"
+     else error $ "Haskell file not found: " ++ s

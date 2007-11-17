@@ -46,6 +46,7 @@ fixup core = core{coreDatas = concatMap fData (coreDatas core)
         fExpr x = x
 
         fAlt (PatCon c vs) = PatCon (upperName c) vs
+        fAlt (PatLit (CoreChr x)) = PatLit (CoreInt (ord x))
         fAlt x = x
 
 

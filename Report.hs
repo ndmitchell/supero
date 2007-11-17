@@ -20,7 +20,7 @@ report = do
     tests <- return $ snub tests
 
     let f test = "<tr><td>" ++ test ++ "</td>" ++
-                 reportTest comps [(a,read c) | (a,b,c) <- res, b == test] ++
+                 reportTest comps [(a,c2) | (a,b,c) <- res, b == test, let c2 = read c, c2 > 0] ++
                  "</tr>"
 
     let ans = "<html><head><title>Supero Performance Results</title>" ++

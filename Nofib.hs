@@ -17,6 +17,13 @@ import General
 
 folders = ["imaginary","spectral","real"]
 
+
+exclude = let (*) = (,) in
+    ["integrate" * "supero-none" -- runs out of memory
+    ,"paraffins" * "supero-none" -- requires Array primitives
+    ]
+
+
 type Benchmark = String
 
 --                                      errmsg executable
@@ -35,7 +42,8 @@ nofib opts rep comps benchs = do
         case res of
             Left err -> putStrLn $ "Doh: " ++ err
             Right exec -> replicateM_ rep $ runBenchmark opts2 name b exec
-        | b <- benchs, (name,c) <- comps]
+        | b <- benchs, (name,c) <- comps
+        , (takeBaseName b, name) `notElem` exclude]
 
 
 resolveBenchmarks :: Options -> [Benchmark] -> IO [Benchmark]

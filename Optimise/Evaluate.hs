@@ -68,12 +68,17 @@ addFunc :: CoreFunc -> SS ()
 addFunc func = modify $ \s -> s{funcs = func : funcs s}
 
 
+addKey :: CoreExpr -> CoreFuncName -> SS ()
+addKey key val = do
+    modify $ \s -> s{names = Map.insert key val (names s)}
+    sioPutStr "."
+
 tieFunc :: CoreFuncName -> SS CoreExpr
 tieFunc name = do
     s <- get
     when (not (prim s name) && CoreFun name `Map.notMember` names s) $ do
         CoreFunc _ args body <- uniqueBoundVarsFunc $ core s name
-        modify $ \s -> s{names = Map.insert (CoreFun name) name (names s)}
+        addKey (CoreFun name) name
         body <- tie emptyContext body
         addFunc (CoreFunc name args body)
     return $ CoreFun name
@@ -92,7 +97,7 @@ tie context x = do
                 Just name -> return name
                 Nothing -> do
                     name <- getName x
-                    modify $ \s -> s{names = Map.insert key name (names s)}
+                    addKey key name
                     x <- onf name context x
                     addFunc (CoreFunc name params x)
                     return name

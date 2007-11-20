@@ -13,6 +13,27 @@ import Optimise.Util
 termination :: [(String,Termination)]
 termination =
     [("none",none)
+    ,("whistle",whistle)
+    ,("hash1",hash 1)
+    ,("hash2",hash 2)
+    ,("hash3",hash 3)
+    ,("hash4",hash 4)
+    ,("hash5",hash 5)
+    ,("hash6",hash 6)
+    ,("hash7",hash 7)
+    ,("size1",size 1)
+    ,("size2",size 2)
+    ,("size3",size 3)
+    ,("size4",size 4)
+    ,("size5",size 5)
+    ,("size6",size 6)
+    ,("size7",size 7)
+    ,("size8",size 8)
+    ,("size9",size 9)
+    ,("size10",size 10)
+    ,("size11",size 11)
+    ,("size12",size 12)
+    ,("size13",size 13)
     ,("jonish",jonish)
     ]
 
@@ -20,6 +41,28 @@ termination =
 none c = return $ Just $ current c
 
 
+whistle :: Context -> SS (Maybe CoreExpr)
+whistle Context{rho=rho, current=x} = return $
+    if null $ filter (<<| x) rho
+    then Nothing
+    else Just x
+
+hash :: Int -> Context -> SS (Maybe CoreExpr)
+hash depth Context{rho=rho, current=x} = return $
+        if any ((==) x . root) rho
+        then Nothing
+        else Just x
+    where
+        root = f depth
+        rootx = root x
+
+        f 0 _ = CoreVar ""
+        f _ (CoreVar _) = CoreVar ""
+        f n x = descend (f (n-1)) x
+
+size :: Int -> Context -> SS (Maybe CoreExpr)
+size depth Context{current=x} = return $
+        if exprSizeOld x > depth then Nothing else Just x
 
 ---------------------------------------------------------------------
 -- FROM THE BEFORE TIME
@@ -80,12 +123,10 @@ msg x y = do v <- getVar ; f (CoreVar v) [(v,(x,y))]
 
 -- | Homeomorphic embedding
 (<<|) :: CoreExpr -> CoreExpr -> Bool
-CoreLit _ <<| CoreLit _ = True -- can omit as I don't do maths?
-CoreVar _ <<| CoreVar _ = True
-x <<| y =
-    any (x <<|) (children y) ||
-    (x `eq1` y && and (zipWith (<<|) (children x) (children y)))
-
+(<<|) x y = f (blurVar $ blurLit x) (blurVar $ blurLit y)
+    where
+        f x y = any (x <<|) (children y) ||
+                (x `eq1` y && and (zipWith (<<|) (children x) (children y)))
 
 
 -- | Least common anti-instance

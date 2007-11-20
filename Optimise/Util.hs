@@ -50,6 +50,17 @@ blurVar = transform f
         g (PatCon x _) = PatCon x []
         g x = x
 
+
+blurLit = transform f
+    where
+        f (CoreLit _) = CoreLit (CoreInt 0)
+        f (CoreCase on alts) = CoreCase on [(g a,b) | (a,b) <- alts]
+        f x = x
+
+        g (PatLit _) = PatLit (CoreInt 0)
+        g x = x
+
+
 -- are two constructors equal to depth 1
 eq1 :: CoreExpr -> CoreExpr -> Bool
 eq1 x y = length xs == length ys && _x vs == _y vs

@@ -61,15 +61,6 @@ blurLit = transform f
         g x = x
 
 
--- are two constructors equal to depth 1
-eq1 :: CoreExpr -> CoreExpr -> Bool
-eq1 x y = length xs == length ys && _x vs == _y vs
-    where
-        vs = replicate (length xs) (CoreVar "")
-        (xs,_x) = uniplate x
-        (ys,_y) = uniplate y
-
-
 splits :: [a] -> [([a],a,[a])]
 splits [] = []
 splits (x:xs) = ([],x,xs) : [(x:a,b,c) | (a,b,c) <- splits xs]

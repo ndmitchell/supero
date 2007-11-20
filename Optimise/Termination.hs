@@ -107,7 +107,7 @@ msg x y = do v <- getVar ; f (CoreVar v) [(v,(x,y))]
                     bind2 = zip vs (zip xc yc) ++ miss ++ rest
                 f expr2 bind2
             where
-                (match,miss) = partition (\(_,(x,y)) -> x `eq1` y) bind
+                (match,miss) = partition (\(_,(x,y)) -> x `eq1CoreExpr` y) bind
                 (v,(x,y)):rest = match
 
         -- rule 2
@@ -126,12 +126,12 @@ msg x y = do v <- getVar ; f (CoreVar v) [(v,(x,y))]
 (<<|) x y = f (blurVar $ blurLit x) (blurVar $ blurLit y)
     where
         f x y = any (x <<|) (children y) ||
-                (x `eq1` y && and (zipWith (<<|) (children x) (children y)))
+                (x `eq1CoreExpr` y && and (zipWith (<<|) (children x) (children y)))
 
 
 -- | Least common anti-instance
 lca :: UniqueIdM m => CoreExpr -> CoreExpr -> m (CoreExpr, Subst, Subst)
-lca x y | x `eq1` y = do
+lca x y | x `eq1CoreExpr` y = do
         let rep = snd $ uniplate x
         (cs,sx,sy) <- liftM unzip3 $ zipWithM lca (children x) (children y)
         return (rep cs, concat sx, concat sy)

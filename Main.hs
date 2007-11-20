@@ -39,7 +39,7 @@ main = do
 
 
 
-runGHC :: String -> Options -> Benchmark -> IO (Either String String)
+runGHC :: String -> Options -> Benchmark -> IO Answer
 runGHC flag (Options {optObjLocation=obj}) bench = do
     let exe = obj </> "main.exe"
     b <- doesFileExist exe
@@ -49,10 +49,10 @@ runGHC flag (Options {optObjLocation=obj}) bench = do
                 (obj </> "compile.stdout")
                 (obj </> "compile.stderr")
     b <- doesFileExist exe
-    return $ if b then Right exe else Left "Could not create executable"
+    return $ if b then Success else Failure "Could not create executable"
 
 
-runYhc :: Options -> Benchmark -> IO (Either String String)
+runYhc :: Options -> Benchmark -> IO Answer
 runYhc (Options {optObjLocation=obj}) bench = do
     let exe = obj </> "main.hbc"
     b <- doesFileExist exe
@@ -62,9 +62,10 @@ runYhc (Options {optObjLocation=obj}) bench = do
                 (obj </> "compile.stdout")
                 (obj </> "compile.stderr")
     b <- doesFileExist exe
-    return $ if b then Right ("yhi " ++ exe) else Left "Could not create executable"
+    return $ error "todo, create a .bat file to run it"
+    -- return $ if b then Right ("yhi " ++ exe) else Left "Could not create executable"
 
 
-runSupero :: Termination -> Options -> Benchmark -> IO (Either String String)
+runSupero :: Termination -> Options -> Benchmark -> IO Answer
 runSupero term (Options {optObjLocation=obj}) bench = do
     optimise term bench obj

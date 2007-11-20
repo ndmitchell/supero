@@ -2,7 +2,8 @@
 module General(
     Options(..), readOptions,
     system_, readFile',
-    haskellFile, recompile
+    haskellFile, recompile,
+    Answer(..)
     ) where
 
 import System.Directory
@@ -12,6 +13,10 @@ import Safe
 import System.Cmd
 import System.Exit
 import System.IO
+
+
+data Answer = Failure String
+            | Success
 
 
 data Options = Options {

@@ -26,8 +26,7 @@ exclude = let (*) = (,) in
 
 type Benchmark = String
 
---                                      errmsg executable
-type Compiler = Options -> Benchmark -> IO (Either String String)
+type Compiler = Options -> Benchmark -> IO Answer
 
 
 nofib :: Options -> Int -> [(String,Compiler)] -> [Benchmark] -> IO ()
@@ -37,11 +36,12 @@ nofib opts rep comps benchs = do
         putStrLn $ "Running " ++ takeBaseName b ++ " with " ++ name
         let objdir = optObjLocation opts </> name </> takeBaseName b
             opts2 = opts{optObjLocation = objdir}
+            exec = objdir </> "main"
         createDirectoryIfMissing True objdir
         res <- c opts2 b
         case res of
-            Left err -> putStrLn $ "Doh: " ++ err
-            Right exec -> replicateM_ rep $ runBenchmark opts2 name b exec
+            Failure err -> putStrLn $ "Doh: " ++ err
+            Success -> replicateM_ rep $ runBenchmark opts2 name b exec
         | b <- benchs, (name,c) <- comps
         , (takeBaseName b, name) `notElem` exclude]
 

@@ -14,7 +14,7 @@ import Optimise.Termination(termination)
 import Optimise.State(Termination)
 
 
-optimise :: Termination -> FilePath -> FilePath -> IO (Either String String)
+optimise :: Termination -> FilePath -> FilePath -> IO Answer
 optimise term src obj = do
     srcMain <- haskellFile (src </> "Main")
     let dest = obj </> "Main.yca"
@@ -35,7 +35,7 @@ optimise term src obj = do
              " -odir " ++ obj ++ " -hidir " ++ obj ++ " -o " ++ exe)
             (obj </> "compileghc.stdout")
             (obj </> "compileghc.stderr")
-    return $ Right exe
+    return Success
     
 
 output obj n core = do

@@ -24,6 +24,9 @@ instance (Monad m, UniqueId i) => UniqueIdM (StateT i m) where
 sioPrint :: String -> StateIO state ()
 sioPrint s = liftIO $ putStrLn s
 
+sioPutStr :: String -> StateIO state ()
+sioPutStr = liftIO . putStr
+
 
 sioPause :: StateIO state ()
 sioPause = do

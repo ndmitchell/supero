@@ -21,8 +21,8 @@ instance (Monad m, UniqueId i) => UniqueIdM (StateT i m) where
     getIdM = liftM getId get
     putIdM n = modify (putId n)
 
-sioPrint :: String -> StateIO state ()
-sioPrint s = liftIO $ putStrLn s
+sioPutStrLn :: String -> StateIO state ()
+sioPutStrLn = liftIO . putStrLn
 
 sioPutStr :: String -> StateIO state ()
 sioPutStr = liftIO . putStr

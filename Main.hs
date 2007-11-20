@@ -9,6 +9,7 @@ import Safe
 import System.Environment
 import System.Directory
 import System.FilePath
+import System.IO
 
 import General
 import Nofib
@@ -23,6 +24,7 @@ compilers = [("yhc",runYhc)
 
 
 main = do
+    hSetBuffering stdout NoBuffering
     args <- getArgs
     (nums,args) <- return $ partition (all isDigit) args
     (cs,args) <- return $ partition (`elem` map fst compilers) args

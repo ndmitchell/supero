@@ -1,19 +1,23 @@
 
-module Report(report) where
+module Report(report, reportFile) where
 
 import Safe
 import Data.List
 import Data.Maybe
 import System.Directory
+import System.Info
 
 
 -- The MR sucks!
 snub x = sort $ nub x
 
+reportFile :: FilePath
+reportFile = "results." ++ os ++ ".txt"
+
 report :: IO ()
 report = do
-    b <- doesFileExist "results.txt"
-    src <- if not b then return "" else readFile "results.txt"
+    b <- doesFileExist reportFile
+    src <- if not b then return "" else readFile reportFile
     let res = map (\[a,b,c] -> (a,b,c)) $ map words $ lines src
         (comps,tests,_) = unzip3 res
     comps <- return $ snub comps
@@ -29,7 +33,7 @@ report = do
               concatMap f tests ++
               "</table></body></html>"
 
-    writeFile "report.htm" ans
+    writeFile ("report." ++ os ++ ".htm") ans
 
 
 reportTest :: [String] -> [(String,Integer)] -> String

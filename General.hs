@@ -28,8 +28,8 @@ data Options = Options {
 
 readOptions :: IO Options
 readOptions = do
-    nofib <- locate ["C:\\Documents\\Uni\\nofib","C:\\Neil\\nofib","D:\\sources\\contrib\\nofib"]
-    obj <- locate ["F:\\Temp\\supero","D:\\Temp\\supero","C:\\Neil\\Temp\\supero"]
+    nofib <- locate ["C:\\Documents\\Uni\\nofib","C:\\Neil\\nofib","D:\\sources\\contrib\\nofib","/grp/haskell/nofib"]
+    obj <- locate ["F:\\Temp\\supero","D:\\Temp\\supero","C:\\Neil\\Temp\\supero","/tmp/ndm/supero/obj"]
     return $ Options nofib obj
 
 

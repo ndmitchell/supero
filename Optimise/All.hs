@@ -29,9 +29,9 @@ optimise term src obj = do
     core <- return $ coreReachable ["main"] $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
     core <- evaluate term (output obj) core
     
-    let exe = obj </> "main.exe"
+    let exe = obj </> "main" ++ (if isWindows then ".exe" else "")
     generate (obj </> "Main_.hs") core
-    system_ ("ghc --make " ++ (obj </> "Main_.hs") ++ " -O2 " ++
+    system_ ("ghc --make " ++ (obj </> "Main_.hs") ++ " -O2 -fasm " ++
              " -odir " ++ obj ++ " -hidir " ++ obj ++ " -o " ++ exe)
             (obj </> "compileghc.stdout")
             (obj </> "compileghc.stderr")

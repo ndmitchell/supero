@@ -47,7 +47,7 @@ main = do
 
 runGHC :: String -> Options -> Benchmark -> IO Answer
 runGHC flag (Options {optObjLocation=obj}) bench = do
-    let exe = obj </> "main.exe"
+    let exe = obj </> "main" ++ (if isWindows then ".exe" else "")
     b <- doesFileExist exe
     when (not b) $
         system_ ("ghc --make " ++ (bench </> "Main") ++ " " ++ flag ++ " " ++

@@ -51,7 +51,7 @@ runGHC flag (Options {optObjLocation=obj}) bench = do
     b <- doesFileExist exe
     when (not b) $
         system_ ("ghc --make " ++ (bench </> "Main") ++ " " ++ flag ++ " " ++
-                 " -odir " ++ obj ++ " -hidir " ++ obj ++ " -o " ++ exe)
+                 " -odir " ++ obj ++ " -hidir " ++ obj ++ " -fasm -o " ++ exe)
                 (obj </> "compile.stdout")
                 (obj </> "compile.stderr")
     b <- doesFileExist exe

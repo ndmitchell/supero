@@ -1,5 +1,5 @@
 
-module Nofib(nofib, Compiler, Benchmark) where
+module Nofib(nofib, Nofib(..), Compiler, Benchmark) where
 
 import Control.Monad
 import Data.Maybe
@@ -28,9 +28,14 @@ type Benchmark = String
 
 type Compiler = Options -> Benchmark -> IO Answer
 
+data Nofib = Nofib
+             {repetitions :: Int
+             ,rebuild :: Bool
+             }
 
-nofib :: Options -> Int -> [(String,Compiler)] -> [Benchmark] -> IO ()
-nofib opts rep comps benchs = do
+
+nofib :: Options -> Nofib -> [(String,Compiler)] -> [Benchmark] -> IO ()
+nofib opts Nofib{repetitions=repetitions, rebuild=rebuild} comps benchs = do
     benchs <- resolveBenchmarks opts benchs
     sequence_ [do
         putStrLn $ "Running " ++ takeBaseName b ++ " with " ++ name
@@ -38,10 +43,10 @@ nofib opts rep comps benchs = do
             opts2 = opts{optObjLocation = objdir}
             exec = objdir </> "main"
         createDirectoryIfMissing True objdir
-        res <- c opts2 b
+        res <- if rebuild then c opts2 b else return Success
         case res of
             Failure err -> putStrLn $ "Doh: " ++ err
-            Success -> replicateM_ rep $ runBenchmark opts2 name b exec
+            Success -> replicateM_ repetitions $ runBenchmark opts2 name b exec
         | b <- benchs, (name,c) <- comps
         , (takeBaseName b, name) `notElem` exclude]
 

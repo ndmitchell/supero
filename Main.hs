@@ -22,11 +22,14 @@ compilers = [("yhc",runYhc)
             ,("ghc2",runGHC "-O2")
             ]
 
+validArgs = ["norebuild"]
+
 
 main = do
     hSetBuffering stdout NoBuffering
     args <- getArgs
     (nums,args) <- return $ partition (all isDigit) args
+    (os,args) <- return $ partition (`elem` validArgs) args
     (cs,args) <- return $ partition (`elem` map fst compilers) args
     (ts,args) <- return $ partition (`elem` map fst termination) args
 
@@ -34,7 +37,10 @@ main = do
                 map (\c -> ("supero-" ++ c, runSupero $ lookupJust c termination)) ts
 
     opts <- readOptions
-    nofib opts (headDef 1 (map read nums)) comps args
+    let o = Nofib {repetitions = headDef 1 (map read nums)
+                  ,rebuild = "norebuild" `notElem` os
+                  }
+    nofib opts o comps args
     report
 
 

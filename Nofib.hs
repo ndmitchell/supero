@@ -124,8 +124,9 @@ checkedBy comp args opts bench exe = do
     let elapsed = diffMilliseconds end begin
     expected <- readFile' (bench </> takeBaseName bench <.> "stdout")
     got <- readFile' stdout
+    err <- readFile' stderr
     return $ if got `comp` expected then Right elapsed
-             else Left $ "Result wrong:\nExpected: " ++ expected ++ "\nGot: " ++ got ++ "\n"
+             else Left $ "Result wrong:\nExpected: " ++ expected ++ "\nGot: " ++ got ++ "\n" ++ err ++ "\n"
 
 piped :: Options -> Benchmark -> FilePath -> IO (Either String Integer)
 piped opts bench exe = do

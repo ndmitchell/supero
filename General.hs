@@ -3,9 +3,10 @@ module General(
     Options(..), readOptions,
     system_, readFile',
     haskellFile, recompile,
-    Answer(..)
+    Answer(..), isWindows
     ) where
 
+import Data.List
 import System.Directory
 import System.FilePath
 import Control.Monad
@@ -13,6 +14,7 @@ import Safe
 import System.Cmd
 import System.Exit
 import System.IO
+import System.Info
 
 
 data Answer = Failure String
@@ -24,6 +26,10 @@ data Options = Options {
                    optObjLocation :: FilePath
                }
                deriving Show
+
+
+isWindows :: Bool
+isWindows = "mingw" `isPrefixOf` os
 
 
 readOptions :: IO Options

@@ -125,8 +125,11 @@ msg x y = do v <- getVar ; f (CoreVar v) [(v,(x,y))]
 (<<|) :: CoreExpr -> CoreExpr -> Bool
 (<<|) x y = f (blurVar $ blurLit x) (blurVar $ blurLit y)
     where
-        f x y = any (x <<|) (children y) ||
-                (x `eq1CoreExpr` y && and (zipWith (<<|) (children x) (children y)))
+        f x y = any (x <<|) ys ||
+                (x `eq1CoreExpr` y && length xs == length ys && and (zipWith (<<|) xs ys))
+            where
+                xs = children x
+                ys = children y
 
 
 -- | Least common anti-instance

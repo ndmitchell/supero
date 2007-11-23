@@ -129,8 +129,8 @@ msg x y = do v <- getVar ; f (CoreVar v) [(v,(x,y))]
 (<<|) x y = if null (children x) then False else
             f (blurVar $ blurLit x) (blurVar $ blurLit y)
     where
-        f x y = any (x <<|) ys ||
-                (x `eq1CoreExpr` y && length xs == length ys && and (zipWith (<<|) xs ys))
+        f x y = any (f x) ys ||
+                (x `eq1CoreExpr` y && length xs == length ys && and (zipWith f xs ys))
             where
                 xs = children x
                 ys = children y

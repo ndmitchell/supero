@@ -13,6 +13,7 @@ import Optimise.Util
 termination :: [(String,Termination)]
 termination =
     [("none",none)
+    ,("always",always)
     ,("whistle",whistle)
     ,("hash1",hash 1)
     ,("hash2",hash 2)
@@ -39,6 +40,8 @@ termination =
 
 
 none c = return $ Just $ current c
+
+always _ = return Nothing
 
 
 whistle :: Context -> SS (Maybe CoreExpr)

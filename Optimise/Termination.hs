@@ -123,7 +123,8 @@ msg x y = do v <- getVar ; f (CoreVar v) [(v,(x,y))]
 
 -- | Homeomorphic embedding
 (<<|) :: CoreExpr -> CoreExpr -> Bool
-(<<|) x y = f (blurVar $ blurLit x) (blurVar $ blurLit y)
+(<<|) x y = if null (children x) then False else
+            f (blurVar $ blurLit x) (blurVar $ blurLit y)
     where
         f x y = any (x <<|) ys ||
                 (x `eq1CoreExpr` y && length xs == length ys && and (zipWith (<<|) xs ys))

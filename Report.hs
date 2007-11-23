@@ -2,9 +2,11 @@
 module Report(report, reportFile) where
 
 import Safe
+import Control.Monad
 import Data.List
 import Data.Maybe
 import System.Directory
+import System.FilePath
 import System.Info
 
 
@@ -33,7 +35,11 @@ report = do
               concatMap f tests ++
               "</table></body></html>"
 
-    writeFile ("report." ++ os ++ ".htm") ans
+    let reportFile = "report." ++ os ++ ".htm"
+        reportWeb = "/usr/ndm/web/temp/"
+    writeFile reportFile ans
+    b <- doesDirectoryExist reportWeb
+    when b $ copyFile reportFile (reportWeb </> reportFile)
 
 
 reportTest :: [String] -> [(String,Integer)] -> String

@@ -183,3 +183,34 @@ unfold (CoreFun x) = do
         return $ coreLam params body
 
 unfold x = return x
+
+
+
+--- new unfolding and unpeeling functions
+
+unfold2 :: S -> CoreExpr -> Maybe (SS CoreExpr)
+unfold2 s (CoreFun x) =
+    if prim s x || caf s x then Nothing else Just $ do
+        CoreFunc _ params body <- uniqueBoundVarsFunc $ core s x
+        return $ coreLam params body
+
+unfold2 s x = listToMaybe $ mapMaybe f $ splits children
+    where
+        (children,gen) = uniplate x
+
+        f (pre,x,post) = do
+            x <- unfold2 s x
+            return $ do
+                x <- x
+                return $ gen (pre++[x]++post)
+
+
+-- return True if any possible unfolding is uselss
+-- having badUnfold implies you should residuate straight away
+-- i.e. case PRIM of ... may unfold in the leaves, but will never unfold back
+-- ditto for CON x y z, you will never change the Con
+badUnfold :: S -> CoreExpr -> Bool
+badUnfold s (CoreCase x _) = isNothing $ unfold2 s x
+badUnfold s (CoreApp (CoreCon _) _) = True
+badUnfold s _ = False
+

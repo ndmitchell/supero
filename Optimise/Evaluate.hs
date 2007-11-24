@@ -35,6 +35,7 @@ evaluate term out c = do
     let cafs = detectCafs c
     c <- eval term cafs c
     out 1 c
+    out 4 $ coreReachable [mainName] $ coreInline InlineForward c
     c <- return $ decaffeinate cafs c
     out 2 c
     c <- return $ coreFix c

@@ -1,7 +1,9 @@
 
 module Optimise.Util where
 
-import Yhc.Core
+import Yhc.Core hiding (uniqueBoundVarsFunc)
+import Yhc.Core.FreeVar3
+import Control.Monad.State
 
 
 unwrapLet (CoreLet x y) = (CoreLet x,y)
@@ -82,5 +84,5 @@ disjoint xs ys = all (`notElem` xs) ys
 eqAlphaCoreExpr :: CoreExpr -> CoreExpr -> Bool
 eqAlphaCoreExpr a b = f a == f b
     where
-        f x = runFreeVars $ uniqueBoundVarsFunc $
+        f x = flip evalState (1::Int) $ uniqueBoundVarsFunc $
               CoreFunc "" (collectFreeVars x) x

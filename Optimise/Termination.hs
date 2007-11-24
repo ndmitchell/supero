@@ -7,6 +7,8 @@ import Yhc.Core.UniqueId
 import Yhc.Core.FreeVar3
 import Control.Monad
 import Data.List
+import Data.Maybe
+import Safe
 import Optimise.Util
 
 
@@ -15,6 +17,7 @@ termination =
     [("none",none)
     ,("always",always)
     ,("whistle",whistle)
+    ,("general",general)
     ,("hash1",hash 1)
     ,("hash2",hash 2)
     ,("hash3",hash 3)
@@ -43,6 +46,40 @@ none c = return $ Just $ current c
 
 always _ = return Nothing
 
+general :: Context -> SS (Maybe CoreExpr)
+general Context{rho=rho, current=x, currents=currents} =
+    let bad = filter (<<| x) rho in
+    if null bad then return Nothing
+    else if head bad `eqAlphaCoreExpr` x then
+        (if head bad `elem` currents then
+            return $ Just $ CoreFun "non_termination"
+        else
+            return Nothing
+        )
+    else do
+        new <- head bad <<|+ x
+        {-
+        sioPutStrLn ""
+        sioPutStrLn $ show $ head bad
+        sioPutStrLn "<<|"
+        sioPutStrLn $ show x
+        sioPutStrLn "<<|+"
+        sioPutStrLn $ show new
+        sioPause
+        -}
+        return $ Just new
+
+        {-
+    
+        
+        -- must compare against the first in the list
+        -- otherwise you keep comparing against yourself
+        (_,new) <- msg2 (last bad) x
+        sioPutStrLn $ show new
+        -- sioPause
+        return $ Just new
+        
+        -}
 
 whistle :: Context -> SS (Maybe CoreExpr)
 whistle Context{rho=rho, current=x} = return $
@@ -92,6 +129,102 @@ jonish context =
 
 type Subst = [(CoreVarName,CoreExpr)]
 type SubstPair = [(CoreVarName,(CoreExpr,CoreExpr))]
+
+
+
+coreLet' bind (CoreVar x) = fromMaybe (coreLet bind (CoreVar x)) $ lookup x bind
+coreLet' bind x = coreLet bind x
+
+
+
+-- if c(xs) <<| c(ys), then find differences within and float them up
+-- if x <<| a child, then descend and lambda float it
+-- spit out a modified version of the second, attempting to be more like the first
+(<<|+) :: UniqueIdM m => CoreExpr -> CoreExpr -> m CoreExpr
+a <<|+ b | any (a <<|) (children b) = do
+        v <- getVar
+        let (lam,bod) = f v (collectFreeVars b) a b
+        lam <- duplicateExpr lam
+        return $ coreLet [(v,lam)] bod
+    where
+        -- the first CoreExpr is probably a CoreLam, with duplicate variables (lam bindings)
+        -- the second is the whole removed
+        f :: CoreVarName -> [CoreVarName] -> CoreExpr -> CoreExpr -> (CoreExpr, CoreExpr) 
+        f v vars a b = case filter ((a <<|) . fst) $ holes b of
+                          (b,b_):_ -> let (x,y) = f v vars a b in (x, b_ y)
+                          [] -> (coreLam vars2 b, coreApp (CoreVar v) (map CoreVar vars2))
+            where
+                vars2 = collectFreeVars b \\ vars
+
+a <<|+ b = liftM (uncurry coreLet) $ f (collectFreeVars b) a b
+    where
+        f :: UniqueIdM m => [CoreVarName] -> CoreExpr -> CoreExpr -> m (Subst, CoreExpr)
+
+        f vars a b | blurVar a `eq1CoreExpr` blurVar b &&
+                     length (children a) == length (children b) = do
+            let (as, a_) = uniplate a
+                (bs, b_) = uniplate b
+            (binds,cs) <- mapAndUnzipM (uncurry $ f vars) (zip as bs)
+            return (concat binds, b_ cs)
+
+        f vars a b = if null (collectFreeVars b \\ vars)
+                     then do v <- getVar; return ([(v,b)], CoreVar v)
+                     else return ([], b)
+
+
+
+-- essential idea: try and move the differences to the top of the
+-- expressions so the inner bits are as similar as possible
+msg2 :: UniqueIdM m => CoreExpr -> CoreExpr -> m (CoreExpr, CoreExpr)
+msg2 a b = do
+    (bind,a,b) <- msg2' a b
+    let (vars,vals) = unzip bind
+        (as,bs) = unzip vals
+
+        f xs x = coreLet' (zip vars xs) x
+
+    return (f as a, f bs b)
+    
+
+msg2' :: UniqueIdM m => CoreExpr -> CoreExpr -> m (SubstPair, CoreExpr, CoreExpr)
+msg2' x y | not (blurVar x `eq1CoreExpr` blurVar y)
+         || (length (children x) /= length (children y)) = do
+    v <- getVar
+    return ([(v,(x,y))], CoreVar v, CoreVar v)
+
+-- must be free variables at this point
+msg2' (CoreVar x) (CoreVar y) = return ([], CoreVar x, CoreVar y)
+
+msg2' x y = do
+    -- normalise both expressions
+    i <- getIdM
+    x <- duplicateExpr1 x
+    putIdM i
+    y <- duplicateExpr1 y
+    
+    -- grab bits
+    let bound = fst $ uniplateBoundVars x
+        (xs, x_) = uniplate x
+        (ys, y_) = uniplate y
+
+    (bind, xs2, ys2) <- liftM unzip3 $ mapM (f bound) (zip xs ys)
+    return (concat bind, x_ xs2, y_ ys2)
+    where
+        f bound (x,y) = do
+            (bind,x,y) <- msg2' x y
+            let (good,bad) = partition safe bind
+                safe (_,(a,b)) = (collectFreeVars a ++ collectFreeVars b) `disjoint` bound
+                wrap f = coreLet' [(v,f z) | (v,z) <- bad]
+            return (good, wrap fst x, wrap snd y)
+
+
+duplicateExpr1 :: UniqueIdM m => CoreExpr -> m CoreExpr
+duplicateExpr1 x = do
+    let (cs,gen) = uniplateBoundVars x
+    cs2 <- getVars (length cs)
+    let rep = zip cs $ map CoreVar cs2
+    return $ descend (replaceFreeVars rep) $ gen cs2
+
 
 -- | Most specific generalisation
 --

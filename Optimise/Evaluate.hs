@@ -149,22 +149,29 @@ onf resultName context x = do
          else (term s) context{current=x}
     case r of
         Just x -> unpeel context x
-        Nothing -> do
-            x2 <- unfold x
-            if x2 == x then do
-                unpeel context x
-             else do
-                context <- return context{currents=x:currents context, rho=x:rho context}
-                onf resultName context x2
+        Nothing ->
+            case unfold2 s x of
+                Nothing -> unpeel context x
+                Just x2 -> do
+                    context <- return context{currents=x:currents context, rho=x:rho context}
+                    x2 <- x2
+                    onf resultName context x2
 
 
 -- unpeel at least one layer, but keep going if it makes no difference
 -- never residuate a CoreFun, since it won't be linked otherwise
 unpeel :: Context -> CoreExpr -> SS CoreExpr
 unpeel context (CoreFun x) = tieFunc x
-unpeel context x = descendM (tie context{currents=[]}) x
+unpeel context x = descendM f x
+    where
+        f (CoreFun x) = tieFunc x
+        f x = do
+            s <- get
+            if badUnfold s x
+                then descendM f x
+                else tie context{currents=[]} x
 
-
+{-
 -- perform one unfolding, if you can
 unfold :: CoreExpr -> SS CoreExpr
 unfold (CoreCase on alts) = do on <- unfold on; return $ CoreCase on alts
@@ -185,7 +192,7 @@ unfold (CoreFun x) = do
         return $ coreLam params body
 
 unfold x = return x
-
+-}
 
 
 --- new unfolding and unpeeling functions

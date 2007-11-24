@@ -26,8 +26,10 @@ optimise term src obj = do
                 (obj </> "compileyhc.stderr")
     core <- loadCore (obj </> "Main.yca")
     over <- loadOverlay
-    core <- return $ coreReachable ["main"] $ transs $ coreReachable ["main"] $ liftMain $ coreOverlay core over
+    (cont,core) <- return $ liftMain $ coreOverlay core over
+    core <- return $ coreReachable ["main"] $ transs $ coreReachable ["main"] core
     core <- evaluate term (output obj) core
+    when (not cont) $ error "Aborted as no main available"
     
     let exe = obj </> "main" ++ (if isWindows then ".exe" else "")
     generate (obj </> "Main_.hs") core
@@ -72,8 +74,15 @@ tweak (CoreFun "Prelude;otherwise") = CoreCon "Prelude;True"
 tweak x = x
 
 
-liftMain = applyFuncCore f
+-- return True if you can actually lift Main up
+liftMain :: Core -> (Bool, Core)
+liftMain core = (not small, applyFuncCore f core)
     where
-        f (CoreFunc "main" [] x) = CoreFunc "main" ["real"] (CoreApp x [CoreVar "real"])
+        small = "Main;main_small" `elem` map coreFuncName (coreFuncs core)
+
+        f (CoreFunc "main" [] x)
+            | small = CoreFunc "main_" ["x"] (CoreVar "x")
+            | otherwise = CoreFunc "main" ["real"] (CoreApp x [CoreVar "real"])
+        f (CoreFunc "Main;main_small" args body) = CoreFunc "main" args body
         f x = x
 

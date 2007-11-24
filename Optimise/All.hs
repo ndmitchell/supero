@@ -5,6 +5,7 @@ import Yhc.Core
 import Control.Monad
 import System.FilePath
 import System.Directory
+import System.IO
 import Optimise.Evaluate
 import Optimise.Generate
 import General
@@ -16,6 +17,10 @@ import Optimise.State(Termination)
 
 optimise :: Termination -> FilePath -> FilePath -> IO Answer
 optimise term src obj = do
+    b <- doesFileExist "log.txt"
+    when b $ removeFile "log.txt"
+    h <- openFile "log.txt" WriteMode
+
     srcMain <- haskellFile (src </> "Main")
     let dest = obj </> "Main.yca"
     b <- recompile srcMain dest
@@ -28,7 +33,8 @@ optimise term src obj = do
     over <- loadOverlay
     (cont,core) <- return $ liftMain $ coreOverlay core over
     core <- return $ coreReachable ["main"] $ transs $ coreReachable ["main"] core
-    core <- evaluate term (output obj) core
+    core <- evaluate h term (output obj) core
+    hClose h
     when (not cont) $ error "Aborted as no main available"
     
     let exe = obj </> "main" ++ (if isWindows then ".exe" else "")

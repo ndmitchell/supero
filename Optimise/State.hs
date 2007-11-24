@@ -3,6 +3,7 @@ module Optimise.State where
 
 import qualified Data.Map as Map
 import Control.Monad.State
+import System.IO
 import Yhc.Core.UniqueId
 import Yhc.Core
 
@@ -27,6 +28,10 @@ sioPutStrLn = liftIO . putStrLn
 sioPutStr :: String -> StateIO state ()
 sioPutStr = liftIO . putStr
 
+sioLog :: String -> StateIO S ()
+sioLog x = do
+    s <- get
+    liftIO $ hPutStrLn (logging s) x
 
 sioPause :: StateIO state ()
 sioPause = do
@@ -46,6 +51,7 @@ data S = S {names :: Map.Map CoreExpr CoreFuncName
            ,prim :: CoreFuncName -> Bool
            ,caf :: CoreFuncName -> Bool -- an expensive caf
            ,term :: Termination
+           ,logging :: Handle
            }
 
 instance UniqueId S where

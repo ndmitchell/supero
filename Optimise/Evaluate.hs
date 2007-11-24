@@ -14,6 +14,7 @@ import Control.Monad.State
 import Data.List
 import Data.Maybe
 import Safe
+import System.IO
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -29,11 +30,11 @@ import qualified Data.Set as Set
 -- debug hook to optimise something other than main
 mainName = "main"
 
-evaluate :: Termination -> (Int -> Core -> IO ()) -> Core -> IO Core
-evaluate term out c = do
+evaluate :: Handle -> Termination -> (Int -> Core -> IO ()) -> Core -> IO Core
+evaluate h term out c = do
     out 0 c
     let cafs = detectCafs c
-    c <- eval term cafs c
+    c <- eval h term cafs c
     out 1 c
     c <- return $ coreReachable [mainName] $ coreInline InlineForward c
     out 2 c
@@ -51,9 +52,9 @@ coreFix = coreReachable [mainName] . coreInline (if agressive then InlineFull el
 ---------------------------------------------------------------------
 -- EVAL DRIVER
 
-eval :: Termination -> Set.Set CoreFuncName -> Core -> IO Core
-eval term cafs core = do
-    let s0 = S Map.empty [] (uniqueFuncsNext core) 1 (coreFuncMap fm) (`Set.member` primsSet) (`Set.member` cafs) term
+eval :: Handle -> Termination -> Set.Set CoreFuncName -> Core -> IO Core
+eval h term cafs core = do
+    let s0 = S Map.empty [] (uniqueFuncsNext core) 1 (coreFuncMap fm) (`Set.member` primsSet) (`Set.member` cafs) term h
     (_,sn) <- sioRun (tieFunc mainName) s0
     return $ core{coreFuncs = prims ++ funcs sn}
     where

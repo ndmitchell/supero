@@ -60,14 +60,14 @@ resolveBenchmarks opts want = do
 
 benchmarks :: Options -> IO [(String,[Benchmark])]
 benchmarks (Options {optNofibLocation=root}) = do
-        res <- mapM f folders
+        res <- mapM f $ "examples" : map (root </>) folders
         return $ (".",concatMap snd $ concat res) : 
                  zipWith (\f r -> (f,concatMap snd r)) folders res ++
                  concat res
     where
         f folder = do
-            res <- getDirectoryContents (root </> folder)
-            liftM concat $ mapM (g (root </> folder)) res
+            res <- getDirectoryContents folder
+            liftM concat $ mapM (g folder) res
 
         g root x = do
             b <- doesDirectoryExist (root </> x)

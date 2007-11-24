@@ -211,6 +211,7 @@ unfold2 s x = listToMaybe $ mapMaybe f $ splits children
 -- ditto for CON x y z, you will never change the Con
 badUnfold :: S -> CoreExpr -> Bool
 badUnfold s (CoreCase x _) = isNothing $ unfold2 s x
+badUnfold s (CoreLam _ _) = True
 badUnfold s (CoreApp (CoreCon _) _) = True
 badUnfold s _ = False
 

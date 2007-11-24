@@ -77,3 +77,10 @@ disjoint xs ys = all (`notElem` xs) ys
 
 (~~) :: Show a => String -> a -> String
 (~~) lhs rhs = lhs ++ "\n" ++ show rhs
+
+
+eqAlphaCoreExpr :: CoreExpr -> CoreExpr -> Bool
+eqAlphaCoreExpr a b = f a == f b
+    where
+        f x = runFreeVars $ uniqueBoundVarsFunc $
+              CoreFunc "" (collectFreeVars x) x

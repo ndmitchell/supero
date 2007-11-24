@@ -144,7 +144,9 @@ onf :: CoreFuncName -> Context -> CoreExpr -> SS CoreExpr
 onf resultName context x = do
     s <- get
     x <- coreSimplifyExprUniqueExt simplify x
-    r <- (term s) context{current=x}
+    r <- if badUnfold s x
+         then return $ Just x
+         else (term s) context{current=x}
     case r of
         Just x -> unpeel context x
         Nothing -> do

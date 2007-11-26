@@ -41,7 +41,7 @@
 \maketitle              % typeset the title of the contribution
 
 \begin{abstract}
-Haskell is a functional language, with features such as higher order functions and lazy evaluation, which allow succinct programs. These high-level features are difficult for fast execution, but GHC is a mature and widely used optimising compiler. This paper presents a whole-program approach to optimisation, which produces speed improvements of between 10\% and 60\% when used with GHC, on eight benchmarks.
+Haskell is a functional language, with features such as higher order functions and lazy evaluation, which allow succinct programs. These high-level features are difficult for fast execution, but GHC is a mature and widely used optimising compiler. This paper presents a whole-program approach to optimisation, using techniques from supercompilation, which produces speed improvements of up to 60\% when used with GHC, on fifteen benchmarks.
 \end{abstract}
 
 \section{Introduction}
@@ -84,9 +84,17 @@ int main()
 \item[Laziness and Thunks] The Haskell program proceeds in a lazy manner, first demanding one character from |getContents|, then processing it with each of the functions in the pipeline. At each stage, a lazy thunk for the remainder of each function is created.
 \end{description}
 
-Using the optimiser developed in this paper we can eliminate all these overheads. We obtain a program that performs \textit{faster} than the C version. The central idea of the optimiser is to evaluate as much of the program as possible at compile time, leaving a residual program consisting only of actions dependent on the input data.
+Using the optimiser developed in this paper we can eliminate all these overheads. We obtain a program that performs \textit{faster} than the C version. The central idea of the optimiser is taken from supercompilation: namely to evaluate as much of the program as possible at compile time, leaving a residual program consisting only of actions dependent on the input data.
 
 Our goal is an automatic optimisation that makes high-level Haskell programs run as fast as low-level equivalents, eliminating the current need for hand-tuning and low-level techniques to obtain competitive performance. We require no annotations on any part of the program, including the library functions.
+
+\subsection{Contributions}
+
+This paper makes a number of contributions:
+
+\begin{itemize}
+\item To our knowledge, supercompilation techniques have not been applied to the full Haskell language previously.
+\end{itemize}
 
 \subsection{Roadmap}
 

@@ -56,7 +56,7 @@ main = print . length . words =<< getContents
 
 From right to left, the |getContents| function reads the input as a list of characters, |words| splits this list into a list of words, |length| counts the number of words, and finally |print| writes the value to the screen.
 
-An equivalent C program is given in Figure \ref{fig:c_words}. Compared to the C program, the Haskell version is more concise and more easily seen to be correct. Unfortunately, the Haskell program (compiled with GHC) is also three times slower than the C version (compiled with GCC). This slowdown is caused by several factors:
+An equivalent C program is given in Figure \ref{fig:c_words}. Compared to the C program, the Haskell version is more concise and more easily seen to be correct. Unfortunately, the Haskell program (compiled with GHC \cite{ghc}) is also three times slower than the C version (compiled with GCC). This slowdown is caused by several factors:
 
 \begin{fig}
 \bigskip
@@ -93,7 +93,7 @@ Our goal is an automatic optimisation that makes high-level Haskell programs run
 \subsection{Contributions}
 
 \begin{itemize}
-\item To our knowledge, this is the first time supercompilation has been applied to Haskell. This enables us to compare against GHC \cite{ghc}, a mature optimising compiler for Haskell.
+\item To our knowledge, this is the first time supercompilation has been applied to Haskell. This enables us to compare against GHC, a mature optimising compiler for Haskell.
 \item We make careful study of the let expression, something absent from the Core language of many other papers on supercompilation.
 \item We present an alternative generalisation step, based on a homeomorphic embedding \cite{leuschel:homeomorphic}.
 \end{itemize}
@@ -118,14 +118,14 @@ expr  =  v                                          {-" \text{  variable} "-}
 pat   =  c vs_
 \end{code}
 
-Where |v| ranges over variables, |c| ranges over constructors, |f| ranges over functions, |x|, |y| and |z| range over expressions and |p| ranges over patterns.
+Where |v| ranges over variables, |c| ranges over constructors, |f| ranges over functions, |s|, |t|, |x|, |y| and |z| range over expressions and |p| ranges over patterns.
 \bigskip
 \figend
 \caption{Core syntax}
 \label{fig:core}
 \end{fig}
 
-All our optimisations operate on a standard Core language, documented in \cite{me:yhc_core}. The expression type is given in Figure \ref{fig:core}. A program is a mapping of function names to expressions. Our Core language is higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. All names are fully qualified. Haskell's type classes have been removed by the dictionary transformation \cite{wadler:type_classes}.
+All our optimisations operate on a standard Core language \cite{me:yhc_core}. The expression type is given in Figure \ref{fig:core}. A program is a mapping of function names to expressions. Our Core language is higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. All names are fully qualified. Haskell's type classes have been removed by the dictionary transformation \cite{wadler:type_classes}.
 
 The Yhc compiler, a fork of nhc \cite{nhc}, can output Core files. Yhc can also link in all definitions from all required libraries, producing a single Core file representing the whole program.
 
@@ -138,7 +138,7 @@ In order to avoid accidental variable name clashes while performing transformati
 
 Our optimisation procedure takes a Core program as input, and produces a new equivalent Core program as output. To improve the program we do not make small local changes to the original, but instead \textit{evaluate it} so far as possible at compile time, leaving a \textit{residual program} to be run.
 
-Each function in the output program is an optimised version of some associated expression in the input program. Optimisation starts at the |main| function, and optimises the expression associated with |main|. Once the expression has been optimised, the outermost element in the expression becomes part of the residual program. All the subexpressions are assigned names, and will be given definitions in the residual program. If any expression (up to alpha renaming) already has a name in the residual program, then the same name is used. Each of these named inner expressions is then optimised as before.
+Each function in the output program is an optimised version of some associated expression in the input program. Optimisation starts at the |main| function, and optimises the expression associated with |main|. Once the expression has been optimised, the outermost element in the expression becomes part of the residual program. All the subexpressions are assigned names, and will be given definitions in the residual program. If any expression (up to alpha renaming) already has a name in the residual program, then the same name is used. Each of these named inner expressions are then optimised as before.
 
 \begin{comment}
 \begin{fig}
@@ -303,7 +303,7 @@ In the first example, a single expansion of the let binding will result in |(\x 
 
 Taking the second example, unfolding |repeat| will not terminate. However, by unfolding the |const| we produce |let x = repeat 1 in 0 : map f x|. Since |x| is only used once we may replace it to produce |0 : map (+1) (repeat 1)|, which may be deforested appropriately.
 
-Unfortunately these two examples seem to suggest different strategies for unfolding - unfold the let binding or unfold the let body. However, they do have a common theme -- unfolding the function that \textit{terminates} first. We use the strategy of picking the left-most inner-most function that does \textit{not} cause the termination criteria to be invoked. If no such function exists, we simply revert to left-most inner-most.
+Unfortunately these two examples seem to suggest different strategies for unfolding - unfold the let binding or unfold the let body. However, they do have a common theme -- unfolding the function that cannot be unfolding infinitely. We use the strategy of picking the left-most inner-most function that does \textit{not} cause the termination criteria to be invoked. If no such function exists, we simply revert to left-most inner-most.
 
 \subsection{The Termination Criteria}
 
@@ -315,21 +315,21 @@ We use the termination criteria suggested by S{\o}rensen and Gl{\"u}ck \cite{sor
 \vspace{-10mm}
 
 \noindent\begin{tabular}{p{5cm}p{5cm}}
-\[\text{dive}(x,y) = \frac{s \unlhd t_i \text{ for some } |i|}{s \unlhd \sigma(t_1,\ldots,t_n)} \]
+\[\frac{s \unlhd t_i \text{ for some } |i|}{\text{dive}(s, \sigma(t_1,\ldots,t_n))} \]
 &
-\[\text{couple}(x,y) = \frac{\sigma_1 \stackrel{*}{=} \sigma_2,
-                            s_1 \unlhd t_1, \ldots , s_n \unlhd t_n}
-                            {\sigma_1 (s_1,\ldots,s_n) \unlhd \sigma_2 (t_1,\ldots,t_n)}
+\[\frac{\sigma_1 \stackrel{*}{=} \sigma_2,
+        s_1 \unlhd t_1, \ldots , s_n \unlhd t_n}
+       {\text{couple}(\sigma_1 (s_1,\ldots,s_n), \sigma_2 (t_1,\ldots,t_n))}
 \]
 \end{tabular}
 
-We use $\sigma$ to denote the shell of an expression, with $s_1,\ldots,s_n$ being its child expressions. We test for equality of $\sigma_1$ and $\sigma_2$ using $\stackrel{*}{=}$ -- equality where all variables are considered equal. We terminate the optimisation of an expression |y| if on the chain of reductions from |main| to |y| we have encountered an expression |x| such that $x \unlhd y$.
+We use $\sigma$ to denote the shell of an expression, with $s_1,\ldots,s_n$ being its subexpressions. We test for equality of $\sigma_1$ and $\sigma_2$ using $\stackrel{*}{=}$ -- equality where all variables are considered equal. We terminate the optimisation of an expression |y| if on the chain of reductions from |main| to |y| we have encountered an expression |x| such that $x \unlhd y$.
 
 In addition to using the homeomorphic embedding, we also terminate if further unfolding would not yield any improvement to the root of the expression. For example, if the root of an expression is a constructor application, no further unfolding will change the root constructor. When terminating for this reason, we always residuate the outer shell of the expression, without applying any generalisation.
 
 \subsection{Generalisation}
 
-When the termination criteria has been met, it is necessary to discard information about the current expression, so that the optimisation terminates. We always residuate the outer shell of the expression, but first we attempt to generalise the expression so that the information lost is minimal. The paper by S{\o}rensen and Gl{\"u}ck provides a method for generation, which works by taking the most specific generationalisation of the current term and that which matched a homeomorhpic embedding. We first show an example where their method fails to produce the ideal generalised version, then show our new method based on the driving/coupling distinction already present in the homeomorhpic embedding.
+When the termination criteria has been met, it is necessary to discard information about the current expression, so that the optimisation terminates. We always residuate the outer shell of the expression, but first we attempt to generalise the expression so that the information lost is minimal. The paper by S{\o}rensen and Gl{\"u}ck provides a method for generalisation, which works by taking the most specific generationalisation of the current expression and expression which is a homeomorhpic embedding of it. We first show an example where their method fails to produce the ideal generalised version, then show our new method based on the driving/coupling distinction already present in the homeomorhpic embedding.
 
 \begin{code}
 case  putStr (repeat '1') of
@@ -347,11 +347,12 @@ case  putChar '1' r of
 The homeomorhpic embedding detects the repeated occurrence of |putStr|, and the optimisation of this expression is stopped. The most specific generalisation rule produces:
 
 \begin{code}
-let  f = putChar
-     x = '1'
-in case  f x r of
-         (r, _) -> case  putStr (repeat '1') r of
-                         (r, _) -> (r, ())
+let  a = putChar
+     b = '1'
+     c = \r -> case  putStr (repeat '1') r of
+                     (r, _) -> (r, ())
+in case  a b r of
+         (r, _) -> c r
 \end{code}
 
 The problem is that the rule works from the top of both expressions looking for a common root of both trees. However, if the first rule applied was diving, the roots may be unrelated. Using our rule:
@@ -370,18 +371,18 @@ The most specific generalisation of two expressions $s$ and $t$, $\text{msg}(s,t
 \[
 \left( \begin{array}{lcl}
 	t_g \\
-	\{x = \theta(s_1,\ldots,s_n)\} & \cup & \theta_1 \\
-	\{x = \theta(t_1,\ldots,t_n)\} & \cup & \theta_2
+	\{x = \sigma(s_1,\ldots,s_n)\} & \cup & \theta_1 \\
+	\{x = \sigma(t_1,\ldots,t_n)\} & \cup & \theta_2
 	\end{array} \right)
 \rightarrow
 \left( \begin{array}{lcl}
-	t_g\{x = \theta(y_1,\ldots,y_n)\} \\
+	t_g[x / \sigma(y_1,\ldots,y_n)] \\
 	\{y_1 = s_1,\ldots,y_n = s_n\} & \cup & \theta_1 \\
 	\{y_1 = t_1,\ldots,y_n = t_n\} & \cup & \theta_2
 	\end{array} \right)
 \]
 
-Our generalisation is characterised by $x \bowtie y$ which produces an expression equivalent to $y$, but ideally more similar in structure to $x$ than before.
+Our generalisation is characterised by $x \bowtie y$, which produces an expression equivalent to $y$, but ideally more similar in structure to $x$ than before.
 
 \begin{code}
 {-" x \bowtie \sigma^*(y), \text{where dive}(x,\sigma^*(y)) \wedge \text{couple}(x,y) "-}
@@ -397,7 +398,7 @@ Our generalisation is characterised by $x \bowtie y$ which produces an expressio
         {-" \text{where }(t_g,\theta_1,\theta_2) = \text{msg}(x,y) "-}
 \end{code}
 
-The first rule applies if the homeomorphic embedding first applied the dive rule. The idea is to descend to the element which matched, and then promote this to the top-level using a lambda. The fv function in the first rule calculates the free variables in an expression, and $\sigma^*$ is a multi-level context. The second rule applies the most specific generalisation operation if the coupling rule was applied first.
+The first rule applies if the homeomorphic embedding first applied the dive rule. The idea is to descend to the element which matched, and then promote this to the top-level using a lambda. The fv function in the first rule calculates the free variables in an expression, and $\sigma^*(y)$ denotes a subexpression $y$ within a containing context $\sigma^*$. The second rule applies the most specific generalisation operation if the coupling rule was applied first.
 
 
 \begin{comment}
@@ -573,7 +574,7 @@ The benchmarks we have chosen are inspired by the Unix \texttt{wc} command -- na
 
 All the C versions are implemented following a similar pattern to Figure \ref{fig:c_words}. Characters are read in a loop, with an accumulator recording the current value. Depending on the program, the body of the loop decides when to increment the accumulator. The Haskell versions all follow the same pattern as in the Introduction, merely replacing |words| with |lines|, or removing the |words| function for character counting.
 
-We performed all benchmarks on a machine running Windows XP, with a 3GHz processor and 1Gb RAM. All benchmarks were run over a 50Mb log file, repeated 10 times, and the lowest value was taken. The C versions used GCC\footnote{\url{http://gcc.gnu.org/}} version 3.4.2 with -O3. The Haskell version used GHC \cite{ghc} 6.6.1 with -O2. The Supero version was compiled using our optimiser, then written back as a Haskell file, and compiled once more with GHC 6.6.1 and -O2.
+We performed all benchmarks on a machine running Windows XP, with a 3GHz processor and 1Gb RAM. All benchmarks were run over a 50Mb log file, repeated 10 times, and the lowest value was taken. The C versions used GCC\footnote{\url{http://gcc.gnu.org/}} version 3.4.2 with -O3. The Haskell version used GHC 6.6.1 with -O2. The Supero version was compiled using our optimiser, then written back as a Haskell file, and compiled once more with GHC 6.6.1 and -O2.
 
 \begin{fig}
 \vspace{7mm}
@@ -751,15 +752,15 @@ The existence of a termination bound requiring different values for different pr
 \section{Related Work}
 \label{sec:related}
 
-Supercompilation \cite{supercompilation,turchin:experiments} was introduced by Turchin for the Refal language. Since this original work, there have been various suggestions of both termination strategies and generalisation strategies \cite{turchin:generalisation}. The termination strategy we use is taken from \cite{sorensen:supercompilation} and is based on homeomorphic embedding \cite{leuschel:homeomorphic}. A standard supercompiler only maintains positive knowledge, but this can be extended with negative information \cite{secher:perfect_supercompilation}.
+Supercompilation \cite{supercompilation,turchin:experiments} was introduced by Turchin for the Refal language \cite{refal}. Since this original work, there have been various suggestions of both termination strategies and generalisation strategies \cite{turchin:generalisation}. The termination strategy we use is taken from \cite{sorensen:supercompilation} and is based on homeomorphic embedding \cite{leuschel:homeomorphic}. The original supercompiler maintained both positive and negative knowledge, but our implementation is a simplified version maintaining only positive information \cite{secher:perfect_supercompilation}.
 
 The issue of let expressions in supercompilation has not previously been a primary focus. If lets are mentioned, the usual strategy is to substitute all linear lets and residuate all others. Let's have been considered in a strict setting \cite{jonsson:supercompilation}, where they are used to preserve termination semantics, but here all strict lets are inlined without regard to loss of sharing. It is known that the movement of lets can have dramatic impact on performance, providing an average speedup of 15\% in GHC \cite{spj:letfloating}, suggesting let expressions are critical to the performance of real programs.
 
-\paragraph{Partial evaluation} There has been a lot of work on partial evaluation \cite{jones:partial_evaluation}, where a program is specialised with respect to some static data. The emphasis is on determining which variable can be entirely computed at compile time, and which must remain in the residual program. Partial evaluation is particularly appropriate for specialising an interpreter with an expression tree to generate a compiler automatically, often with an order of magnitude speedup, known as the First Futamura Projection \cite{futanama:projections}. The difference between our work and partial evaluation is that we fold back definitions, and perform no binding time analysis. Our method is certainly less appropriate for specialising an interpreter, but in the absence of static data, is still able to show improvements. Partial evaluation has been applied to full-scale functional languages, such as Curry \cite{albert:partial_evaluation_curry}.
+\paragraph{Partial evaluation} There has been a lot of work on partial evaluation \cite{jones:partial_evaluation}, where a program is specialised with respect to some static data. The emphasis is on determining which variable can be entirely computed at compile time, and which must remain in the residual program. Partial evaluation is particularly appropriate for specialising an interpreter with an expression tree to generate a compiler automatically, often with an order of magnitude speedup, known as the First Futamura Projection \cite{futanama:projections}. The difference between our work and partial evaluation is that we fold back definitions, and perform no binding time analysis. Partial evaluation is not usually able to remove intermediate data structures. Our method is certainly less appropriate for specialising an interpreter, but in the absence of static data, is still able to show improvements. Partial evaluation has been applied to full-scale functional languages, such as Curry \cite{albert:partial_evaluation_curry}.
 
 \paragraph{Deforestation} The deforestation technique \cite{wadler:deforestation} removes intermediate lists in computations. This technique has been extended in many ways to encompass higher order deforestation \cite{marlow:higher_order_deforestation} and work on other data types \cite{coutts:string_fusion}. Probably the most practically motivated work on deforestation has come from those attempting to restrict deforestation, in particular shortcut deforestation \cite{gill:shortcut_deforestation}, and newer approaches such as stream fusion \cite{coutts:stream_fusion}. In this work certain named functions are automatically fused together. By rewriting library functions in terms of these special functions, fusion occurs. Shortcut deforestation is limited to cases where the correct underlying function is used -- sometimes requiring unnatural definitions.
 
-\paragraph{Lower Level Optimisations} Our optimisation works at the Core level, but even once optimal Core has been generated there is still some work before optimal machine code can be produced. Key optimisations include strictness analysis and unboxing \cite{spj:unboxing}. In GHC both of these optimisations are done at the Core level, using a Core language extended with unboxed types. After this lower level Core has been generated, it is then transformed in to STG machine instructions \cite{spj:stg}, before being transformed into assembly code. There is still work being done to modify the lowest levels to take advantage of the current generation of microprocessors \cite{marlow:pointer_tagging}. We rely on GHC to perform all these optimisations after Supero generates a residual program.
+\paragraph{Lower Level Optimisations} Our optimisation works at the Core level, but even once efficient Core has been generated there is still some work before efficient machine code can be produced. Key optimisations include strictness analysis and unboxing \cite{spj:unboxing}. In GHC both of these optimisations are done at the Core level, using a Core language extended with unboxed types. After this lower level Core has been generated, it is then transformed in to STG machine instructions \cite{spj:stg}, before being transformed into assembly code. There is still work being done to modify the lowest levels to take advantage of the current generation of microprocessors \cite{marlow:pointer_tagging}. We rely on GHC to perform all these optimisations after Supero generates a residual program.
 
 \begin{comment}
 \paragraph{GRIN} The GRIN approach \cite{grin} is currently being implemented in the jhc compiler \cite{jhc}, with promising initial results. GRIN works by first translating to a monadic intermediate language, then repeatedly performing a series of optimisations, using whole program transformation. The intermediate language is at a much lower level than our Core language, so jhc is able to perform detailed optimisations that we are unable to express.

@@ -64,12 +64,12 @@
 %format _T_ = "\mathcal{\overline{T}}"
 %format _C_ = "\mathcal{\overline{C}}"
 
-%format xs_  = "\Varid{\overrightarrow{xs}}"
-%format ys_  = "\Varid{\overrightarrow{ys}}"
-%format vs_  = "\Varid{\overrightarrow{vs}}"
-%format alts_  = "\Varid{\overrightarrow{alts}}"
-%format c_  = "\Varid{\overrightarrow{c}}"
-%format t_  = "\Varid{\overrightarrow{t}}"
+%format xs_  = "\Varid{\overline{xs}}"
+%format ys_  = "\Varid{\overline{ys}}"
+%format vs_  = "\Varid{\overline{vs}}"
+%format alts_  = "\Varid{\overline{alts}}"
+%format c_  = "\Varid{\overline{c}}"
+%format t_  = "\Varid{\overline{t}}"
 
 %format t_1  = "\Varid{t_1}"
 %format y_1  = "\Varid{y_1}"
@@ -88,6 +88,7 @@
 
 %format x1  = "\Varid{x_1}"
 %format x2  = "\Varid{x_2}"
+%format h0  = "\Varid{h_0}"
 %format xn  = "\Varid{x_n}"
 %format x_i = "\Varid{x_i}"
 %format ns1 = "\Varid{ns_1}"

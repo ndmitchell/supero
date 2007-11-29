@@ -91,6 +91,10 @@ tie :: Context -> CoreExpr -> SS CoreExpr
 tie context x = do
     (args,CoreFunc _ params x) <- return $ normalise x
     case x of
+        -- small enough to "pre-inline"
+        CoreLit x | isCoreLitSmall x -> return $ CoreLit x
+        CoreCon x -> return $ CoreCon x
+
         CoreVar y -> return $ CoreVar $ head args
         CoreFun x -> tieFunc x
         x -> do

@@ -56,6 +56,7 @@ eval :: Handle -> Termination -> Set.Set CoreFuncName -> Core -> IO Core
 eval h term cafs core = do
     let s0 = S Map.empty [] (uniqueFuncsNext core) 1 (coreFuncMap fm) (`Set.member` primsSet) (`Set.member` cafs) term h
     (_,sn) <- sioRun (tieFunc mainName) s0
+    --putStrLn $ unlines $ map show $ Map.toList $ names sn
     return $ core{coreFuncs = prims ++ funcs sn}
     where
         fm = toCoreFuncMap core

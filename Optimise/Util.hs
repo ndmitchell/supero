@@ -4,6 +4,7 @@ module Optimise.Util where
 import Yhc.Core hiding (uniqueBoundVarsFunc)
 import Yhc.Core.FreeVar3
 import Control.Monad.State
+import Optimise.Embedding
 
 
 unwrapLet (CoreLet x y) = (CoreLet x,y)
@@ -61,6 +62,15 @@ blurLit = transform f
 
         g (PatLit _) = PatLit (CoreInt 0)
         g x = x
+
+
+termExpr :: CoreExpr -> Term CoreExpr
+termExpr x = term (gen (replicate (length cs) (CoreVar []))) (map termExpr cs)
+    where (cs,gen) = uniplate x
+
+
+blurTermExpr = termExpr . blurVar . blurLit
+
 
 
 splits :: [a] -> [([a],a,[a])]

@@ -150,11 +150,15 @@ opt context best (x:xs) = do
     s <- get
     x <- x
     x <- simplifyFull x
-    if badUnfold s x then opt context (pick best (Root,x)) xs else do
-        r <- (term s) context{current=x}
-        case r of
-            Just x -> opt context (pick best (Term,x)) xs
-            Nothing -> opt (addContext context x) (None,x) (unfolds s x)
+    if badUnfold s x
+        then
+            if True then opt context (None,x) []
+            else opt context (pick best (Root,x)) xs
+        else do
+            r <- (term s) context{current=x}
+            case r of
+                Just x -> opt context (pick best (Term,x)) xs
+                Nothing -> opt (addContext context x) (None,x) (unfolds s x)
 
 
 -- unpeel at least one layer, but keep going if it makes no difference

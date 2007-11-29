@@ -46,7 +46,7 @@ evaluate h term out c = do
 
 coreFix :: Core -> Core
 coreFix = coreReachable [mainName] . coreInline (if agressive then InlineFull else InlineCallOnce)
-    where agressive = True
+    where agressive = False
 
 
 ---------------------------------------------------------------------

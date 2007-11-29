@@ -93,6 +93,7 @@ system_Environment_getArgs :: RW_Box -> RW_Pair [[Int]]
 system_Environment_getArgs r = case (fromIO getArgs) r of
                                     PAIR_WORLD(r, s) -> PAIR_WORLD(r, map str_ s)
 
+overlay_supero_wrap x = x
 
 
 -- Primitives

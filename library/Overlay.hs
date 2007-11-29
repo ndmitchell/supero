@@ -154,3 +154,17 @@ foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Integral''mo
 foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Integral''div :: a
 foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Num''signum :: a
 foreign import primitive global_Prelude''Prelude'_Integer''Prelude'_Num''abs :: a
+
+
+
+---------------------------------------------------------------------
+-- Optimised Implementations
+
+foreign import primitive supero_wrap :: a -> a
+
+global_Prelude''filter p xs =
+    case xs of
+        [] -> []
+        x:xs -> case supero_wrap (p x) of
+                    True -> x : global_Prelude''filter p xs
+                    False -> global_Prelude''filter p xs

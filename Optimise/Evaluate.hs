@@ -194,7 +194,7 @@ unfolds s (CoreFun x) | canUnfold s x = [unfold x]
 -- will cause the let to be reduced, but the binding itself must be the
 -- root
 unfolds s l@(CoreLet bind x) =
-    if null bs then mapS (CoreLet bind) $ unfolds s x
+    if null bs then [] -- mapS (CoreLet bind) $ unfolds s x
     else bs ++ [liftM (CoreLet bind . f) (unfold y) | (CoreFun y,f) <- contexts x, canUnfold s y]
     where bs = concat [mapS gen $ unfolds s c | (c,gen) <- init $ holes l]
 

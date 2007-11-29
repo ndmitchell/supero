@@ -106,7 +106,6 @@ tie context x = do
                 Nothing -> do
                     name <- getName x
                     addKey key name
-                    x <- simplifyFull x
                     x <- optimise context x
                     addFunc (CoreFunc name params x)
                     return name
@@ -132,33 +131,30 @@ normalise x = (vars, evalState (uniqueBoundVarsFunc (CoreFunc "" vars x)) (1 :: 
 ---------------------------------------------------------------------
 -- OPTIMISATION
 
+-- either you have no term (residuate root)
+-- or are running with a termination embedding
+-- or are running with a perfect root
+data Score = None | Term | Root
+             deriving (Eq,Ord,Show)
+
+pick (a,b) (c,d) = if c > a then (c,d) else (a,b)
+
 
 -- optimise an expression until you are told to stop
 optimise :: Context -> CoreExpr -> SS CoreExpr
-optimise context x = do
-    s <- get
-    r <- if badUnfold s x
-         then return $ Just x
-         else (term s) context{current=x}
-    case r of
-        Just x2 -> do
-            unpeel context x2
-        Nothing ->
-            case unfolds s x of
-                [] -> unpeel context x
-                zs -> do
-                    context <- return $ addContext context x
-                    zs <- sequence zs
-                    zs <- mapM (score context) zs
-                    let x2 = snd $ head $ sortBy (compare `on` fst) zs
-                    optimise context x2
+optimise context x = opt context (None,undefined) [return x]
 
-    where
-        score context x = do
-            s <- get
-            if badUnfold s x then return (1,x) else do
-                stop <- (term s) context{current=x}
-                return ((if isNothing stop then 0 else 2), x)
+opt context (n,best) [] = unpeel context best
+
+opt context best (x:xs) = do
+    s <- get
+    x <- x
+    x <- simplifyFull x
+    if badUnfold s x then opt context (pick best (Root,x)) xs else do
+        r <- (term s) context{current=x}
+        case r of
+            Just x -> opt context (pick best (Term,x)) xs
+            Nothing -> opt (addContext context x) (None,x) (unfolds s x)
 
 
 -- unpeel at least one layer, but keep going if it makes no difference
@@ -182,8 +178,7 @@ unfolds s x = [g f y | (CoreFun y,f) <- contexts x, canUnfold s y]
     where
         g context name = do
             CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
-            let x = context $ coreLam params body
-            simplifyFull x
+            return $ context $ coreLam params body
 
 
 -- return True if any possible unfolding is uselss

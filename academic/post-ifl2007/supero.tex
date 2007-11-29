@@ -205,7 +205,7 @@ let v = c x_1 ... x_n in y
 \label{fig:simplify}
 \end{fig}
 
-The optimisation of an expression proceeds by repeatedly inlining a function application until some termination criteria is met. Once the termination criteria holds, the expression is generalised before the outer shell becomes part of the residual program and all subexpressions are assigned names. After each inlining step, the expression is simplified using the rules in Figure \ref{fig:simplify}. There are three key decisions in the optimisation of an expression:
+The optimisation of an expression proceeds by repeatedly inlining a function application until some termination criteria is met. Once the termination criteria holds, the expression is generalised before the outer spine becomes part of the residual program and all subexpressions are assigned names. After each inlining step, the expression is simplified using the rules in Figure \ref{fig:simplify}. There are three key decisions in the optimisation of an expression:
 
 \begin{enumerate}
 \item Which function to inline.
@@ -237,7 +237,7 @@ map (\b -> b + 1) as = h0 as = case  as of
                                      d:ds  -> d+1 : map (\b -> b + 1) ds
 \end{code}
 
-We now have a |case| with a variable as the scrutinee at the root of the expression, which cannot be optimised further, so we residuate the outer shell. When processing the expression |map (\b -> b + 1) ds| we spot this to be an alpha renaming of an existing generated function, namely |h0|, and use this function:
+We now have a |case| with a variable as the scrutinee at the root of the expression, which cannot be optimised further, so we residuate the outer spine. When processing the expression |map (\b -> b + 1) ds| we spot this to be an alpha renaming of an existing generated function, namely |h0|, and use this function:
 
 \begin{code}
 h0 as = case  as of
@@ -323,13 +323,13 @@ We use the termination criteria suggested by S{\o}rensen and Gl{\"u}ck \cite{sor
 \]
 \end{tabular}
 
-We use $\sigma$ to denote the shell of an expression, with $s_1,\ldots,s_n$ being its subexpressions. We test for equality of $\sigma_1$ and $\sigma_2$ using $\stackrel{*}{=}$ -- equality where all variables are considered equal. We terminate the optimisation of an expression |y| if on the chain of reductions from |main| to |y| we have encountered an expression |x| such that $x \unlhd y$.
+We use $\sigma$ to denote the spine of an expression, with $s_1,\ldots,s_n$ being its subexpressions. We test for equality of $\sigma_1$ and $\sigma_2$ using $\stackrel{*}{=}$ -- equality where all variables are considered equal. We terminate the optimisation of an expression |y| if on the chain of reductions from |main| to |y| we have encountered an expression |x| such that $x \unlhd y$.
 
-In addition to using the homeomorphic embedding, we also terminate if further unfolding would not yield any improvement to the root of the expression. For example, if the root of an expression is a constructor application, no further unfolding will change the root constructor. When terminating for this reason, we always residuate the outer shell of the expression, without applying any generalisation.
+In addition to using the homeomorphic embedding, we also terminate if further unfolding would not yield any improvement to the root of the expression. For example, if the root of an expression is a constructor application, no further unfolding will change the root constructor. When terminating for this reason, we always residuate the outer spine of the expression, without applying any generalisation.
 
 \subsection{Generalisation}
 
-When the termination criteria has been met, it is necessary to discard information about the current expression, so that the optimisation terminates. We always residuate the outer shell of the expression, but first we attempt to generalise the expression so that the information lost is minimal. The paper by S{\o}rensen and Gl{\"u}ck provides a method for generalisation, which works by taking the most specific generationalisation of the current expression and expression which is a homeomorhpic embedding of it. We first show an example where their method fails to produce the ideal generalised version, then show our new method based on the driving/coupling distinction already present in the homeomorhpic embedding.
+When the termination criteria has been met, it is necessary to discard information about the current expression, so that the optimisation terminates. We always residuate the outer spine of the expression, but first we attempt to generalise the expression so that the information lost is minimal. The paper by S{\o}rensen and Gl{\"u}ck provides a method for generalisation, which works by taking the most specific generationalisation of the current expression and expression which is a homeomorhpic embedding of it. We first show an example where their method fails to produce the ideal generalised version, then show our new method based on the driving/coupling distinction already present in the homeomorhpic embedding.
 
 \begin{code}
 case  putStr (repeat '1') of

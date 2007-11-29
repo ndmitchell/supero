@@ -1,5 +1,5 @@
 
-module Optimise.Simplify(simplify) where
+module Optimise.Simplify(simplify, simplifyFull) where
 
 import Yhc.Core
 import Yhc.Core.FreeVar3
@@ -7,6 +7,9 @@ import Control.Monad
 import Data.List
 import Data.Maybe
 import qualified Data.Map as Map
+
+
+simplifyFull x = coreSimplifyExprUniqueExt simplify x
 
 
 simplify cont x@(CoreCase (CoreVar on) alts) | on `elem` collectFreeVars (CoreCase (CoreLit $ CoreInt 0) alts) =

@@ -106,7 +106,7 @@ tie context x = do
                 Nothing -> do
                     name <- getName x
                     addKey key name
-                    x <- coreSimplifyExprUniqueExt simplify x
+                    x <- simplifyFull x
                     x <- optimise context x
                     addFunc (CoreFunc name params x)
                     return name
@@ -183,7 +183,7 @@ unfolds s x = [g f y | (CoreFun y,f) <- contexts x, canUnfold s y]
         g context name = do
             CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
             let x = context $ coreLam params body
-            coreSimplifyExprUniqueExt simplify x
+            simplifyFull x
 
 
 -- return True if any possible unfolding is uselss

@@ -18,27 +18,6 @@ termination =
     ,("always",always)
     ,("whistle",whistle)
     ,("general",general)
-    ,("hash1",hash 1)
-    ,("hash2",hash 2)
-    ,("hash3",hash 3)
-    ,("hash4",hash 4)
-    ,("hash5",hash 5)
-    ,("hash6",hash 6)
-    ,("hash7",hash 7)
-    ,("size1",size 1)
-    ,("size2",size 2)
-    ,("size3",size 3)
-    ,("size4",size 4)
-    ,("size5",size 5)
-    ,("size6",size 6)
-    ,("size7",size 7)
-    ,("size8",size 8)
-    ,("size9",size 9)
-    ,("size10",size 10)
-    ,("size11",size 11)
-    ,("size12",size 12)
-    ,("size13",size 13)
-    ,("jonish",jonish)
     ]
 
 
@@ -47,13 +26,13 @@ none c = return $ Just $ current c
 always _ = return Nothing
 
 general :: Context -> SS (Maybe CoreExpr)
-general Context{rho=rho, current=x, currents=currents} =
+general Context{rho=rho, current=x} =
     let bad = filter (<<| x) rho in
     if null bad then return Nothing
     else if head bad `eqAlphaCoreExpr` x then
-        (if head bad `elem` currents then
+        ( {- if head bad `elem` currents then
             return $ Just $ CoreFun "non_termination"
-        else
+        else -}
             return Nothing
         )
     else do
@@ -87,6 +66,7 @@ whistle Context{rho=rho, current=x} = return $
     then Nothing
     else Just x
 
+{-
 hash :: Int -> Context -> SS (Maybe CoreExpr)
 hash depth Context{rho=rho, current=x} = return $
         if any ((==) x . root) rho
@@ -103,12 +83,13 @@ hash depth Context{rho=rho, current=x} = return $
 size :: Int -> Context -> SS (Maybe CoreExpr)
 size depth Context{current=x} = return $
         if exprSizeOld x > depth then Nothing else Just x
+-}
 
 ---------------------------------------------------------------------
 -- FROM THE BEFORE TIME
 
 
-
+{-
 jonish :: Context -> SS (Maybe CoreExpr)
 jonish context =
     if null whistle then return Nothing else do
@@ -125,7 +106,7 @@ jonish context =
     where
         x = current context
         whistle = filter (<<| x) (rho context)
-
+-}
 
 type Subst = [(CoreVarName,CoreExpr)]
 type SubstPair = [(CoreVarName,(CoreExpr,CoreExpr))]

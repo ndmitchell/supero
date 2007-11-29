@@ -73,7 +73,7 @@ data Context = Context
         -- the expressions since the last residuation
         -- includes the result just after residuation
         -- does not include the current expression
-        ,currents :: [CoreExpr]
+        -- ,currents :: [CoreExpr]
         
         -- includes all expressions pre their unfoldings
         -- a strict superset of currents
@@ -81,10 +81,13 @@ data Context = Context
         ,rho  :: [CoreExpr]     -- a list of all expressions ever
         }
 
-emptyContext = Context undefined [] []
+emptyContext = Context undefined []
 
 addContext :: Context -> CoreExpr -> Context
-addContext context x = context{currents=x:currents context, rho=x:rho context}
+addContext context x = context{rho=x:rho context}
+
+-- clear the currents field
+resetContext = id
 
 type Termination = Context -> SS (Maybe CoreExpr)
 

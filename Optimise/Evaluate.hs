@@ -168,7 +168,7 @@ unpeel context x = descendM f x
             s <- get
             if badUnfold s x
                 then descendM f x
-                else tie context{currents=[]} x
+                else tie (resetContext context) x
 
 
 -- return all the possible unfoldings that could be carried out

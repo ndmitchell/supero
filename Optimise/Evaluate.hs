@@ -105,6 +105,7 @@ tie context x = do
                 Nothing -> do
                     name <- getName x
                     addKey key name
+                    x <- coreSimplifyExprUniqueExt simplify x
                     x <- onf name context x
                     addFunc (CoreFunc name params x)
                     return name
@@ -150,19 +151,28 @@ POSTCONDITIONS:
 onf :: CoreFuncName -> Context -> CoreExpr -> SS CoreExpr
 onf resultName context x = do
     s <- get
-    x <- coreSimplifyExprUniqueExt simplify x
     r <- if badUnfold s x
          then return $ Just x
          else (term s) context{current=x}
     case r of
-        Just x -> unpeel context x
+        Just x2 -> do
+            unpeel context x2
         Nothing ->
-            case unfold2 s x of
-                Nothing -> unpeel context x
-                Just x2 -> do
-                    context <- return context{currents=x:currents context, rho=x:rho context}
-                    x2 <- x2
+            case unfolds s x of
+                [] -> unpeel context x
+                zs -> do
+                    context <- return $ addContext context x
+                    zs <- sequence zs
+                    zs <- mapM (score context) zs
+                    let x2 = snd $ head $ sortBy (compare `on` fst) zs
                     onf resultName context x2
+
+    where
+        score context x = do
+            s <- get
+            if badUnfold s x then return (1,x) else do
+                stop <- (term s) context{current=x}
+                return ((if isNothing stop then 0 else 2), x)
 
 
 -- unpeel at least one layer, but keep going if it makes no difference
@@ -204,6 +214,7 @@ unfold x = return x
 
 --- new unfolding and unpeeling functions
 
+{-
 unfold2 :: S -> CoreExpr -> Maybe (SS CoreExpr)
 unfold2 s (CoreFun x) =
     if prim s x || caf s x then Nothing else Just $ do
@@ -219,6 +230,17 @@ unfold2 s x = listToMaybe $ mapMaybe f $ splits children
             return $ do
                 x <- x
                 return $ gen (pre++[x]++post)
+-}
+
+
+-- return all the possible unfoldings that could be carried out
+unfolds :: S -> CoreExpr -> [SS CoreExpr]
+unfolds s x = [g f y | (CoreFun y,f) <- contexts x, canUnfold s y]
+    where
+        g context name = do
+            CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
+            let x = context $ coreLam params body
+            coreSimplifyExprUniqueExt simplify x
 
 
 -- return True if any possible unfolding is uselss
@@ -226,8 +248,11 @@ unfold2 s x = listToMaybe $ mapMaybe f $ splits children
 -- i.e. case PRIM of ... may unfold in the leaves, but will never unfold back
 -- ditto for CON x y z, you will never change the Con
 badUnfold :: S -> CoreExpr -> Bool
-badUnfold s (CoreCase x _) = isNothing $ unfold2 s x
+badUnfold s (CoreCase x _) = null $ unfolds s x
 badUnfold s (CoreLam _ _) = True
 badUnfold s (CoreApp (CoreCon _) _) = True
+badUnfold s (CoreApp (CoreFun x) _) = not $ canUnfold s x
 badUnfold s _ = False
 
+
+canUnfold s x = not $ prim s x || caf s x

@@ -83,6 +83,8 @@ data Context = Context
 
 emptyContext = Context undefined [] []
 
+addContext :: Context -> CoreExpr -> Context
+addContext context x = context{currents=x:currents context, rho=x:rho context}
 
 type Termination = Context -> SS (Maybe CoreExpr)
 

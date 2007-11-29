@@ -144,7 +144,11 @@ pick (a,b) (c,d) = if c > a then (c,d) else (a,b)
 optimise :: Context -> CoreExpr -> SS CoreExpr
 optimise context x = opt context (None,undefined) [return x]
 
-opt context (n,best) [] = unpeel context best
+opt context (n,best) [] = do
+    --sioPutStrLn $ show best
+    --sioPutStrLn "RESIDUATE"
+    --sioPause
+    unpeel context best
 
 opt context best (x:xs) = do
     s <- get
@@ -158,7 +162,11 @@ opt context best (x:xs) = do
             r <- (term s) context{current=x}
             case r of
                 Just x -> opt context (pick best (Term,x)) xs
-                Nothing -> opt (addContext context x) (None,x) (unfolds s x)
+                Nothing -> do
+                    sioLog $ show x
+                    sioLog ""
+
+                    opt (addContext context x) (None,x) (unfolds s x)
 
 
 -- unpeel at least one layer, but keep going if it makes no difference
@@ -175,6 +183,46 @@ unpeel context x = descendM f x
                 else tie (resetContext context) x
 
 
+-- return all the possible unfoldings that could be carried out
+-- only do those which would be of use
+unfolds :: S -> CoreExpr -> [SS CoreExpr]
+unfolds s (CoreCase on alts) = mapS (`CoreCase` alts) $ unfolds s on
+unfolds s (CoreApp x y) = mapS (`CoreApp` y) $ unfolds s x
+unfolds s (CoreFun x) | canUnfold s x = [unfold x]
+
+-- for a let binding its possible that unfolding any child in the body
+-- will cause the let to be reduced, but the binding itself must be the
+-- root
+unfolds s l@(CoreLet bind x) =
+    if null bs then mapS (CoreLet bind) $ unfolds s x
+    else bs ++ [liftM (CoreLet bind . f) (unfold y) | (CoreFun y,f) <- contexts x, canUnfold s y]
+    where bs = concat [mapS gen $ unfolds s c | (c,gen) <- init $ holes l]
+
+unfolds s _ = []
+
+
+mapS :: Monad m => (a -> b) -> [m a] -> [m b]
+mapS f = map (liftM f)
+
+
+
+unfold :: CoreFuncName -> SS CoreExpr
+unfold name = do
+    s <- get
+    CoreFunc _ params body <- uniqueBoundVarsFunc $ core s name
+    return $ coreLam params body
+
+
+badUnfold :: S -> CoreExpr -> Bool
+badUnfold s x = null $ unfolds s x
+
+
+-- can you unfold a particular function
+canUnfold :: S -> CoreFuncName -> Bool
+canUnfold s x = not $ prim s x || caf s x
+
+
+{-
 -- return all the possible unfoldings that could be carried out
 -- ensure that you call simplify afterwards
 unfolds :: S -> CoreExpr -> [SS CoreExpr]
@@ -197,6 +245,4 @@ badUnfold s (CoreApp (CoreFun x) _) = not $ canUnfold s x
 badUnfold s _ = False
 
 
--- can you unfold a particular function
-canUnfold :: S -> CoreFuncName -> Bool
-canUnfold s x = not $ prim s x || caf s x
+-}

@@ -107,7 +107,7 @@ tie context x = do
                     name <- getName x
                     addKey key name
                     x <- coreSimplifyExprUniqueExt simplify x
-                    x <- onf name context x
+                    x <- onf context x
                     addFunc (CoreFunc name params x)
                     return name
             return $ coreApp (CoreFun name) (map CoreVar args)
@@ -134,9 +134,8 @@ normalise x = (vars, evalState (uniqueBoundVarsFunc (CoreFunc "" vars x)) (1 :: 
 
 
 -- optimise an expression until you are told to stop
--- resultName is only passed to aid debugging
-onf :: CoreFuncName -> Context -> CoreExpr -> SS CoreExpr
-onf resultName context x = do
+onf :: Context -> CoreExpr -> SS CoreExpr
+onf context x = do
     s <- get
     r <- if badUnfold s x
          then return $ Just x
@@ -152,7 +151,7 @@ onf resultName context x = do
                     zs <- sequence zs
                     zs <- mapM (score context) zs
                     let x2 = snd $ head $ sortBy (compare `on` fst) zs
-                    onf resultName context x2
+                    onf context x2
 
     where
         score context x = do

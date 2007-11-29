@@ -69,7 +69,8 @@ loadOverlay = do
     loadCore output
 
 
-transs = ensureInvariants [ConsecutiveFuncs, NoCorePos, NoRecursiveLet, NoCaseDefaultOne]
+transs = coreInline InlineForward
+       . ensureInvariants [ConsecutiveFuncs, NoCorePos, NoRecursiveLet, NoCaseDefaultOne]
        . transformExpr tweak
 
 

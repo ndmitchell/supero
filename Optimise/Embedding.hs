@@ -3,7 +3,10 @@
     couple operation much cheaper
 -}
 
-module Optimise.Embedding(Embedding, insert, lookup, term) where
+module Optimise.Embedding(
+    Embedding, insert, lookup, empty,
+    Term, term
+    ) where
 
 import Prelude hiding (lookup)
 import qualified Data.Map as Map
@@ -24,6 +27,9 @@ term a as = Term a (length as) as
 
 
 newtype Embedding k v = Embedding (Map.Map (k,Int) [(v,[Term k])])
+
+empty :: Embedding k v
+empty = Embedding Map.empty
 
 insert :: Ord k => Term k -> v -> Embedding k v -> Embedding k v
 insert k v (Embedding x) = Embedding (f v x k)

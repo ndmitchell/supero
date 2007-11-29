@@ -133,21 +133,7 @@ normalise x = (vars, evalState (uniqueBoundVarsFunc (CoreFunc "" vars x)) (1 :: 
 -- OPTIMISATION
 
 
-{-
-POSTCONDITIONS:
-
-* Any let binding spit out by unfold MUST be preserved
-* All let bindings must be in ONF, and referenced more than once
-* The body must be in ONF
--}
-
-
--- must invoke tie on all computations below the most optimal form
--- must try and unfold at least once
-
--- for each let-rhs or case-on, optimise it once
--- if you reach over (size n) then unpeel until you get to size n, and tie the remainder
---
+-- optimise an expression until you are told to stop
 -- resultName is only passed to aid debugging
 onf :: CoreFuncName -> Context -> CoreExpr -> SS CoreExpr
 onf resultName context x = do
@@ -189,52 +175,9 @@ unpeel context x = descendM f x
                 then descendM f x
                 else tie context{currents=[]} x
 
-{-
--- perform one unfolding, if you can
-unfold :: CoreExpr -> SS CoreExpr
-unfold (CoreCase on alts) = do on <- unfold on; return $ CoreCase on alts
-unfold (CoreApp x xs) = do x <- unfold x; return $ CoreApp x xs
-
-unfold (CoreLet ((v,e):bind) x) = do
-    e2 <- unfold e
-    if e == e2 then do
-        x <- unfold $ coreLet bind x
-        return $ CoreLet [(v,e)] x
-     else do
-        return $ CoreLet ((v,e2):bind) x
-
-unfold (CoreFun x) = do
-    s <- get
-    if prim s x || caf s x then return $ CoreFun x else do
-        CoreFunc _ params body <- uniqueBoundVarsFunc $ core s x
-        return $ coreLam params body
-
-unfold x = return x
--}
-
-
---- new unfolding and unpeeling functions
-
-{-
-unfold2 :: S -> CoreExpr -> Maybe (SS CoreExpr)
-unfold2 s (CoreFun x) =
-    if prim s x || caf s x then Nothing else Just $ do
-        CoreFunc _ params body <- uniqueBoundVarsFunc $ core s x
-        return $ coreLam params body
-
-unfold2 s x = listToMaybe $ mapMaybe f $ splits children
-    where
-        (children,gen) = uniplate x
-
-        f (pre,x,post) = do
-            x <- unfold2 s x
-            return $ do
-                x <- x
-                return $ gen (pre++[x]++post)
--}
-
 
 -- return all the possible unfoldings that could be carried out
+-- ensure that you call simplify afterwards
 unfolds :: S -> CoreExpr -> [SS CoreExpr]
 unfolds s x = [g f y | (CoreFun y,f) <- contexts x, canUnfold s y]
     where
@@ -256,4 +199,6 @@ badUnfold s (CoreApp (CoreFun x) _) = not $ canUnfold s x
 badUnfold s _ = False
 
 
+-- can you unfold a particular function
+canUnfold :: S -> CoreFuncName -> Bool
 canUnfold s x = not $ prim s x || caf s x

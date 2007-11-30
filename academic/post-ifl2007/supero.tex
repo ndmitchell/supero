@@ -35,7 +35,7 @@
 % Specialisation, whole program
 % Termination - fix
 
-\title{Supero: Making Haskell Faster}
+\title{A Supercompiler for Core Haskell}
 
 \author{Neil Mitchell and Colin Runciman}
 
@@ -44,7 +44,7 @@
 \maketitle              % typeset the title of the contribution
 
 \begin{abstract}
-Haskell is a functional language, with features such as higher order functions and lazy evaluation, which allow succinct programs. These high-level features present many challenges for optimising compilers. We report practical experiments using novel variants of \textit{supercompilation}, with special attention to let bindings and the generalisation technique. Results include speed improvements of up to 55\% when our supercompiler is used in conjunction with GHC.
+Haskell is a functional language, with features such as higher order functions and lazy evaluation, which allow succinct programs. These high-level features present many challenges for optimising compilers. We report practical experiments using novel variants of \textit{supercompilation}, with special attention to let bindings and the generalisation technique. Results include runtime reductions of up to 55\% when our supercompiler is used in conjunction with GHC, with an average of 16\% reduction on one section of the nofib benchmark suite.
 \end{abstract}
 
 \section{Introduction}
@@ -269,7 +269,7 @@ The supercompilation of an expression proceeds by repeatedly inlining a function
 \item What generalisation to use.
 \end{enumerate}
 
-The original Supero work \cite{me:supero_ifl} always inlined the left-most inner-most function call, used a bound on the size of the expression to ensure termination, and performed no generalisation. First we give examples of our supercompiler in use, then we return to examine each of the three choices we have made.
+The original Supero work \cite{me:supero_ifl} inlined following evaluation order (with the exception of let expressions), used a bound on the size of the expression to ensure termination, and performed no generalisation. First we give examples of our supercompiler in use, then we return to examine each of the three choices we have made.
 
 \subsection{Examples of Supercompilation}
 
@@ -714,7 +714,7 @@ However, in C it is quite challenging to capture the required control flow. The 
 
 The standard set of Haskell benchmarks is the nofib suite \cite{nofib}. It is divided into three categories of increasing size: imaginary, spectral and real. Many small Haskell programs increase in size substantially once the libraries are included, particularly when type classes are involved. Because of the relatively large source code size of even small examples, we have limited our focus to the benchmarks in the imaginary section. All benchmarks were run with parameters that require runtimes of between 3 and 5 seconds for GHC.
 
-We exclude two benchmarks, paraffins and integrate. The paraffins benchmark makes substantial use of arrays, and we have not yet mapped the array primitives of Yhc onto those of GHC, which would be required to run the transformed result. The integrate benchmark tests arithmetic on the |Double| type, and can be optimised by Supero. Unfortunately, the resultant executables consume increasingly large amounts of memory and fail to produce an answer. We suspect the mistranslation of a primitive operation is at fault, but have yet to track down the cause.
+We exclude two benchmarks, paraffins and gen\_regexps. The paraffins benchmark makes substantial use of arrays, and we have not yet mapped the array primitives of Yhc onto those of GHC, which would be required to run the transformed result. The gen\_regexps benchmark tests character processing, and can be optimised by Supero. Unfortunately, the resultant executables consume increasingly large amounts of memory and fail to produce an answer -- we have yet to determine why.
 
 \begin{fig}
 \vspace{4mm}
@@ -724,7 +724,7 @@ We exclude two benchmarks, paraffins and integrate. The paraffins benchmark make
 \end{center}
 \vspace{3mm}
 \figend
-\caption{Runtime, relative to GHC.}
+\caption{Runtime, relative to GHC being 1.}
 \label{fig:haskell_results}
 \end{fig}
 
@@ -732,36 +732,45 @@ We exclude two benchmarks, paraffins and integrate. The paraffins benchmark make
 \hrule
 \vspace{3mm}
 
-\begin{tabular}{lrrrrr}
-\textbf{Program} & \hspace{5mm}\textbf{Source} & \hspace{5mm}\textbf{Residual} & \hspace{5mm}\textbf{Bound} & \hspace{5mm}\textbf{\% GHC Size} & \hspace{5mm}\textbf{\% GHC Time} \\
-digits-of-e1 &  521 & 1676 & 13 & 110 & 90 \\
-digits-of-e2 & 1235 &  515 & 12 &  99 & 75 \\
-exp3\_8      &  380 & 1138 &  5 & 104 & 35 \\
-primes       &  422 &  356 & 12 & 101 & 87 \\
-queens       &  637 & 4265 &  8 & 116 & 78 \\
+\begin{tabular}{lrrrr}
+\textbf{Program} & \hspace{5mm}\textbf{Supero} & \hspace{5mm}\textbf{msg} & \hspace{5mm}\textbf{spine} & \hspace{5mm}\textbf{none} \\
+bernouilli 		& 1.41 & 1.53 & 1.58 & 1.18 \\
+digits-of-e1	& 1.03 & 1.16 & 1.03 & 1.06 \\
+digits-of-e2	& 0.72 & 0.72 & 0.72 & 1.86 \\
+exp3\_8			& 1.00 & 1.00 & 1.00 & 1.01 \\
+integrate 		& 0.46 & 0.47 & 0.46 & 4.01 \\
+primes 			& 0.57 & 0.57 & 0.88 & 0.96 \\
+queens 			& 0.79 & 0.96 & 0.83 & 1.21 \\
+rfib 			& 0.97 & 0.97 & 0.97 & 1.00 \\
+tak 			& 0.72 & 1.39 & 1.39 & 1.39 \\
+wheel-sieve1 	& 0.98 & 1.11 & 1.42 & 5.23 \\
+wheel-sieve2 	& 0.87 & 0.63 & 0.89 & 0.63 \\
+x2n1 			& 0.58 & 0.64 & 1.61 & 3.04 \\
 \end{tabular}
 \vspace{2mm}
 
-\textbf{Program} is the name of the program; \textbf{Source} is the number of lines of pretty printed source code including all libraries; \textbf{Residual} is the number of lines after optimisation; \textbf{Bound} is the termination bound used; \textbf{Size} is the size of the resultant binary as a percentage of the GHC binary size; \textbf{Time} is the runtime as a percentage of GHC run-time.
+\textbf{Program} is the name of the program; \textbf{Supero} is using the $\bowtie$ generalisation method; \textbf{msg} uses the msg function for generalisation; \textbf{spine} applies no generalisation operation; \textbf{none} never performs any inlining.
 
 \vspace{4mm}
 \hrule
 \vspace{2mm}
-\caption{Result on the nofib suite.}
+\caption{Result on the Imaginary section of the nofib suite.}
 \label{tab:haskell_results}
 \end{table}
 
-The results of these benchmarks are given in Figure \ref{fig:haskell_results}, along with detailed breakdowns in Table \ref{tab:haskell_results}. In all benchmarks Supero+GHC performs at least 10\% faster than GHC alone, and in one case is nearly three times faster. Binaries were at most 10\% larger than those from GHC alone, and in one case the binary was even marginally smaller.
+The results of these benchmarks are given in Figure \ref{fig:haskell_results}, along with detailed breakdowns in Table \ref{tab:haskell_results}. All results are relative to the runtime of a GHC program compiled with -O2, lower numbers being better. The first three variants (Supero, msg, spine) all use homeomorphic embedding as the termination criterion, and $\bowtie$, msg or nothing respectively as the generalisation function. The final variant, none, is set with a termination test that always causes a residuation. The none variant is useful as a control to determine which improvements are due to bringing all definitions into one module scope, and which are as a result of supercompilation. Compilation times ranged from a few seconds to five minutes.
+
+The Bernouilli benchmark is the only one where Supero is slower than GHC by more than 3\%. The reason for this anomaly is that a dictionary is referred to in an inner loop which has not been specialised away by Supero, but has by GHC. The remaining benchmarks show four where Supero has little impact, and seven where a reduction in runtime of more than 10\% is obtained.
+
+With the exception of the wheel-sieve2 benchmark, the $\bowtie$ generalisation strategy proposed in this paper always performs as well or better than the alternatives. While the msg generalisation performs better than the empty generalisation on average, the difference is not as dramatic.
 
 \subsection{GHC's optimisations}
 
-For these benchmarks it is important to clarify which optimisations are performed by GHC, and which are performed by Supero. Core output from Yhc, compiled using GHC without any prior optimisation, would \textit{not} perform as well as the original program compiled using GHC. GHC has two special optimisations that work in a restricted number of cases, but which Supero is unable to take advantage of.
+For these benchmarks it is important to clarify which optimisations are performed by GHC, and which are performed by Supero. The none set of results show that taking the Core output from Yhc and compiling with GHC does \textit{not} perform as well as the original program compiled using GHC. GHC has two special optimisations that work in a restricted number of cases, but which Supero produced Core is unable to take advantage of.
 
 \paragraph{Dictionary Removal} Functions which make use of type classes are given an additional dictionary argument. In practice, GHC specialises many such functions by creating code with a particular dictionary frozen in. This optimisation is specific to type classes -- a tuple of higher order functions is not similarly specialised. After compilation with Yhc, the type classes have already been converted to tuples, so Supero must be able to remove the dictionaries itself. One benchmark where dictionary removal is critical is digits-of-e2.
 
 \paragraph{List Fusion} GHC relies on names of functions, particularly |foldr|/|build| \cite{spj:rules}, to apply special optimisation rules such as list fusion. Many of GHC's library functions, for example |iterate|, are defined in terms of |foldr| to take advantage of these special properties. After transformation with Yhc, these names are destroyed, so no rule based optimisation can be performed. One example where list fusion is critical is primes, although it occurs in most of the benchmarks to some extent.
-
-Supero has no special purpose optimisations which rely on named functions or desugaring knowledge. The one benchmark where no GHC specific optimisations apply is exp3\_8, which operates solely on Peano numbers -- a type GHC has no inbuilt knowledge of. Hence the advantage of Supero in exp3\_8: while GHC is limited to basic inline/simplify transformations, Supero is able to remove some intermediate data structures.
 
 \begin{comment}
 \subsection{Termination Bound}
@@ -796,11 +805,14 @@ One optimisation we do not currently support is the use of user provided transfo
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
-We have introduced an optimising front-end which can enhance the results of back-end compilation using GHC -- at least for a small range of benchmarks. Our optimiser is simple -- the Core transformation is expressed in just 300 lines of Haskell, yet it replicates many of the performance enhancements of GHC in a more general way. We have modified some of the techniques from supercompilation, particularly in respect to let bindings. Our initial results are promising, but incomplete. There are three main obstacles that need to be tackled:
+We have introduced an optimising front-end which can enhance the results of back-end compilation using GHC -- at least for a small range of benchmarks. Our optimiser is simple -- the Core transformation is expressed in just 300 lines of Haskell, yet it replicates many of the performance enhancements of GHC in a more general way. We have modified some of the techniques from supercompilation, particularly in respect to let bindings and generalisation. Our initial results are promising, but incomplete. We have obtained an average runtime improvement of 16\% over the imaginary section of the nofib suite, and to quote Simon Peyton Jones, ``an average runtime improvement of 10\%, against the baseline of an already well -optimised compiler, is an excellent result'' \cite{spj:specconstr}.
+
+There are three main obstacles that need to be tackled:
 
 \begin{description}
-\item[Benchmarks] Eight small benchmarks are not enough. We would like to obtain results for all the remaining benchmarks in the nofib suite.
-\item[Performance] The performance results presented in \S\ref{sec:haskell_results} are disappointing. Earlier versions of Supero were able to obtain a 50\% speed up in the primes benchmark, but decreased performance in other benchmarks. We suspect that much better performance can be obtained.
+\item[Benchmarks] The fifteen benchmarks presented in this paper are not enough. We would like to obtain results for all the remaining benchmarks in the nofib suite.
+\item[Runtime Performance] The performance results presented in \S\ref{sec:haskell_results} could be improved. Earlier versions of Supero \cite{me:supero_ifl} managed to obtain substantial speed ups on benchmarks such as exp3\_8. The Bernouilli benchmark has failed to be optimised properly. We suspect that there is still a lot of scope for improvement.
+\item[Compilation Speed] The compilation times are tolerable for benchmarking and a final optimised release, but not for general usage. Basic profiling shows that over 90\% of the time is spent testing for a homeomorphic embedding, which is currently done in a na\"{i}ve manner -- dramatic speedups should be possible.
 \end{description}
 
 The Programming Language Shootout\footnote{\url{http://shootout.alioth.debian.org/}} has shown that low-level Haskell can compete with with low-level imperative languages such as C. Our goal is that Haskell programs can be written in a high-level declarative style, yet still perform competitively.

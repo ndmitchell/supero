@@ -33,7 +33,7 @@ mainName = "main"
 evaluate :: Handle -> Termination -> (Int -> Core -> IO ()) -> Core -> IO Core
 evaluate h term out c = do
     out 0 c
-    let cafs = detectCafs c
+    let cafs = Set.empty -- detectCafs c
     c <- eval h term cafs c
     out 1 c
     c <- return $ coreReachable [mainName] $ coreInline InlineForward c

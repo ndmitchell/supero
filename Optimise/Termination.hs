@@ -17,6 +17,7 @@ termination =
     [("none",none)
     ,("always",always)
     ,("whistle",whistle)
+    ,("msg",embedMsg)
     ,("general",general)
     ]
 
@@ -24,6 +25,44 @@ termination =
 none c = return $ Just $ current c
 
 always _ = return Nothing
+
+
+embedMsg :: Context -> SS (Maybe CoreExpr)
+embedMsg Context{rho=rho, current=x} =
+    let bad = filter (<<| x) rho in
+    if null bad then return Nothing
+    else if head bad `eqAlphaCoreExpr` x then
+        ( {- if head bad `elem` currents then
+            return $ Just $ CoreFun "non_termination"
+        else -}
+            return Nothing
+        )
+    else do
+        new <- head bad `msgGluck` x
+        {-
+        sioPutStrLn ""
+        sioPutStrLn $ show $ head bad
+        sioPutStrLn "<<|"
+        sioPutStrLn $ show x
+        sioPutStrLn "<<|+"
+        sioPutStrLn $ show new
+        sioPause
+        -}
+        return $ Just new
+
+        {-
+    
+        
+        -- must compare against the first in the list
+        -- otherwise you keep comparing against yourself
+        (_,new) <- msg2 (last bad) x
+        sioPutStrLn $ show new
+        -- sioPause
+        return $ Just new
+        
+        -}
+
+
 
 general :: Context -> SS (Maybe CoreExpr)
 general Context{rho=rho, current=x} =
@@ -137,7 +176,30 @@ a <<|+ b | any (a <<|) (children b) = do
             where
                 vars2 = collectFreeVars b \\ vars
 
-a <<|+ b = liftM (uncurry coreLet) $ f (collectFreeVars b) a b
+a <<|+ b = do (bind,x) <- f (collectFreeVars b) a b
+              return $ if isCoreVar x
+                  then lookupJust (fromCoreVar x) bind
+                  else coreLet bind x
+    where
+        f :: UniqueIdM m => [CoreVarName] -> CoreExpr -> CoreExpr -> m (Subst, CoreExpr)
+
+        f vars a b | blurVar a `eq1CoreExpr` blurVar b &&
+                     length (children a) == length (children b) = do
+            let (as, a_) = uniplate a
+                (bs, b_) = uniplate b
+            (binds,cs) <- mapAndUnzipM (uncurry $ f vars) (zip as bs)
+            return (concat binds, b_ cs)
+
+        f vars a b = if null (collectFreeVars b \\ vars)
+                     then do v <- getVar; return ([(v,b)], CoreVar v)
+                     else return ([], b)
+
+
+msgGluck a b = do
+    (bind,x) <- f (collectFreeVars b) a b
+    return $ if isCoreVar x
+             then lookupJust (fromCoreVar x) bind
+              else coreLet bind x
     where
         f :: UniqueIdM m => [CoreVarName] -> CoreExpr -> CoreExpr -> m (Subst, CoreExpr)
 

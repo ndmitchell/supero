@@ -3,6 +3,7 @@
 \usepackage{url}
 \usepackage{bar}
 \usepackage{comment}
+\usepackage{graphicx}
 
 %include polycode.fmt
 %include supero.fmt
@@ -574,40 +575,11 @@ The benchmarks we have chosen are inspired by the Unix \texttt{wc} command -- na
 
 All the C versions are implemented following a similar pattern to Figure \ref{fig:c_words}. Characters are read in a loop, with an accumulator recording the current value. Depending on the program, the body of the loop decides when to increment the accumulator. The Haskell versions all follow the same pattern as in the Introduction, merely replacing |words| with |lines|, or removing the |words| function for character counting.
 
-We performed all benchmarks on a machine running Windows XP, with a 3GHz processor and 1Gb RAM. All benchmarks were run over a 50Mb log file, repeated 10 times, and the lowest value was taken. The C versions used GCC\footnote{\url{http://gcc.gnu.org/}} version 3.4.2 with -O3. The Haskell version used GHC 6.6.1 with -O2. The Supero version was compiled using our optimiser, then written back as a Haskell file, and compiled once more with GHC 6.6.1 and -O2.
+We performed all benchmarks on a machine running Windows XP, with a 3GHz processor and 1Gb RAM. All benchmarks were run over a 50Mb log file, repeated 10 times, and the lowest value was taken. The C versions used GCC\footnote{\url{http://gcc.gnu.org/}} version 3.4.2 with -O3. The Haskell version used GHC 6.8.1 with -O2. The Supero version was compiled using our optimiser, then written back as a Haskell file, and compiled once more with GHC 6.8.1 and -O2.
 
 \begin{fig}
-\vspace{7mm}
-\makebox[33mm][r]{
-    \begin{barenv}
-    \legend{1}{C$\;\;\;\;\;\;$}
-    \legend{2}{Supero+GHC$\;\;\;\;\;\;$}
-    \legend{3}{GHC$\;\;\;\;\;\;$}
-    \end{barenv}
-}
-\begin{barenv}
-\setwidth{20}
-\setdepth{0}
-\sethspace{0.05}
-\setstretch{6}
-\setnumberpos{empty}
-% \setxaxis{0}{1}{1}
-% \setxname{$n$}
-\setyaxis{0}{25}{5} \setyname{Seconds}
-\bar{6}{1}
-\bar{6.3}{2}[characters]
-\bar{12.5}{3}
-\bar{0}{0}
-\bar{6.2}{1}
-\bar{6.5}{2}[lines]
-\bar{17}{3}
-\bar{0}{0}
-\bar{7.3}{1}
-\bar{6.9}{2}[words]
-\bar{22}{3}
-\end{barenv}
-\vspace{7mm}
-\figend
+% http://csdl.ics.hawaii.edu/FAQ/chart-ps.html
+\includegraphics[scale=0.75,angle=270]{wc.eps} 
 \caption{Benchmarks with C, Supero+GHC and GHC alone.}
 \label{fig:c_results}
 \end{fig}
@@ -667,14 +639,14 @@ The final source of extra computation relative to the C version are stack checks
 
 The most curious result is that Supero outperforms C on wordcounting, by about 6\% -- even with the problems discussed! The C program presented in Figure \ref{fig:c_words} is not optimal. The variable \verb"last_space" is a boolean, indicating whether the previous character was a space, or not. Each time round the loop a test is performed on \verb"last_space", even though its value was determined and tested on the previous iteration. The way to optimise this code is to have two specialised variants of the loop, one for when \verb"last_space" is true, and one for when it is false. When the value of \verb"last_space" changes, the program would transition to the other loop. This pattern effectively encodes the boolean variable in the program counter, and is what the Haskell program has managed to generate from the high-level code.
 
-However, in C it is quite challenging to capture the required control flow! The program needs two loops, where both loops can transition to the other. Using \texttt{goto} turn off many critical optimisations in the C compiler. Tail recursion is neither required by the C standard, nor supported by most compilers. The only way to express the necessary pattern is using nested while loops, but unlike newer imperative languages such as Java, C does not have named loops -- so the inner loop cannot break from the outer loop if it reaches the end of the file. The only solution is to place the nested while loops in a function, and use \texttt{return} to break from the inner loop. This solution would not scale to a three-valued control structure, and substantially increases the complexity of the code.
+However, in C it is quite challenging to capture the required control flow. The program needs two loops, where both loops can transition to the other. Using \texttt{goto} turns off many critical optimisations in the C compiler. Tail recursion is neither required by the C standard, nor supported by most compilers. The only way to express the necessary pattern is using nested while loops, but unlike newer imperative languages such as Java, C does not have named loops -- so the inner loop cannot break from the outer loop if it reaches the end of the file. The only solution is to place the nested while loops in a function, and use \texttt{return} to break from the inner loop. This solution would not scale to a three-valued control structure, and substantially increases the complexity of the code.
 
 \section{Performance Compared With GHC Alone}
 \label{sec:haskell_results}
 
-The standard set of Haskell benchmarks is the nofib suite \cite{nofib}. It is divided into three categories of increasing size: imaginary, spectral and real. Many small Haskell programs increase in size substantially once the libraries are included, particularly when type classes are involved. Because of the relatively large source code size of even small examples, we have limited our focus to five benchmarks drawn from the imaginary section. We have chosen programs which do not perform large amounts of IO.
+The standard set of Haskell benchmarks is the nofib suite \cite{nofib}. It is divided into three categories of increasing size: imaginary, spectral and real. Many small Haskell programs increase in size substantially once the libraries are included, particularly when type classes are involved. Because of the relatively large source code size of even small examples, we have limited our focus to the benchmarks in the imaginary section. All benchmarks were run with parameters that require runtimes of between 3 and 5 seconds for GHC.
 
-The benchmarks are: digits-of-e1 and digits-of-e2, both of which compute the digits of |e| by different methods; exp3\_8 computes $3^8$ using Peano numbers and the |Num| class; primes computes a list of prime numbers; and queens counts the safe layouts of queen pieces on a chess board. All benchmarks were run with parameters that require runtimes of between 3 and 5 seconds for GHC.
+We exclude two benchmarks, paraffins and integrate. The paraffins benchmark makes substantial use of arrays, and we have not yet mapped the array primitives of Yhc onto those of GHC, which would be required to run the transformed result. The integrate benchmark tests arithmetic on the |Double| type, and can be optimised by Supero. Unfortunately, the resultant executables consume increasingly large amounts of memory and fail to produce an answer. We suspect the mistranslation of a primitive operation is at fault, but have yet to track down the cause.
 
 \begin{fig}
 \vspace{7mm}

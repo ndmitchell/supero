@@ -8,6 +8,7 @@ import System.Environment
 import System.Exit
 import Foreign.C.Types
 import Data.Char(ord,chr)
+import Data.Array
 
 
 -- low level imports
@@ -214,3 +215,7 @@ prelude_Integer_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest
 
 prelude_Double_Show_showsPrec :: Int -> Double -> [Int] -> [Int]
 prelude_Double_Show_showsPrec prec i rest = str_ (showsPrec prec i []) ++ rest
+
+
+overlay_arrayInt_array = array :: (Int,Int) -> [(Int,b)] -> Array Int b
+overlay_arrayInt_index = (!) :: Array Int b -> Int -> b

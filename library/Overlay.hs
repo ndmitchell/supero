@@ -168,3 +168,15 @@ global_Prelude''filter p xs =
         x:xs -> case supero_wrap (p x) of
                     True -> x : global_Prelude''filter p xs
                     False -> global_Prelude''filter p xs
+
+
+---------------------------------------------------------------------
+-- Optimised Implementations
+
+foreign import primitive arrayInt_index :: a
+foreign import primitive arrayInt_array :: a
+
+
+global_Data'_Array'''ex _ a b = arrayInt_index a b
+
+global_Data'_Array''array _ a b = arrayInt_array a b

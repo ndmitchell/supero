@@ -145,30 +145,35 @@ optimise :: Context -> CoreExpr -> SS CoreExpr
 optimise context x = do
     --sioLog $ show x
     --sioLog ""
-    opt context (None,undefined) [return x]
+    opt 0 context (None,x) [return x]
 
-opt context (n,best) [] = do
+-- faster termination
+opt :: Int -> Context -> (Score,CoreExpr) -> [SS CoreExpr] -> SS CoreExpr
+opt count context (None,x) _ | count > 1000 = sioPutStrLn "!" >> opt count context (None,x) []
+opt count context (b,x) _ | b /= None && count > 100 = sioPutStrLn ":" >> opt count context (b,x) []
+
+opt count context (n,best) [] = do
     --sioLog $ show best
     --sioLog "RESIDUATE"
     --sioLog ""
     unpeel context best
 
-opt context best (x:xs) = do
+opt count context best (x:xs) = do
     s <- get
     x <- x
     x <- simplifyFull x
     if badUnfold s x
         then
-            if True then opt context (None,x) []
-            else opt context (pick best (Root,x)) xs
+            if True then opt count context (Root,x) []
+            else opt count context (pick best (Root,x)) xs
         else do
             r <- (term s) context{current=x}
             case r of
-                Just x -> opt context (pick best (Term,x)) xs
+                Just x -> opt count context (pick best (Term,x)) xs
                 Nothing -> do
                     --sioLog $ show x
                     --sioLog ""
-                    opt (addContext context x) (None,x) (unfolds s x)
+                    opt (count+1) (addContext context x) (None,x) (unfolds s x)
 
 
 -- unpeel at least one layer, but keep going if it makes no difference

@@ -17,6 +17,7 @@
 %format :* = "\star{}"
 %format :| = "\ddagger{}"
 %format `o` = "\bullet{}"
+%format bullet = "\bullet{}"
 %format ^. = "\cdot{}"
 %format ~= = "\simeq{}"
 %format ^* = "^\ast{}"
@@ -42,6 +43,7 @@
 
 %format \? = "\;"
 %format \! = "\!"
+%format \!! = "\hspace{-0.3mm}"
 
 %format |- = "\mathsf{\hspace{1mm}|\hspace{-0.5mm}\hbox{-\!-}\;}"
 %format |+ = "\mathsf{\hspace{1mm}|\hspace{-0.5mm}\hbox{\small{+}}\;}"
@@ -51,6 +53,9 @@
 
 %format \< = "[\!["
 %format \> = "]\!]"
+
+%format rho = "{\rho}"
+%format psi = "{\psi}"
 
 %format _O = "\mathcal{O}"
 %format _OO = "\mathcal{O}^*"

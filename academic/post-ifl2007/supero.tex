@@ -127,17 +127,18 @@ Where |v| ranges over variables, |c| ranges over constructors, |f| ranges over f
 
 \begin{fig}
 \begin{code}
-split(v) = (v, [])
-split(c) = (c, [])
-split(f) = (f, [])
-split(x ys_) = (bullet bullet, x:ys_)
-split(\vs_ -> x) = (\vs_ -> bullet, x)
-split(let v = x in y) = (let v = bullet in bullet, [x,y])
-split(case x of {p_1 -> y_1 ; ... ; p_n -> y_n}) = (case x of {p_1 -> bullet ; ... ; p_n -> bullet, [y_1, ... ,y_n])
+split(v                                                      ) = (v, [])
+split(c                                                      ) = (c, [])
+split(f                                                      ) = (f, [])
+split(x ys_                                                  ) = (bullet {-"\text{ } \overline{\bullet} "-}, x:ys_)
+split(\vs_ -> x                                              ) = (\vs_ -> bullet, x)
+split(let v = x in y                                         ) = (let v = bullet in bullet, [x,y])
+split(case x of {p_1 \! -> \! y_1 ; ... ; p_n \! -> \! y_n}  ) = (case {-"\hspace{-1mm}"-} bullet {-"\hspace{-1mm}"-} of {p_1 \! -> \! bullet ; ... ; p_n \! -> \! bullet}, [x, y_1, ... ,y_n])
 \end{code}
+\vspace{-2mm}
 \figend
-\caption{The split function, returning a shell and all subexpressions.}
-\label{fig:core}
+\caption{The |split| function, returning a spine and all subexpressions.}
+\label{fig:split}
 \end{fig}
 
 Our supercompiler uses the Yhc-Core language \cite{me:yhc_core}. The expression type is given in Figure \ref{fig:core}. A program is a mapping of function names to expressions. Our Core language is higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. All names are fully qualified. Haskell's type classes have been removed by the dictionary transformation \cite{wadler:type_classes}.
@@ -148,14 +149,52 @@ The primary difference between Yhc-Core and GHC-Core \cite{ghc_core} is that Yhc
 
 In order to avoid accidental variable name clashes while performing transformations, we demand that all variables within a program are unique. All transformations may assume this invariant, and must maintain it.
 
-The spine of an expression is an expression without its immediate subexpressions.
+We define the |split| function in Figure \ref{fig:split}, which splits an expression into a spine and its immediate subexpressions. The $\bullet$ markers in the spine indicate the positions where subexpressions have been removed from. We define the |join| operation to take a spine and a list of expressions and create a new expression by inserting the expressions into the spine.
 
 \section{Supercompilation}
 \label{sec:optimisation}
 
 Our supercompiler takes a Core program as input, and produces a new equivalent Core program as output. To improve the program we do not make small local changes to the original, but instead \textit{evaluate it} so far as possible at compile time, leaving a \textit{residual program} to be run.
 
-Each function in the output program is an optimised version of some associated expression in the input program. Supercompilation starts at the |main| function, and supercompiles the expression associated with |main|. Once the expression has been supercompiled, the outermost element in the expression becomes part of the residual program. All the subexpressions are assigned names, and will be given definitions in the residual program. If any expression (up to alpha renaming) already has a name in the residual program, then the same name is used. Each of these named inner expressions are then supercompiled as before.
+\begin{fig}
+\begin{code}
+supercompile()
+    seen := {}
+    bind := {}
+    tie({}, main)
+\end{code}
+
+\vspace{-6mm}
+
+\begin{tabular}{p{7cm}p{5cm}}
+\begin{code}
+tie(rho, x)
+    if x `notElem` seen then
+        seen := seen `union` {x}
+        bind := bind `union` {psi\!!(x) fv\!!(x) = drive\!!(x)}
+    {-" \textsf{\textbf{endif}} "-}
+    {-" \textsf{\textbf{return}} "-} (psi\!!(x) fv\!!(x))
+\end{code}
+&
+\begin{code}
+drive(rho, x)
+    if terminate(rho, x) then
+        (a,b) = split(generalise(x))
+        join(a, map (tie rho) b)
+    else
+        drive(rho `union` {x}, unfold(x))
+\end{code}
+\end{tabular}
+
+\vspace{-3mm}
+
+Where |psi| is a bijection between expressions and function names and |fv(x)| returns the free variables in |x|. This code is parameterised by: |terminate| which decided whether to stop supercompilation of this expression; |generalise| which generalises an expression before residuation; |unfold| which chooses a function application and unfolds it.
+\figend
+\caption{The |supercompile| function.}
+\label{fig:supercompile}
+\end{fig}
+
+The general method of supercompilation is shown in Figure \ref{fig:supercompile}. Each function in the output program is an optimised version of some associated expression in the input program. Supercompilation starts at the |main| function, and supercompiles the expression associated with |main|. Once the expression has been supercompiled, the outermost element in the expression becomes part of the residual program. All the subexpressions are assigned names, and will be given definitions in the residual program. If any expression (up to alpha renaming) already has a name in the residual program, then the same name is used. Each of these named inner expressions are then supercompiled as before.
 
 \begin{comment}
 \begin{fig}
@@ -249,9 +288,11 @@ There are two primary inefficiencies in this example: (1) the |map| function pas
 The supercompilation proceeds by first assigning a new unique name (we choose |h0|) to |map (\b -> b + 1) as|, providing parameters for each of the free variables in the expression, namely |as|. We then choose to expand |map|, and invoke the simplification rules:
 
 \begin{code}
-h0 as = map (\b -> b + 1) as = case  as of
-                                     []    -> []
-                                     d:ds  -> d+1 : map (\b -> b + 1) ds
+h0 as  = map (\b -> b + 1) as
+
+       = case  as of
+               []    -> []
+               d:ds  -> d+1 : map (\b -> b + 1) ds
 \end{code}
 
 We now have a |case| with a variable as the scrutinee at the root of the expression, which cannot be reduced further, so we residuate the outer spine. When processing the expression |map (\b -> b + 1) ds| we spot this to be an alpha renaming of the body of an existing generated function, namely |h0|, and use this function:
@@ -318,7 +359,7 @@ in const 0 x : map f x
 
 In the first example, inlining |($)| in the let binding gives |(\x -> 1 == x)|, which is now simple enough to substitute for |x|, resulting in |(1 == 1 : map (\x -> 1 == x) ys)| after simplification. Now |map| can be specialised appropriately. Alternatively, expanding the |map| repeatedly would keep increasing the size of expression until the termination criterion was met, aborting the supercompilation of this expression without achieving specialisation.
 
-Taking the second example, |repeat| can be inlined indefinately. However, by unfolding the |const| we produce |let x = repeat 1 in 0 : map f x|. Since |x| is only used once we may substitute it to produce |(0 : map (+1) (repeat 1))|, which may be deforested appropriately.
+Taking the second example, |repeat| can be inlined indefinitely. However, by unfolding the |const| we produce |let x = repeat 1 in 0 : map f x|. Since |x| is only used once we may substitute it to produce |(0 : map (+1) (repeat 1))|, which may be deforested appropriately.
 
 Unfortunately these two examples seem to suggest different strategies for unfolding -- unfold in the let binding or unfold in the let body. However, they do have a common theme -- unfold the function that cannot be unfolded infinitely often. We use the strategy of picking the left-most inner-most function that does \textit{not} cause the termination criterion to be invoked. If no such function exists, we simply revert to left-most inner-most.
 
@@ -328,19 +369,20 @@ The original Supero program used a size bound on the expression to determine whe
 
 We use the termination criterion suggested by S{\o}rensen and Gl{\"u}ck \cite{sorensen:supercompilation} -- homeomorphic embedding. An expression $x$ is an embedding of $y$, written $x \unlhd y$, if the relationship can be inferred by the rules:
 
-\[x \unlhd y = \text{dive}(x,y) \vee \text{couple}(x,y)\]
-\vspace{-10mm}
-
 \noindent\begin{tabular}{p{5cm}p{5cm}}
+\[\frac{\text{dive}(x,y)}{x \unlhd y}\] \vspace{-8mm}
+&
+\[\frac{\text{couple}(x,y)}{x \unlhd y}\] \vspace{-8mm}
+\\
 \[\frac{s \unlhd t_i \text{ for some } |i|}{\text{dive}(s, \sigma(t_1,\ldots,t_n))} \]
 &
-\[\frac{\sigma_1 \cong \sigma_2,
+\[\frac{\sigma_1 \sim \sigma_2,
         s_1 \unlhd t_1, \ldots , s_n \unlhd t_n}
        {\text{couple}(\sigma_1 (s_1,\ldots,s_n), \sigma_2 (t_1,\ldots,t_n))}
 \]
 \end{tabular}
 
-We use $\sigma$ to denote the spine of an expression, with $s_1,\ldots,s_n$ being its subexpressions. We test for equivalence of $\sigma_1$ and $\sigma_2$ using the $\cong$ relation, a weakened form of equality where all variables are considered equal. We terminate the supercompilation of an expression |y| if on the chain of reductions from |main| to |y| we have encountered an expression |x| such that $x \unlhd y$.
+We use $\sigma$ to denote the spine of an expression, with $s_1,\ldots,s_n$ being its subexpressions. We test for equivalence of $\sigma_1$ and $\sigma_2$ using the $\sim$ relation, a weakened form of equality where all variables are considered equal. We terminate the supercompilation of an expression |y| if on the chain of reductions from |main| to |y| we have encountered an expression |x| such that $x \unlhd y$.
 
 In addition to using the homeomorphic embedding, we also terminate if further unfolding cannot yield any improvement to the root of the expression. For example, if the root of an expression is a constructor application, no further unfolding will change the root constructor. When terminating for this reason, we always residuate the outer spine of the expression, without applying any generalisation.
 
@@ -369,7 +411,7 @@ Our generalisation is characterised by $x \bowtie y$, which produces an expressi
 \begin{code}
 {-" x \bowtie \sigma^*(y), \text{where dive}(x,\sigma^*(y)) \wedge \text{couple}(x,y) "-}
         let f = \vs -> x in {-" \sigma^* "-}(f vs)
-        {-" \text{where } "-}vs{-" = \text{fv}(y) \ \text{fv}(\sigma^*(y)) "-}
+        {-" \text{where } "-}vs{-" = \text{fv}(y) \backslash \text{fv}(\sigma^*(y)) "-}
 \end{code}
 
 \vspace{-2mm}
@@ -391,7 +433,7 @@ case  putStr (repeat '1') r of
       (r, _) -> (r, ())
 \end{code}
 
-This fragment of code prints an infinite stream of 1's. The pairs and |r|'s correspond to the implementation of GHC's IO Monad \cite{spj:awkward_squad}. After several unrollings, we obtain:
+This expression ($x$) prints an infinite stream of 1's. The pairs and |r|'s correspond to the implementation of GHC's IO Monad \cite{spj:awkward_squad}. After several unrollings, we obtain the expression ($x'$):
 
 \begin{code}
 case  putChar '1' r of
@@ -399,7 +441,7 @@ case  putChar '1' r of
                       (r, _) -> (r, ())
 \end{code}
 
-The homeomorhpic embedding detects the repeated occurrence of the |putStr| application, and the supercompilation of this expression is stopped. The most specific generalisation rule produces:
+The homeomorphic embedding $x \unlhd x'$ matches, detecting an occurrence of the |case putStr ...| expression, and the supercompilation of this expression is stopped. The most specific generalisation rule is applied as $\text{msg}(x,x')$ and produces:
 
 \begin{code}
 let  a = putChar
@@ -410,7 +452,7 @@ in case  a b r of
          (r, _) -> c r
 \end{code}
 
-The problem is that the rule works from the top of both expressions looking for a common root of both trees. However, if the first rule applied was diving, the roots may be unrelated. Using our $\bowtie$ generalisation:
+The problem is that the rule works from the top of both expressions looking for a common root of both trees. However, if the first rule applied was diving, the roots may be unrelated. Using our generalisation, $x \bowtie x'$:
 
 \begin{code}
 let x = \r -> case  putStr (repeat '1') r of
@@ -737,7 +779,7 @@ Supercompilation \cite{supercompilation,turchin:experiments} was introduced by T
 
 The issue of let expressions in supercompilation has not previously been a primary focus. If lets are mentioned, the usual strategy is to substitute all linear lets and residuate all others. Lets have been considered in a strict setting \cite{jonsson:supercompilation}, where they are used to preserve termination semantics, but in this work all strict lets are inlined without regard to loss of sharing. Movement of lets can have dramatic impact on performance: carefully designed let-shifting transformations give an average speedup of 15\% in GHC \cite{spj:letfloating}, suggesting let expressions are critical to the performance of real programs.
 
-\paragraph{Partial evaluation} There has been a lot of work on partial evaluation \cite{jones:partial_evaluation}, where a program is specialised with respect to some static data. The emphasis is on determining which variables can be entirely computed at compile time, and which must remain in the residual program. Partial evaluation is particularly appropriate for specialising an interpreter with an expression tree to generate a compiler automatically, often with an order of magnitude speedup, known as the First Futamura Projection \cite{futanama:projections}. The difference between our work and partial evaluation is that we fold back definitions, and perform no binding time analysis. Partial evaluation is not usually able to remove intermediate data structures. Our method is certainly less appropriate for specialising an interpreter, but in the absence of static data, is still able to show improvements. Partial evaluation has been applied to full-scale functional languages, such as Curry \cite{albert:partial_evaluation_curry}.
+\paragraph{Partial evaluation} There has been a lot of work on partial evaluation \cite{jones:partial_evaluation}, where a program is specialised with respect to some static data. The emphasis is on determining which variables can be entirely computed at compile time, and which must remain in the residual program. Partial evaluation is particularly appropriate for specialising an interpreter with an expression tree to generate a compiler automatically, often with an order of magnitude speedup, known as the First Futamura Projection \cite{futanama:projections}. Partial evaluation is not usually able to remove intermediate data structures. Our method is certainly less appropriate for specialising an interpreter, but in the absence of static data, is still able to show improvements. Partial evaluation has been applied to full-scale functional languages, such as Curry \cite{albert:partial_evaluation_curry}.
 
 \paragraph{Deforestation} The deforestation technique \cite{wadler:deforestation} removes intermediate lists in computations. This technique has been extended in many ways to encompass higher order deforestation \cite{marlow:higher_order_deforestation} and work on other data types \cite{coutts:string_fusion}. Probably the most practically motivated work on deforestation has come from those attempting to restrict deforestation, in particular shortcut deforestation \cite{gill:shortcut_deforestation}, and newer approaches such as stream fusion \cite{coutts:stream_fusion}. In this work certain named functions are automatically fused together. By rewriting library functions in terms of these special functions, fusion occurs.
 

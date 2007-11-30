@@ -142,12 +142,15 @@ pick (a,b) (c,d) = if c > a then (c,d) else (a,b)
 
 -- optimise an expression until you are told to stop
 optimise :: Context -> CoreExpr -> SS CoreExpr
-optimise context x = opt context (None,undefined) [return x]
+optimise context x = do
+    --sioLog $ show x
+    --sioLog ""
+    opt context (None,undefined) [return x]
 
 opt context (n,best) [] = do
-    --sioPutStrLn $ show best
-    --sioPutStrLn "RESIDUATE"
-    --sioPause
+    --sioLog $ show best
+    --sioLog "RESIDUATE"
+    --sioLog ""
     unpeel context best
 
 opt context best (x:xs) = do
@@ -163,9 +166,8 @@ opt context best (x:xs) = do
             case r of
                 Just x -> opt context (pick best (Term,x)) xs
                 Nothing -> do
-                    sioLog $ show x
-                    sioLog ""
-
+                    --sioLog $ show x
+                    --sioLog ""
                     opt (addContext context x) (None,x) (unfolds s x)
 
 

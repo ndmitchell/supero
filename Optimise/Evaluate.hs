@@ -147,16 +147,16 @@ optimise context x = do
     --sioLog ""
     opt 0 context (None,x) [return x]
 
--- faster termination
 opt :: Int -> Context -> (Score,CoreExpr) -> [SS CoreExpr] -> SS CoreExpr
-opt count context (None,x) _ | count > 100 = sioPutStr "!" >> opt count context (None,x) []
-opt count context (b,x) _ | b /= None && count > 20 = sioPutStrLn ":" >> opt count context (b,x) []
-
 opt count context (n,best) [] = do
     --sioLog $ show best
     --sioLog "RESIDUATE"
     --sioLog ""
     unpeel context best
+
+-- faster termination
+opt count context (None,x) _ | count > 100 = sioPutStr "!" >> opt count context (None,x) []
+opt count context (b,x) _ | b /= None && count > 20 = sioPutStr ":" >> opt count context (b,x) []
 
 opt count context best (x:xs) = do
     s <- get

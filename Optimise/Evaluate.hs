@@ -149,8 +149,8 @@ optimise context x = do
 
 -- faster termination
 opt :: Int -> Context -> (Score,CoreExpr) -> [SS CoreExpr] -> SS CoreExpr
-opt count context (None,x) _ | count > 1000 = sioPutStrLn "!" >> opt count context (None,x) []
-opt count context (b,x) _ | b /= None && count > 100 = sioPutStrLn ":" >> opt count context (b,x) []
+opt count context (None,x) _ | count > 100 = sioPutStr "!" >> opt count context (None,x) []
+opt count context (b,x) _ | b /= None && count > 20 = sioPutStrLn ":" >> opt count context (b,x) []
 
 opt count context (n,best) [] = do
     --sioLog $ show best

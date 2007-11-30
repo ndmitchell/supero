@@ -19,10 +19,10 @@ import Report
 folders = ["imaginary","spectral","real"]
 
 
-exclude = let (*) = (,) in
+exclude = [] {- let (*) = (,) in
     ["integrate" * "supero-none" -- runs out of memory
     ,"paraffins" * "supero-none" -- requires Array primitives
-    ]
+    ] -}
 
 
 type Benchmark = String

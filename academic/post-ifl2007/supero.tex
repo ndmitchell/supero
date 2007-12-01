@@ -44,7 +44,7 @@
 \maketitle              % typeset the title of the contribution
 
 \begin{abstract}
-Haskell is a functional language, with features such as higher order functions and lazy evaluation, which allow succinct programs. These high-level features present many challenges for optimising compilers. We report practical experiments using novel variants of \textit{supercompilation}, with special attention to let bindings and the generalisation technique. Results include runtime reductions of up to 55\% when our supercompiler is used in conjunction with GHC, with an average of 16\% reduction on one section of the nofib benchmark suite.
+Haskell is a functional language, with features such as higher order functions and lazy evaluation, which allow succinct programs. These high-level features present many challenges for optimising compilers. We report practical experiments using novel variants of \textit{supercompilation}, with special attention to let bindings and the generalisation technique. Results include runtime reductions of up to 55\% when our supercompiler is used in conjunction with GHC.
 \end{abstract}
 
 \section{Introduction}
@@ -87,7 +87,7 @@ int main()
 \item[Laziness and Thunks] The Haskell program proceeds in a lazy manner, first demanding one character from |getContents|, then processing it with each of the functions in the pipeline. At each stage, a lazy thunk for the remainder of each function is created.
 \end{description}
 
-Using the optimiser developed in this paper, named Supero, we can eliminate all these overheads. We obtain a program that performs \textit{faster} than the C version. The optimiser is based around the techniques of supercompilation \cite{supercompilation}, where as much of the program as possible is evaluated at compile time, leaving a faster residual program. A perfect residual program would only perform actions directly related to the input data.
+Using the optimiser developed in this paper, named Supero, we can eliminate all these overheads. We obtain a program that performs \textit{faster} than the C version. The optimiser is based around the techniques of supercompilation \cite{supercompilation}, where some of the program is evaluated at compile time, leaving an optimised residual program.
 
 Our goal is an automatic optimisation that makes high-level Haskell programs run as fast as low-level equivalents, eliminating the current need for hand-tuning and low-level techniques to obtain competitive performance. We require no annotations on any part of the program, including the library functions.
 
@@ -100,7 +100,7 @@ Our goal is an automatic optimisation that makes high-level Haskell programs run
 
 \subsection{Roadmap}
 
-We first introduce a Core language in \S\ref{sec:core}, on which all transformations are applied. Next we describe our optimisation method in \S\ref{sec:optimisation}. We then give a number of benchmarks, comparing both against C (compiled with GCC) in \S\ref{sec:c_results} and Haskell (compiled with GHC) in \S\ref{sec:haskell_results}. Finally, we review related work in \S\ref{sec:related} and conclude in \S\ref{sec:conclusion}.
+We first introduce a Core language in \S\ref{sec:core}, on which all transformations are applied. Next we describe our supercompilation method in \S\ref{sec:optimisation}. We then give a number of benchmarks, comparing both against C (compiled with GCC) in \S\ref{sec:c_results} and Haskell (compiled with GHC) in \S\ref{sec:haskell_results}. Finally, we review related work in \S\ref{sec:related} and conclude in \S\ref{sec:conclusion}.
 
 \section{Core Language}
 \label{sec:core}
@@ -125,36 +125,37 @@ Where |v| ranges over variables, |c| ranges over constructors, |f| ranges over f
 \label{fig:core}
 \end{fig}
 
-\begin{fig}
-\begin{code}
-split(v                                                      ) = (v, [])
-split(c                                                      ) = (c, [])
-split(f                                                      ) = (f, [])
-split(x ys_                                                  ) = (bullet {-"\text{ } \overline{\bullet} "-}, x:ys_)
-split(\vs_ -> x                                              ) = (\vs_ -> bullet, x)
-split(let v = x in y                                         ) = (let v = bullet in bullet, [x,y])
-split(case x of {p_1 \! -> \! y_1 ; ... ; p_n \! -> \! y_n}  ) = (case {-"\hspace{-1mm}"-} bullet {-"\hspace{-1mm}"-} of {p_1 \! -> \! bullet ; ... ; p_n \! -> \! bullet}, [x, y_1, ... ,y_n])
-\end{code}
-\vspace{-2mm}
-\figend
-\caption{The |split| function, returning a spine and all subexpressions.}
-\label{fig:split}
-\end{fig}
+Our supercompiler uses the Yhc-Core language \cite{me:yhc_core}. The expression type is given in Figure \ref{fig:core}. A program is a mapping of function names to expressions. Our Core language is higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. All names are fully qualified. Haskell's type classes have been removed using the dictionary transformation \cite{wadler:type_classes}.
 
-Our supercompiler uses the Yhc-Core language \cite{me:yhc_core}. The expression type is given in Figure \ref{fig:core}. A program is a mapping of function names to expressions. Our Core language is higher order and lazy, but lacks much of the syntactic sugar found in Haskell. Pattern matching occurs only in case expressions, and all case expressions are exhaustive. All names are fully qualified. Haskell's type classes have been removed by the dictionary transformation \cite{wadler:type_classes}.
-
-The Yhc compiler, a fork of nhc \cite{nhc}, can output Core files. Yhc can also link in all definitions from all required libraries, producing a single Core file representing the whole program.
+The Yhc compiler, a fork of nhc \cite{nhc}, can output Core files. Yhc can also link in all definitions from all required libraries, producing a single Core file representing a whole program.
 
 The primary difference between Yhc-Core and GHC-Core \cite{ghc_core} is that Yhc-Core is untyped. The Core is generated from well-typed Haskell, and is guaranteed not to fail with a type error. All the transformations could be implemented equally well in a typed Core language, but we prefer to work in an untyped language for simplicity of implementation.
 
 In order to avoid accidental variable name clashes while performing transformations, we demand that all variables within a program are unique. All transformations may assume this invariant, and must maintain it.
 
-We define the |split| function in Figure \ref{fig:split}, which splits an expression into a spine and its immediate subexpressions. The $\bullet$ markers in the spine indicate the positions where subexpressions have been removed from. We define the |join| operation to take a spine and a list of expressions and create a new expression by inserting the expressions into the spine.
+\begin{fig}
+\vspace{2mm}
+\begin{tabular}{rcl}
+|split(v)| & |=| & |(v, [])| \\
+|split(c)| & |=| & |(c, [])| \\
+|split(f)| & |=| & |(f, [])| \\
+|split(x ys_)| & |=| & |(bullet {-"\text{ } \overline{\bullet} "-}, x:ys_)| \\
+|split(\vs_ -> x)| & |=| & |(\vs_ -> bullet, x)| \\
+|split(let v = x in y)| & |=| & |(let v = bullet in bullet, [x,y])| \\
+|split(case x of {p_1 \! -> \! y_1 ; ... ; p_n \! -> \! y_n})| & |=| & |(case {-"\hspace{-1mm}"-} bullet {-"\hspace{-1mm}"-} of {p_1 \! -> \! bullet ; ... ; p_n \! -> \! bullet}, [x, y_1, ... ,y_n])|
+\end{tabular}
+\vspace{2mm}
+\figend
+\caption{The |split| function, returning a spine and all subexpressions.}
+\label{fig:split}
+\end{fig}
+
+We define the |split| function in Figure \ref{fig:split}, which splits an expression into a pair of its spine and its immediate subexpressions. The $\bullet$ markers in the spine indicate the positions from which subexpressions have been removed. We define the |join| operation to be the inverse of |split|, taking a spine and a list of expressions, and producing an expression.
 
 \section{Supercompilation}
 \label{sec:optimisation}
 
-Our supercompiler takes a Core program as input, and produces a new equivalent Core program as output. To improve the program we do not make small local changes to the original, but instead \textit{evaluate it} so far as possible at compile time, leaving a \textit{residual program} to be run.
+Our supercompiler takes a Core program as input, and produces an equivalent Core program as output. To improve the program we do not make small local changes to the original, but instead \textit{evaluate it} so far as possible at compile time, leaving a \textit{residual program} to be run.
 
 \begin{fig}
 \begin{code}
@@ -166,29 +167,30 @@ supercompile()
 
 \vspace{-6mm}
 
-\begin{tabular}{p{7cm}p{5cm}}
+\begin{tabular}{p{6.9cm}p{5cm}}
 \begin{code}
 tie(rho, x)
     if x `notElem` seen then
         seen := seen `union` {x}
-        bind := bind `union` {psi\!!(x) fv\!!(x) = drive\!!(x)}
+        bind := bind `union` {psi\!!(x) = \ fv\!!(x) -> drive\!!(rho,x)}
     {-" \textsf{\textbf{endif}} "-}
-    {-" \textsf{\textbf{return}} "-} (psi\!!(x) fv\!!(x))
+    {-" \textsf{\textbf{return }} "-} (psi\!!(x) fv\!!(x))
 \end{code}
 &
 \begin{code}
 drive(rho, x)
-    if terminate(rho, x) then
-        (a,b) = split(generalise(x))
-        join(a, map (tie rho) b)
+    if terminate\!!(rho, x) then
+        (a,b) = split\!!(generalise\!!(x))
+        {-" \textsf{\textbf{return }} "-} join\!!(a, map (tie rho) b)
     else
-        drive(rho `union` {x}, unfold(x))
+        {-" \textsf{\textbf{return }} "-} drive\!!(rho `union` {x}, unfold(x))
 \end{code}
 \end{tabular}
 
 \vspace{-3mm}
 
-Where |psi| is a bijection between expressions and function names and |fv(x)| returns the free variables in |x|. This code is parameterised by: |terminate| which decided whether to stop supercompilation of this expression; |generalise| which generalises an expression before residuation; |unfold| which chooses a function application and unfolds it.
+Where |psi| is a mapping from expressions to function names, and |fv\!!(x)| returns the free variables in |x|. This code is parameterised by: |terminate| which decided whether to stop supercompilation of this expression; |generalise| which generalises an expression before residuation; |unfold| which chooses a function application and unfolds it.
+\vspace{3mm}
 \figend
 \caption{The |supercompile| function.}
 \label{fig:supercompile}
@@ -261,7 +263,7 @@ let v = c x_1 ... x_n in y
 \label{fig:simplify}
 \end{fig}
 
-The supercompilation of an expression proceeds by repeatedly inlining a function application until some termination criteria is met. Once the termination criterion holds, the expression is generalised before the outer spine becomes part of the residual program and all subexpressions are assigned names. After each inlining step, the expression is simplified using the rules in Figure \ref{fig:simplify}. There are three key decisions in the supercompilation of an expression:
+The supercompilation of an expression proceeds by repeatedly inlining a function application until some termination criterion is met. Once the termination criterion holds, the expression is generalised before the outer spine becomes part of the residual program and all subexpressions are assigned names. After each inlining step, the expression is simplified using the rules in Figure \ref{fig:simplify}. There are three key decisions in the supercompilation of an expression:
 
 \begin{enumerate}
 \item Which function to inline.
@@ -295,7 +297,7 @@ h0 as  = map (\b -> b + 1) as
                d:ds  -> d+1 : map (\b -> b + 1) ds
 \end{code}
 
-We now have a |case| with a variable as the scrutinee at the root of the expression, which cannot be reduced further, so we residuate the outer spine. When processing the expression |map (\b -> b + 1) ds| we spot this to be an alpha renaming of the body of an existing generated function, namely |h0|, and use this function:
+We now have a |case| with a variable as the scrutinee at the root of the expression, which cannot be reduced further, so we residuate the spine. When processing the expression |map (\b -> b + 1) ds| we spot this to be an alpha renaming of the body of an existing generated function, namely |h0|, and use this function:
 
 \begin{code}
 h0 as = case  as of
@@ -359,13 +361,26 @@ in const 0 x : map f x
 
 In the first example, inlining |($)| in the let binding gives |(\x -> 1 == x)|, which is now simple enough to substitute for |x|, resulting in |(1 == 1 : map (\x -> 1 == x) ys)| after simplification. Now |map| can be specialised appropriately. Alternatively, expanding the |map| repeatedly would keep increasing the size of expression until the termination criterion was met, aborting the supercompilation of this expression without achieving specialisation.
 
-Taking the second example, |repeat| can be inlined indefinitely. However, by unfolding the |const| we produce |let x = repeat 1 in 0 : map f x|. Since |x| is only used once we may substitute it to produce |(0 : map (+1) (repeat 1))|, which may be deforested appropriately.
+Taking the second example, |repeat| can be inlined indefinitely. However, by unfolding the |const| we produce |let x = repeat 1 in 0 : map f x|. Since |x| is only used once we substitute it to produce |(0 : map f (repeat 1))|, which can be deforested.
 
-Unfortunately these two examples seem to suggest different strategies for unfolding -- unfold in the let binding or unfold in the let body. However, they do have a common theme -- unfold the function that cannot be unfolded infinitely often. We use the strategy of picking the left-most inner-most function that does \textit{not} cause the termination criterion to be invoked. If no such function exists, we simply revert to left-most inner-most.
+Unfortunately these two examples seem to suggest different strategies for unfolding -- unfold in the let binding or unfold in the let body. However, they do have a common theme -- unfold the function that cannot be unfolded infinitely often. Our strategy can be defined by the |unfold| function:
+
+\begin{code}
+unfold x = head (filter (not . terminate) xs ++ xs ++ [x])
+    where xs = unfolds x
+
+unfolds f | f {-" \text{ is a function} "-} = [inline f]
+unfolds x =  [join spine (sub |+ (i, y))
+             |let (spine, sub) = split x
+             ,i <- [0..length sub], y <- unfolds (sub !! i) ]
+    where xs |+ (i,x) = zipWith (\j y -> if i == j then x else y) [0..] xs
+\end{code}
+
+The |unfolds| function computes all possible one-step inlinings, using an in-order traversal of the abstract syntax tree. The |unfold| function chooses the first unfolding which does not cause the supercompilation to terminate. If no such expression exists, the first unfolding is chosen.
 
 \subsection{The Termination Criterion}
 
-The original Supero program used a size bound on the expression to determine when to stop. The problem with a size bound is that different programs require different bounds to ensure both timely completion at compile-time and efficient residual programs. Indeed, within a single program, there may be different elements requiring different size bounds, a problem exacerbated as the size and complexity of a program increases.
+The original Supero program used a size bound on the expression to determine when to stop. The problem with a size bound is that different programs require different bounds to ensure both timely completion at compile-time and efficient residual programs. Indeed, within a single program, there may be different elements requiring different size bounds -- a problem exacerbated as the size and complexity of a program increases.
 
 We use the termination criterion suggested by S{\o}rensen and Gl{\"u}ck \cite{sorensen:supercompilation} -- homeomorphic embedding. An expression $x$ is an embedding of $y$, written $x \unlhd y$, if the relationship can be inferred by the rules:
 
@@ -389,8 +404,8 @@ In addition to using the homeomorphic embedding, we also terminate if further un
 \subsection{Generalisation}
 
 When the termination criterion has been met, it is necessary to discard information about the current expression, so that the supercompilation terminates. We always residuate the outer spine of the expression, but first we attempt to generalise the expression so that the information lost is minimal. The paper by S{\o}rensen and Gl{\"u}ck provides a method for generalisation, which works by taking the most specific generationalisation of the current expression and expression which is a homeomorphic embedding of it.
- 
-The most specific generalisation of two expressions $s$ and $t$, $\text{msg}(s,t)$, is produced by applying the following rewrite rule to triple $(x,\{x=s\},\{x=t\})$, resulting in a common expression and two sets of bindings.
+
+The most specific generalisation of two expressions $s$ and $t$, $\text{msg}(s,t)$, is produced by applying the following rewrite rule to the initial triple $(x,\{x=s\},\{x=t\})$, resulting in a common expression and two sets of bindings.
 
 \[
 \left( \begin{array}{lcl}
@@ -408,23 +423,23 @@ The most specific generalisation of two expressions $s$ and $t$, $\text{msg}(s,t
 
 Our generalisation is characterised by $x \bowtie y$, which produces an expression equivalent to $y$, but similar in structure to $x$.
 
+\vspace{-3mm}
+\noindent\begin{tabular}{p{7cm}p{5cm}}
 \begin{code}
-{-" x \bowtie \sigma^*(y), \text{where dive}(x,\sigma^*(y)) \wedge \text{couple}(x,y) "-}
-        let f = \vs -> x in {-" \sigma^* "-}(f vs)
-        {-" \text{where } "-}vs{-" = \text{fv}(y) \backslash \text{fv}(\sigma^*(y)) "-}
+{-" x \bowtie \sigma^*(y), \text{if dive}(x,\sigma^*(y)) \wedge \text{couple}(x,y) "-}
+        let f = \vs_ -> x in {-" \sigma^* "-}(f vs)
+        {-" \text{where } "-}vs_{-" = \text{fv}(y) \backslash \text{fv}(\sigma^*(y)) "-}
 \end{code}
-
-\vspace{-2mm}
-
+&
 \begin{code}
-{-" x \bowtie y, \text{where couple}(x,y) "-}
+{-" x \bowtie y, \text{if couple}(x,y) "-}
         let {-" \theta_2 "-} in {-" t_g "-}
         {-" \text{where }(t_g,\theta_1,\theta_2) = \text{msg}(x,y) "-}
 \end{code}
+\end{tabular}
+\vspace{-3mm}
 
-The first rule applies if the homeomorphic embedding first applied the dive rule. The idea is to descend to the element which matched, and then promote this to the top-level using a lambda. The fv function in the first rule calculates the free variables in an expression, and $\sigma^*(y)$ denotes a subexpression $y$ within a containing context $\sigma^*$. The second rule applies the most specific generalisation operation if the coupling rule was applied first.
-
-We first show an example where most specific generalisation fails to produce the ideal generalised version. We then show our new method based on the driving/coupling distinction already present in the homeomorphic embedding.
+The fv function in the first rule calculates the free variables of an expression, and $\sigma^*(y)$ denotes a subexpression $y$ within a containing context $\sigma^*$. The first rule applies if the homeomorphic embedding first applied the dive rule. The idea is to descend to the element which matched, and then promote this to the top-level using a lambda. The second rule applies the most specific generalisation operation if the coupling rule was applied first. We now show an example where most specific generalisation fails to produce the ideal generalised version.
 
 \subsubsection{Example 3}\hfill
 
@@ -433,7 +448,7 @@ case  putStr (repeat '1') r of
       (r, _) -> (r, ())
 \end{code}
 
-This expression ($x$) prints an infinite stream of 1's. The pairs and |r|'s correspond to the implementation of GHC's IO Monad \cite{spj:awkward_squad}. After several unrollings, we obtain the expression ($x'$):
+This expression (which we name $x$) prints an infinite stream of 1's. The pairs and |r|'s correspond to the implementation of GHC's IO Monad \cite{spj:awkward_squad}. After several unrollings, we obtain the expression (named $x'$):
 
 \begin{code}
 case  putChar '1' r of
@@ -441,7 +456,7 @@ case  putChar '1' r of
                       (r, _) -> (r, ())
 \end{code}
 
-The homeomorphic embedding $x \unlhd x'$ matches, detecting an occurrence of the |case putStr ...| expression, and the supercompilation of this expression is stopped. The most specific generalisation rule is applied as $\text{msg}(x,x')$ and produces:
+The homeomorphic embedding $x \unlhd x'$ matches, detecting an occurrence of the |case putStr \? ...| expression, and the supercompilation of $x'$ is stopped. The most specific generalisation rule is applied as $\text{msg}(x,x')$ and produces:
 
 \begin{code}
 let  a = putChar
@@ -452,7 +467,7 @@ in case  a b r of
          (r, _) -> c r
 \end{code}
 
-The problem is that the rule works from the top of both expressions looking for a common root of both trees. However, if the first rule applied was diving, the roots may be unrelated. Using our generalisation, $x \bowtie x'$:
+The problem is that msg works from the top, looking for a common root of both expression trees. However, if the first rule applied by $\unlhd$ was dive, the roots may be unrelated. Using our generalisation, $x \bowtie x'$:
 
 \begin{code}
 let x = \r -> case  putStr (repeat '1') r of
@@ -461,7 +476,7 @@ in case  putChar '1' r of
          (r, _) -> x r
 \end{code}
 
-Our generalisation is superior because it has split out the |putStr| application \textit{without} lifting out the |putChar| application or the constant |'1'|. The |putChar| function can now be supercompiled further in the context of the case expression.\noexample
+Our generalisation is superior because it has split out the |putStr| application \textit{without} lifting the |putChar| application or the constant |'1'|. The |putChar| application can now be supercompiled further in the context of the case expression.\noexample
 
 
 
@@ -689,6 +704,8 @@ The second issue is that the standard definition of the |words| function (given 
 
 \subsection{Potential GHC Speedups}
 
+% NOTE: Shorten this section if space needed
+
 We have identified three factors limiting the performance of residual programs when compiled by GHC. These problems cannot be solved at the level of Core transformations. We suspect that by fixing these problems, the Supero execution time would improve by between 5\% and 15\%.
 
 \paragraph{Strictness inference}
@@ -701,20 +718,22 @@ The GHC compiler follows the standard STG machine \cite{spj:implementation} desi
 
 \paragraph{Stack checks}
 
-The final source of extra computation relative to the C version are stack checks. Before using the stack to store arguments to a function call, a test is performed to check that there is sufficient space on the stack. Unlike the heap checks, it is necessary to analyse a large part of the flow of control to determine when these checks are unnecessary. So it is not clear how to reduce stack checks in GHC.
+The final source of extra computation relative to the C version are stack checks. Before using the stack to store arguments to a function call, a test is performed to check that there is sufficient space on the stack. Unlike the heap checks, it is necessary to analyse a large part of the flow of control to determine when these checks are unnecessary. It is not clear how to reduce stack checks in GHC.
 
+\begin{comment}
 \subsection{Why Supero Outperforms C for the Wordcount Benchmark}
 
 The most curious result is that Supero outperforms C on wordcounting, by about 6\% -- even with the problems discussed! The C program presented in Figure \ref{fig:c_words} is not optimal. The variable \verb"last_space" is a boolean, indicating whether the previous character was a space, or not. Each time round the loop a test is performed on \verb"last_space", even though its value was determined and tested on the previous iteration. The way to optimise this code is to have two specialised variants of the loop, one for when \verb"last_space" is true, and one for when it is false. When the value of \verb"last_space" changes, the program would transition to the other loop. This pattern effectively encodes the boolean variable in the program counter, and is what the Haskell program has managed to generate from the high-level code.
 
 However, in C it is quite challenging to capture the required control flow. The program needs two loops, where both loops can transition to the other. Using \texttt{goto} turns off many critical optimisations in the C compiler. Tail recursion is neither required by the C standard, nor supported by most compilers. The only way to express the necessary pattern is using nested while loops, but unlike newer imperative languages such as Java, C does not have named loops -- so the inner loop cannot break from the outer loop if it reaches the end of the file. The only solution is to place the nested while loops in a function, and use \texttt{return} to break from the inner loop. This solution would not scale to a three-valued control structure, and substantially increases the complexity of the code.
+\end{comment}
 
 \section{Performance Compared With GHC Alone}
 \label{sec:haskell_results}
 
-The standard set of Haskell benchmarks is the nofib suite \cite{nofib}. It is divided into three categories of increasing size: imaginary, spectral and real. Many small Haskell programs increase in size substantially once the libraries are included, particularly when type classes are involved. Because of the relatively large source code size of even small examples, we have limited our focus to the benchmarks in the imaginary section. All benchmarks were run with parameters that require runtimes of between 3 and 5 seconds for GHC.
+The standard set of Haskell benchmarks is the nofib suite \cite{nofib}. It is divided into three categories of increasing size: imaginary, spectral and real. Even small Haskell programs increase in size substantially once libraries are included, so we have limited our attention to the benchmarks in the imaginary section. All benchmarks were run with parameters that require runtimes of between 3 and 5 seconds for GHC.
 
-We exclude two benchmarks, paraffins and gen\_regexps. The paraffins benchmark makes substantial use of arrays, and we have not yet mapped the array primitives of Yhc onto those of GHC, which would be required to run the transformed result. The gen\_regexps benchmark tests character processing, and can be optimised by Supero. Unfortunately, the resultant executables consume increasingly large amounts of memory and fail to produce an answer -- we have yet to determine why.
+We exclude two benchmarks, paraffins and gen\_regexps. The paraffins benchmark makes substantial use of arrays, and we have not yet mapped the array primitives of Yhc onto those of GHC, which is necessary to run the transformed result. The gen\_regexps benchmark tests character processing: for some reason (as yet unknown) the supercompiled executable fails.
 
 \begin{fig}
 \vspace{4mm}
@@ -749,24 +768,24 @@ x2n1 			& 0.58 & 0.64 & 1.61 & 3.04 \\
 \end{tabular}
 \vspace{2mm}
 
-\textbf{Program} is the name of the program; \textbf{Supero} is using the $\bowtie$ generalisation method; \textbf{msg} uses the msg function for generalisation; \textbf{spine} applies no generalisation operation; \textbf{none} never performs any inlining.
+\textbf{Program} is the name of the program; \textbf{Supero} uses the $\bowtie$ generalisation method; \textbf{msg} uses the msg function for generalisation; \textbf{spine} applies no generalisation operation; \textbf{none} never performs any inlining.
 
 \vspace{4mm}
 \hrule
 \vspace{2mm}
-\caption{Result on the Imaginary section of the nofib suite.}
+\caption{Runtime, relative to GHC being 1.}
 \label{tab:haskell_results}
 \end{table}
 
-The results of these benchmarks are given in Figure \ref{fig:haskell_results}, along with detailed breakdowns in Table \ref{tab:haskell_results}. All results are relative to the runtime of a GHC program compiled with -O2, lower numbers being better. The first three variants (Supero, msg, spine) all use homeomorphic embedding as the termination criterion, and $\bowtie$, msg or nothing respectively as the generalisation function. The final variant, none, is set with a termination test that always causes a residuation. The none variant is useful as a control to determine which improvements are due to bringing all definitions into one module scope, and which are as a result of supercompilation. Compilation times ranged from a few seconds to five minutes.
+The results of these benchmarks are given in Figure \ref{fig:haskell_results}, along with detailed breakdowns in Table \ref{tab:haskell_results}. All results are relative to the runtime of a program compiled with GHC -O2, lower numbers being better. The first three variants (Supero, msg, spine) all use homeomorphic embedding as the termination criterion, and $\bowtie$, msg or nothing respectively as the generalisation function. The final variant, none, uses a termination test that always causes a residuation. The `none' variant is useful as a control to determine which improvements are due to bringing all definitions into one module scope, and which are a result of supercompilation. Compilation times ranged from a few seconds to five minutes.
 
-The Bernouilli benchmark is the only one where Supero is slower than GHC by more than 3\%. The reason for this anomaly is that a dictionary is referred to in an inner loop which has not been specialised away by Supero, but has by GHC. The remaining benchmarks show four where Supero has little impact, and seven where a reduction in runtime of more than 10\% is obtained.
+The Bernouilli benchmark is the only one where Supero is slower than GHC by more than 3\%. The reason for this anomaly is that a dictionary is referred to in an inner loop which is specialised away by GHC, but not by Supero.
 
-With the exception of the wheel-sieve2 benchmark, the $\bowtie$ generalisation strategy proposed in this paper always performs as well or better than the alternatives. While the msg generalisation performs better than the empty generalisation on average, the difference is not as dramatic.
+With the exception of the wheel-sieve2 benchmark, our $\bowtie$ generalisation strategy performs as well as, or better than, the alternatives. While the msg generalisation performs better than the empty generalisation on average, the difference is not as dramatic.
 
 \subsection{GHC's optimisations}
 
-For these benchmarks it is important to clarify which optimisations are performed by GHC, and which are performed by Supero. The none set of results show that taking the Core output from Yhc and compiling with GHC does \textit{not} perform as well as the original program compiled using GHC. GHC has two special optimisations that work in a restricted number of cases, but which Supero produced Core is unable to take advantage of.
+For these benchmarks it is important to clarify which optimisations are performed by GHC, and which are performed by Supero. The `none' results show that, on average, taking the Core output from Yhc and compiling with GHC does \textit{not} perform as well as the original program compiled using GHC. GHC has two special optimisations that work in a restricted number of cases, but which Supero produced Core is unable to take advantage of.
 
 \paragraph{Dictionary Removal} Functions which make use of type classes are given an additional dictionary argument. In practice, GHC specialises many such functions by creating code with a particular dictionary frozen in. This optimisation is specific to type classes -- a tuple of higher order functions is not similarly specialised. After compilation with Yhc, the type classes have already been converted to tuples, so Supero must be able to remove the dictionaries itself. One benchmark where dictionary removal is critical is digits-of-e2.
 
@@ -784,13 +803,16 @@ The existence of a termination bound requiring different values for different pr
 \section{Related Work}
 \label{sec:related}
 
-Supercompilation \cite{supercompilation,turchin:experiments} was introduced by Turchin for the Refal language \cite{refal}. Since this original work, there have been various suggestions of both termination strategies and generalisation strategies \cite{turchin:generalisation}. The termination strategy we use is taken from \cite{sorensen:supercompilation} and is based on homeomorphic embedding \cite{leuschel:homeomorphic}. The original supercompiler maintained both positive and negative knowledge, but our implementation is a simplified version maintaining only positive information \cite{secher:perfect_supercompilation}.
+Supercompilation \cite{supercompilation,turchin:experiments} was introduced by Turchin for the Refal language \cite{refal}. Since this original work, there have been various suggestions of both termination strategies and generalisation strategies \cite{turchin:generalisation,sorensen:supercompilation,leuschel:homeomorphic}. The original supercompiler maintained both positive and negative knowledge, but our implementation is a simplified version maintaining only positive information \cite{secher:perfect_supercompilation}.
 
-The issue of let expressions in supercompilation has not previously been a primary focus. If lets are mentioned, the usual strategy is to substitute all linear lets and residuate all others. Lets have been considered in a strict setting \cite{jonsson:supercompilation}, where they are used to preserve termination semantics, but in this work all strict lets are inlined without regard to loss of sharing. Movement of lets can have dramatic impact on performance: carefully designed let-shifting transformations give an average speedup of 15\% in GHC \cite{spj:letfloating}, suggesting let expressions are critical to the performance of real programs.
+The issue of let expressions in supercompilation has not previously been a primary focus. If lets are mentioned, the usual strategy is to substitute all linear lets and residuate all others. Lets have been considered in a strict setting \cite{jonsson:supercompilation}, where they are used to preserve termination semantics, but in this work all strict lets are inlined without regard to loss of sharing. Movement of lets can have a dramatic impact on performance: carefully designed let-shifting transformations give an average speedup of 15\% in GHC \cite{spj:letfloating}, suggesting let expressions are critical to the performance of real programs.
 
-\paragraph{Partial evaluation} There has been a lot of work on partial evaluation \cite{jones:partial_evaluation}, where a program is specialised with respect to some static data. The emphasis is on determining which variables can be entirely computed at compile time, and which must remain in the residual program. Partial evaluation is particularly appropriate for specialising an interpreter with an expression tree to generate a compiler automatically, often with an order of magnitude speedup, known as the First Futamura Projection \cite{futanama:projections}. Partial evaluation is not usually able to remove intermediate data structures. Our method is certainly less appropriate for specialising an interpreter, but in the absence of static data, is still able to show improvements. Partial evaluation has been applied to full-scale functional languages, such as Curry \cite{albert:partial_evaluation_curry}.
+\paragraph{Partial evaluation} There has been a lot of work on partial evaluation \cite{jones:partial_evaluation}, where a program is specialised with respect to some static data. The emphasis is on determining which variables can be entirely computed at compile time, and which must remain in the residual program. Partial evaluation is particularly appropriate for specialising an interpreter with an expression tree to generate a compiler automatically, often with an order of magnitude speedup, known as the First Futamura Projection \cite{futanama:projections}. Partial evaluation is not usually able to remove intermediate data structures. Our method is certainly less appropriate for specialising an interpreter, but in the absence of static data, is still able to show improvements.
 
-\paragraph{Deforestation} The deforestation technique \cite{wadler:deforestation} removes intermediate lists in computations. This technique has been extended in many ways to encompass higher order deforestation \cite{marlow:higher_order_deforestation} and work on other data types \cite{coutts:string_fusion}. Probably the most practically motivated work on deforestation has come from those attempting to restrict deforestation, in particular shortcut deforestation \cite{gill:shortcut_deforestation}, and newer approaches such as stream fusion \cite{coutts:stream_fusion}. In this work certain named functions are automatically fused together. By rewriting library functions in terms of these special functions, fusion occurs.
+% Partial evaluation has been applied to full-scale functional languages, such as Curry
+% \cite{albert:partial_evaluation_curry}.
+
+\paragraph{Deforestation} The deforestation technique \cite{wadler:deforestation} removes intermediate lists in computations. This technique has been extended in many ways to encompass higher order deforestation \cite{marlow:higher_order_deforestation} and work on other data types \cite{coutts:string_fusion}. Probably the most practically motivated work has come from those attempting to restrict deforestation, in particular shortcut deforestation \cite{gill:shortcut_deforestation}, and newer approaches such as stream fusion \cite{coutts:stream_fusion}. In this work certain named functions are automatically fused together. By rewriting library functions in terms of these special functions, fusion occurs.
 
 \paragraph{Whole Program Compilation} The GRIN approach \cite{grin} uses whole program compilation for Haskell. It is currently being implemented in the jhc compiler \cite{jhc}, with promising initial results. GRIN works by first translating Haskell into a monadic intermediate language, then repeatedly performing a series of optimisations, upon the whole program at once. The intermediate language is at a much lower level than our Core language, so jhc is able to perform detailed optimisations that we are unable to express.
 
@@ -805,14 +827,14 @@ One optimisation we do not currently support is the use of user provided transfo
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
-We have introduced an optimising front-end which can enhance the results of back-end compilation using GHC -- at least for a small range of benchmarks. Our optimiser is simple -- the Core transformation is expressed in just 300 lines of Haskell, yet it replicates many of the performance enhancements of GHC in a more general way. We have modified some of the techniques from supercompilation, particularly in respect to let bindings and generalisation. Our initial results are promising, but incomplete. We have obtained an average runtime improvement of 16\% over the imaginary section of the nofib suite, and to quote Simon Peyton Jones, ``an average runtime improvement of 10\%, against the baseline of an already well -optimised compiler, is an excellent result'' \cite{spj:specconstr}.
+Our supercompiler is simple -- the Core transformation is expressed in just 300 lines of Haskell. Yet it replicates many of the performance enhancements of GHC in a more general way. We have modified some of the techniques from supercompilation, particularly with respect to let bindings and generalisation. Our initial results are promising, but incomplete. Using our supercompiler in conjunction with GHC we obtain an average runtime improvement of 16\% for the imaginary section of the nofib suite. To quote Simon Peyton Jones, ``an average runtime improvement of 10\%, against the baseline of an already well-optimised compiler, is an excellent result'' \cite{spj:specconstr}.
 
-There are three main obstacles that need to be tackled:
+There are three main areas for future work:
 
 \begin{description}
-\item[Benchmarks] The fifteen benchmarks presented in this paper are not enough. We would like to obtain results for all the remaining benchmarks in the nofib suite.
-\item[Runtime Performance] The performance results presented in \S\ref{sec:haskell_results} could be improved. Earlier versions of Supero \cite{me:supero_ifl} managed to obtain substantial speed ups on benchmarks such as exp3\_8. The Bernouilli benchmark has failed to be optimised properly. We suspect that there is still a lot of scope for improvement.
-\item[Compilation Speed] The compilation times are tolerable for benchmarking and a final optimised release, but not for general usage. Basic profiling shows that over 90\% of the time is spent testing for a homeomorphic embedding, which is currently done in a na\"{i}ve manner -- dramatic speedups should be possible.
+\item[More Benchmarks] The fifteen benchmarks presented in this paper are not enough. We would like to obtain results for larger programs, including all the remaining benchmarks in the nofib suite.
+\item[Runtime Performance] Earlier versions of Supero \cite{me:supero_ifl} managed to obtain substantial speed ups on benchmarks such as exp3\_8. The Bernouilli benchmark is currently problematic. There is still scope for improvement.
+\item[Compilation Speed] The compilation times are tolerable for benchmarking and a final optimised release, but not for general use. Basic profiling shows that over 90\% of supercompilation time is spent testing for a homeomorphic embedding, which is currently done in a na\"{i}ve manner -- dramatic speedups should be possible.
 \end{description}
 
 The Programming Language Shootout\footnote{\url{http://shootout.alioth.debian.org/}} has shown that low-level Haskell can compete with with low-level imperative languages such as C. Our goal is that Haskell programs can be written in a high-level declarative style, yet still perform competitively.

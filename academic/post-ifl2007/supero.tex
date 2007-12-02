@@ -751,24 +751,24 @@ We exclude two benchmarks, paraffins and gen\_regexps. The paraffins benchmark m
 \hrule
 \vspace{3mm}
 
-\begin{tabular}{lrrrr}
-\textbf{Program} & \hspace{5mm}\textbf{Supero} & \hspace{5mm}\textbf{msg} & \hspace{5mm}\textbf{spine} & \hspace{5mm}\textbf{none} \\
-bernouilli 		& 1.41 & 1.53 & 1.58 & 1.18 \\
-digits-of-e1	& 1.03 & 1.16 & 1.03 & 1.06 \\
-digits-of-e2	& 0.72 & 0.72 & 0.72 & 1.86 \\
-exp3\_8			& 1.00 & 1.00 & 1.00 & 1.01 \\
-integrate 		& 0.46 & 0.47 & 0.46 & 4.01 \\
-primes 			& 0.57 & 0.57 & 0.88 & 0.96 \\
-queens 			& 0.79 & 0.96 & 0.83 & 1.21 \\
-rfib 			& 0.97 & 0.97 & 0.97 & 1.00 \\
-tak 			& 0.72 & 1.39 & 1.39 & 1.39 \\
-wheel-sieve1 	& 0.98 & 1.11 & 1.42 & 5.23 \\
-wheel-sieve2 	& 0.87 & 0.63 & 0.89 & 0.63 \\
-x2n1 			& 0.58 & 0.64 & 1.61 & 3.04 \\
+\begin{tabular}{lrrrrrr}
+\textbf{Program} & \hspace{5mm}\textbf{Supero} & \hspace{5mm}\textbf{msg} & \hspace{5mm}\textbf{spine} & \hspace{5mm}\textbf{none} & \hspace{5mm}\textbf{Size} & \hspace{5mm}\textbf{Memory} \\
+bernouilli 		& 1.41 & 1.53 & 1.58 & 1.18 & 1.10 & 0.97 \\
+digits-of-e1	& 1.03 & 1.16 & 1.03 & 1.06 & 1.01 & 1.11 \\
+digits-of-e2	& 0.72 & 0.72 & 0.72 & 1.86 & 1.00 & 0.84 \\
+exp3\_8			& 1.00 & 1.00 & 1.00 & 1.01 & 0.99 & 1.00 \\
+integrate 		& 0.46 & 0.47 & 0.46 & 4.01 & 1.02 & 0.08 \\
+primes 			& 0.57 & 0.57 & 0.88 & 0.96 & 1.00 & 0.98 \\
+queens 			& 0.79 & 0.96 & 0.83 & 1.21 & 1.01 & 0.85 \\
+rfib 			& 0.97 & 0.97 & 0.97 & 1.00 & 1.00 & 1.08 \\
+tak 			& 0.72 & 1.39 & 1.39 & 1.39 & 1.00 & 1.00 \\
+wheel-sieve1 	& 0.98 & 1.11 & 1.42 & 5.23 & 1.19 & 2.79 \\
+wheel-sieve2 	& 0.87 & 0.63 & 0.89 & 0.63 & 1.49 & 2.30 \\
+x2n1 			& 0.58 & 0.64 & 1.61 & 3.04 & 1.09 & 0.33 \\
 \end{tabular}
 \vspace{2mm}
 
-\textbf{Program} is the name of the program; \textbf{Supero} uses the $\bowtie$ generalisation method; \textbf{msg} uses the msg function for generalisation; \textbf{spine} applies no generalisation operation; \textbf{none} never performs any inlining.
+\textbf{Program} is the name of the program; \textbf{Supero} uses the $\bowtie$ generalisation method; \textbf{msg} uses the msg function for generalisation; \textbf{spine} applies no generalisation operation; \textbf{none} never performs any inlining; \textbf{Size} is the size of the Supero generated executable; \textbf{Memory} is the amount of memory allocated on the heap by the Supero executable.
 
 \vspace{4mm}
 \hrule

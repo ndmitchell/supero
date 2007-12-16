@@ -16,10 +16,14 @@ insert k v (Homeomorphic h1 h2) = Homeomorphic (H1.insert k v h1) (H2.insert k v
 
 
 -- additional Eq v constraint required to check the answers
-find :: (Eq v, Ord k) => Shell k -> Homeomorphic k v -> [v]
+-- additional Show constraints required to give a meainingful error message
+find :: (Ord k, Eq v, Show v, Show k) => Shell k -> Homeomorphic k v -> [v]
 find k (Homeomorphic h1 h2) =
         if r1 == r2 then r1 else
-           error "Data.Homeomorhpic.Check.find: mismatch"
+           error $ "Data.Homeomorhpic.Check.find: mismatch\n" ++
+                   "Given: " ++ show k ++ "\n" ++
+                   "H1: " ++ show r1 ++ "\n" ++
+                   "H2: " ++ show r2 ++ "\n"
     where
         r1 = H1.find k h1
         r2 = H2.find k h2

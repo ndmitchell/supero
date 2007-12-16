@@ -67,7 +67,7 @@ embedMsg Context{rho=rho, current=x} =
 
 general :: Context -> SS (Maybe CoreExpr)
 general Context{rho=rho, current=x} =
-    let bad = H.find (coreExprShellBlur x) rho in
+    let bad = maybeToList $ H.findOne (coreExprShellBlur x) rho in
     if null bad then return Nothing
     else if head bad `eqAlphaCoreExpr` x then
         ( {- if head bad `elem` currents then

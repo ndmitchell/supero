@@ -2,32 +2,51 @@
 module Data.Homeomorphic.Neil where
 
 import qualified Data.Map as Map
-import Data.Homeomorphic.Internal
+import qualified Data.IntMap as IntMap
 
-data Homeomorphic k v = Homeomorphic [v] (Map.Map (Int,k) (Homeomorphic k v))
+import Data.Homeomorphic.Internal
+import Data.List
+import Debug.Trace
+
+{-
+Problem: a <<| b may happen twice, since there may be
+two different dive/couple ways to end up with a.
+
+Solution: Store Int's, lookup each only once.
+-}
+
+data Homeomorphic k v = Homeomorphic (IntMap.IntMap v) (H k)
+
+data H k = H [Int] (Map.Map (Int,k) (H k))
 
 
 empty :: Homeomorphic k v
-empty = Homeomorphic [] Map.empty
+empty = Homeomorphic IntMap.empty emptyH
+
+emptyH = H [] Map.empty
 
 
 insert :: Ord k => Shell k -> v -> Homeomorphic k v -> Homeomorphic k v
-insert k v = add (flatten k)
+insert k v (Homeomorphic a b) = Homeomorphic (IntMap.insert i v a) (add (flatten k) b)
     where
+        i = IntMap.size a
         flatten (Shell a b c) = (b,a) : concatMap flatten c
 
-        add []     (Homeomorphic a b) = Homeomorphic (v:a) b
-        add (x:xs) (Homeomorphic a b) = Homeomorphic a b2
+        add []     (H a b) = H (i:a) b
+        add (x:xs) (H a b) = H a b2
             where
-                b2 = Map.insertWith comb x (add xs empty) b
+                b2 = Map.insertWith comb x (add xs emptyH) b
                 comb new old = add xs old
 
 
 find :: Ord k => Shell k -> Homeomorphic k v -> [v]
-find k = match [k]
+find k (Homeomorphic a b) = trace (show $ length count) $ map (a IntMap.!) res
     where
-        match []     (Homeomorphic ans _ ) = ans
-        match (k:ks) (Homeomorphic _   mp) = concatMap f (shell k)
+        count = match [k] b
+        res = reverse $ sort $ nub count
+
+        match []     (H ans _ ) = ans
+        match (k:ks) (H _   mp) = concatMap f (shell k)
             where f (a,b) = maybe [] (match $ b++ks) $ Map.lookup a mp
 
         shell (Shell a b c) = ((b,a), c) : concatMap shell c

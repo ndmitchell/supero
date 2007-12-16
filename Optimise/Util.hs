@@ -5,6 +5,7 @@ import Yhc.Core hiding (uniqueBoundVarsFunc)
 import Yhc.Core.FreeVar3
 import Control.Monad.State
 import Optimise.Embedding
+import Data.Homeomorphic as H
 
 
 unwrapLet (CoreLet x y) = (CoreLet x,y)
@@ -96,3 +97,10 @@ eqAlphaCoreExpr a b = f a == f b
     where
         f x = flip evalState (1::Int) $ uniqueBoundVarsFunc $
               CoreFunc "" (collectFreeVars x) x
+
+
+coreExprShell :: CoreExpr -> Shell CoreExpr1
+coreExprShell x = shell (coreExpr1 x) (map coreExprShell $ children x)
+
+coreExprShellBlur :: CoreExpr -> Shell CoreExpr1
+coreExprShellBlur = coreExprShell . blurVar . blurLit

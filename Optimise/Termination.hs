@@ -10,6 +10,7 @@ import Data.List
 import Data.Maybe
 import Safe
 import Optimise.Util
+import Data.Homeomorphic as H hiding ((<<|))
 
 
 termination :: [(String,Termination)]
@@ -29,7 +30,7 @@ always _ = return Nothing
 
 embedMsg :: Context -> SS (Maybe CoreExpr)
 embedMsg Context{rho=rho, current=x} =
-    let bad = filter (<<| x) rho in
+    let bad = H.find (coreExprShellBlur x) rho in
     if null bad then return Nothing
     else if head bad `eqAlphaCoreExpr` x then
         ( {- if head bad `elem` currents then
@@ -66,7 +67,7 @@ embedMsg Context{rho=rho, current=x} =
 
 general :: Context -> SS (Maybe CoreExpr)
 general Context{rho=rho, current=x} =
-    let bad = filter (<<| x) rho in
+    let bad = H.find (coreExprShellBlur x) rho in
     if null bad then return Nothing
     else if head bad `eqAlphaCoreExpr` x then
         ( {- if head bad `elem` currents then
@@ -101,7 +102,7 @@ general Context{rho=rho, current=x} =
 
 whistle :: Context -> SS (Maybe CoreExpr)
 whistle Context{rho=rho, current=x} = return $
-    if null $ filter (<<| x) rho
+    if null $ H.find (coreExprShellBlur x) rho
     then Nothing
     else Just x
 

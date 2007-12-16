@@ -6,6 +6,8 @@ import Control.Monad.State
 import System.IO
 import Yhc.Core.UniqueId
 import Yhc.Core
+import Data.Homeomorphic as H
+import Optimise.Util
 
 
 ---------------------------------------------------------------------
@@ -78,13 +80,13 @@ data Context = Context
         -- includes all expressions pre their unfoldings
         -- a strict superset of currents
         -- does not include current
-        ,rho  :: [CoreExpr]     -- a list of all expressions ever
+        ,rho  :: Homeomorphic CoreExpr1 CoreExpr     -- a list of all expressions ever
         }
 
-emptyContext = Context undefined []
+emptyContext = Context undefined H.empty
 
 addContext :: Context -> CoreExpr -> Context
-addContext context x = context{rho=x:rho context}
+addContext context x = context{rho=H.insert (coreExprShellBlur x) x (rho context)}
 
 -- clear the currents field
 resetContext = id

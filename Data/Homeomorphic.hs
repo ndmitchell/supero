@@ -5,5 +5,5 @@ module Data.Homeomorphic(
     Homeomorphic, empty, insert, find
     ) where
 
-import Data.Homeomorphic.Slow
+import Data.Homeomorphic.Simple
 import Data.Homeomorphic.Internal

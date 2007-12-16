@@ -4,7 +4,7 @@ module Data.Homeomorphic.Internal where
 
 
 data Shell a = Shell a Int [Shell a]
-               deriving (Eq, Ord)
+               deriving (Eq, Ord, Show)
 
 shell :: a -> [Shell a] -> Shell a
 shell a b = Shell a (length b) b

@@ -44,6 +44,13 @@ find k (Homeomorphic a b) = map (a IntMap.!) res
     where res = reverse $ sort $ nub $ findIds [k] b
 
 
+findOne :: Ord k => Shell k -> Homeomorphic k v -> Maybe v
+findOne k (Homeomorphic a b) =
+    case findIds [k] b of
+         [] -> Nothing
+         i:_ -> Just $ a IntMap.! i
+
+
 findIds :: Ord k => [Shell k] -> H k -> [Int]
 findIds []     (H ans _ ) = ans
 findIds (k:ks) (H _   mp) = concatMap f (shell k)

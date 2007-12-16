@@ -27,3 +27,6 @@ find k (Homeomorphic h1 h2) =
     where
         r1 = H1.find k h1
         r2 = H2.find k h2
+
+findOne :: (Ord k, Eq v, Show v, Show k) => Shell k -> Homeomorphic k v -> Maybe v
+findOne k h@(Homeomorphic h1 h2) = error "Data.Homeomorphic.Check.findOne: todo"

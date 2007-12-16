@@ -40,13 +40,14 @@ insert k v (Homeomorphic a b) = Homeomorphic (IntMap.insert i v a) (add (flatten
 
 
 find :: Ord k => Shell k -> Homeomorphic k v -> [v]
-find k (Homeomorphic a b) = trace (show $ length count) $ map (a IntMap.!) res
-    where
-        count = match [k] b
-        res = reverse $ sort $ nub count
+find k (Homeomorphic a b) = map (a IntMap.!) res
+    where res = reverse $ sort $ nub $ findIds [k] b
 
-        match []     (H ans _ ) = ans
-        match (k:ks) (H _   mp) = concatMap f (shell k)
-            where f (a,b) = maybe [] (match $ b++ks) $ Map.lookup a mp
+
+findIds :: Ord k => [Shell k] -> H k -> [Int]
+findIds []     (H ans _ ) = ans
+findIds (k:ks) (H _   mp) = concatMap f (shell k)
+    where
+        f (a,b) = maybe [] (findIds $ b++ks) $ Map.lookup a mp
 
         shell (Shell a b c) = ((b,a), c) : concatMap shell c

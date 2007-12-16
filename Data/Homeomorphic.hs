@@ -2,7 +2,7 @@
 module Data.Homeomorphic(
     Shell, shell,
     (<<|), couple, dive,
-    Homeomorphic, insert, find
+    Homeomorphic, empty, insert, find
     ) where
 
 import Data.Homeomorphic.Slow

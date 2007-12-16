@@ -6,6 +6,9 @@ import Data.Homeomorphic.Internal
 data Homeomorphic k v = Homeomorphic [(Shell k, v)]
 
 
+empty :: Homeomorphic k v
+empty = Homeomorphic []
+
 insert :: Ord k => Shell k -> v -> Homeomorphic k v -> Homeomorphic k v
 insert k v (Homeomorphic xs) = Homeomorphic ((k,v):xs)
 

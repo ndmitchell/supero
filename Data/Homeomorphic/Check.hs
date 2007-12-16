@@ -4,6 +4,7 @@ module Data.Homeomorphic.Check where
 import qualified Data.Homeomorphic.Simple as H1
 import qualified Data.Homeomorphic.Neil   as H2
 import Data.Homeomorphic.Internal
+import Data.Maybe
 
 data Homeomorphic k v = Homeomorphic (H1.Homeomorphic k v) (H2.Homeomorphic k v)
 
@@ -29,4 +30,10 @@ find k (Homeomorphic h1 h2) =
         r2 = H2.find k h2
 
 findOne :: (Ord k, Eq v, Show v, Show k) => Shell k -> Homeomorphic k v -> Maybe v
-findOne k h@(Homeomorphic h1 h2) = error "Data.Homeomorphic.Check.findOne: todo"
+findOne k h@(Homeomorphic h1 h2) =
+        if all isNothing ans then Nothing
+        else if all isJust ans && all ((`elem` res) . fromJust) ans then head ans
+        else error "Data.Homeomorphic.Check.findOne: mismatch"
+    where
+        ans = [H1.findOne k h1, H2.findOne k h2]
+        res = find k h

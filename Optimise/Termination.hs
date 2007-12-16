@@ -183,7 +183,7 @@ a <<|+ b = do (bind,x) <- f (collectFreeVars b) a b
     where
         f :: UniqueIdM m => [CoreVarName] -> CoreExpr -> CoreExpr -> m (Subst, CoreExpr)
 
-        f vars a b | blurVar a `eq1CoreExpr` blurVar b &&
+        f vars a b | blurVar a `eqCoreExpr1` blurVar b &&
                      length (children a) == length (children b) = do
             let (as, a_) = uniplate a
                 (bs, b_) = uniplate b
@@ -203,7 +203,7 @@ msgGluck a b = do
     where
         f :: UniqueIdM m => [CoreVarName] -> CoreExpr -> CoreExpr -> m (Subst, CoreExpr)
 
-        f vars a b | blurVar a `eq1CoreExpr` blurVar b &&
+        f vars a b | blurVar a `eqCoreExpr1` blurVar b &&
                      length (children a) == length (children b) = do
             let (as, a_) = uniplate a
                 (bs, b_) = uniplate b
@@ -230,7 +230,7 @@ msg2 a b = do
     
 
 msg2' :: UniqueIdM m => CoreExpr -> CoreExpr -> m (SubstPair, CoreExpr, CoreExpr)
-msg2' x y | not (blurVar x `eq1CoreExpr` blurVar y)
+msg2' x y | not (blurVar x `eqCoreExpr1` blurVar y)
          || (length (children x) /= length (children y)) = do
     v <- getVar
     return ([(v,(x,y))], CoreVar v, CoreVar v)
@@ -286,7 +286,7 @@ msg x y = do v <- getVar ; f (CoreVar v) [(v,(x,y))]
                     bind2 = zip vs (zip xc yc) ++ miss ++ rest
                 f expr2 bind2
             where
-                (match,miss) = partition (\(_,(x,y)) -> x `eq1CoreExpr` y) bind
+                (match,miss) = partition (\(_,(x,y)) -> x `eqCoreExpr1` y) bind
                 (v,(x,y)):rest = match
 
         -- rule 2
@@ -306,7 +306,7 @@ msg x y = do v <- getVar ; f (CoreVar v) [(v,(x,y))]
             f (blurVar $ blurLit x) (blurVar $ blurLit y)
     where
         f x y = any (f x) ys ||
-                (x `eq1CoreExpr` y && length xs == length ys && and (zipWith f xs ys))
+                (x `eqCoreExpr1` y && length xs == length ys && and (zipWith f xs ys))
             where
                 xs = children x
                 ys = children y
@@ -314,7 +314,7 @@ msg x y = do v <- getVar ; f (CoreVar v) [(v,(x,y))]
 
 -- | Least common anti-instance
 lca :: UniqueIdM m => CoreExpr -> CoreExpr -> m (CoreExpr, Subst, Subst)
-lca x y | x `eq1CoreExpr` y = do
+lca x y | x `eqCoreExpr1` y = do
         let rep = snd $ uniplate x
         (cs,sx,sy) <- liftM unzip3 $ zipWithM lca (children x) (children y)
         return (rep cs, concat sx, concat sy)

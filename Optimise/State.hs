@@ -6,7 +6,7 @@ import Control.Monad.State
 import System.IO
 import Yhc.Core.UniqueId
 import Yhc.Core
-import Data.Homeomorphic as H
+import Data.Homeomorphic.SimpleParallel as H
 import Optimise.Util
 
 

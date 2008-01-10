@@ -10,7 +10,7 @@ import Data.List
 import Data.Maybe
 import Safe
 import Optimise.Util
-import Data.Homeomorphic as H hiding ((<<|))
+import Data.Homeomorphic.SimpleParallel as H
 
 
 termination :: [(String,Termination)]
@@ -66,16 +66,27 @@ embedMsg Context{rho=rho, current=x} =
 
 
 general :: Context -> SS (Maybe CoreExpr)
-general Context{rho=rho, current=x} =
-    let bad = maybeToList $ H.findOne (coreExprShellBlur x) rho in
+general Context{rho=rho, current=x} = do
+    sioLog "------------------------------------------------"
+
+    -- REPLACED THE BELOW LINE TO RESPECT THE ABSTRACTION
+    --let Homeomorphic dat = rho
+    let dat = undefined :: [(CoreExpr1,CoreExpr)]
+
+    mapM_ (sioLog . show . snd) dat
+    sioLog "<<|"
+    sioLog $ show x
+    sioLog ""
+
+    let bad = maybeToList $ H.findOne (coreExprShellBlur x) rho
     if null bad then return Nothing
-    else if head bad `eqAlphaCoreExpr` x then
+     else if head bad `eqAlphaCoreExpr` x then
         ( {- if head bad `elem` currents then
             return $ Just $ CoreFun "non_termination"
         else -}
             return Nothing
         )
-    else do
+     else do
         new <- head bad <<|+ x
         {-
         sioPutStrLn ""

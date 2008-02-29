@@ -223,8 +223,11 @@ case (case x of {p_1 -> y_1 ; ... ; p_n -> y_n}) of alts_
                   ;  ...
                   ;  p_n  -> case y_n of alts_ }
 
-case c xs_ of {... ; c vs_ -> y ; ...}
-    => y[vs_/xs_]
+case c x_1 ... x_n of {... ; c v_1 ... v_n -> y ; ...}
+    =>  let v_1 = x_1 in
+        ...
+        let v_n = x_n in
+        y
 
 case v of {... ; c vs_ -> x ; ...}
     => case v of {... ; c vs_ -> x[v/c vs_]; ...}
@@ -320,7 +323,7 @@ We first assign a new name for the body of |main|, then choose to expand the out
 \begin{code}
 h0 as = case  map (\c -> c*2) as of
               []    -> []
-              d:ds  -> y+1 : map (\b -> b+1) ds
+              d:ds  -> d+1 : map (\b -> b+1) ds
 \end{code}
 
 Next we choose to inline the |map| scrutinised by the case, then perform the |case|/|case| simplification, and finally residuate:
@@ -397,7 +400,7 @@ We use the termination criterion suggested by S{\o}rensen and Gl{\"u}ck \cite{so
 \]
 \end{tabular}
 
-The homeomorphic embedding uses the relations dive and couple. The dive relation checks if the left term is contained as a child of the right term, while the couple relation checks if both terms have the same outer shell. We use $\sigma$ to denote the spine of an expression, with $s_1,\ldots,s_n$ being its subexpressions. We test for equivalence of $\sigma_1$ and $\sigma_2$ using the $\sim$ relation, a weakened form of equality where all variables are considered equal. We terminate the supercompilation of an expression |y| if on the chain of reductions from |main| to |y| we have encountered an expression |x| such that $x \unlhd y$.
+The homeomorphic embedding uses the relations dive and couple. The dive relation checks if the first term is contained as a child of the second term, while the couple relation checks if both terms have the same outer shell. We use $\sigma$ to denote the spine of an expression, with $s_1,\ldots,s_n$ being its subexpressions. We test for equivalence of $\sigma_1$ and $\sigma_2$ using the $\sim$ relation, a weakened form of equality where all variables are considered equal. We terminate the supercompilation of an expression |y| if on the chain of reductions from |main| to |y| we have encountered an expression |x| such that $x \unlhd y$.
 
 In addition to using the homeomorphic embedding, we also terminate if further unfolding cannot yield any improvement to the root of the expression. For example, if the root of an expression is a constructor application, no further unfolding will change the root constructor. When terminating for this reason, we always residuate the outer spine of the expression, without applying any generalisation.
 
@@ -741,7 +744,11 @@ We exclude two benchmarks, paraffins and gen\_regexps. The paraffins benchmark m
 % http://csdl.ics.hawaii.edu/FAQ/chart-ps.html
 \includegraphics[scale=0.75,angle=270]{nofib.eps}
 \end{center}
-\vspace{3mm}
+\vspace{0mm}
+
+\textbf{Supero} uses the $\bowtie$ generalisation method; \textbf{msg} uses the msg function for generalisation; \textbf{spine} applies no generalisation operation; \textbf{none} never performs any inlining.
+
+\vspace{4mm}
 \figend
 \caption{Runtime, relative to GHC being 1.}
 \label{fig:haskell_results}

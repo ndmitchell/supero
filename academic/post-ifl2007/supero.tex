@@ -44,7 +44,7 @@
 \maketitle              % typeset the title of the contribution
 
 \begin{abstract}
-Haskell is a functional language, with features such as higher order functions and lazy evaluation, which allow succinct programs. These high-level features present many challenges for optimising compilers. We report practical experiments using novel variants of \textit{supercompilation}, with special attention to let bindings and the generalisation technique. Results include runtime reductions of up to 55\% when our supercompiler is used in conjunction with GHC.
+Haskell is a functional language, with features such as higher order functions and lazy evaluation, which allow succinct programs. These high-level features present many challenges for optimising compilers. We report practical experiments using novel variants of \textit{supercompilation}, with special attention to let bindings and the generalisation technique.
 \end{abstract}
 
 \section{Introduction}
@@ -189,7 +189,7 @@ drive(rho, x)
 
 \vspace{-3mm}
 
-Where |psi| is a mapping from expressions to function names, and |fv\!!(x)| returns the free variables in |x|. This code is parameterised by: |terminate| which decided whether to stop supercompilation of this expression; |generalise| which generalises an expression before residuation; |unfold| which chooses a function application and unfolds it.
+Where |psi| is a mapping from expressions to function names, and |fv\!!(x)| returns the free variables in |x|. This code is parameterised by: |terminate| which decides whether to stop supercompilation of this expression; |generalise| which generalises an expression before residuation; |unfold| which chooses a function application and unfolds it.
 \vspace{3mm}
 \figend
 \caption{The |supercompile| function.}
@@ -255,7 +255,7 @@ let v = c x_1 ... x_n in y
     =>  let v_1 = x_1 in
         ...
         let v_n = x_n in
-        y[v/c x_1 ... x_n]
+        y[v/c v_1 ... v_n]
     where v_1 ... v_n {-" \hbox{ are fresh} "-}
 \end{code}
 \figend
@@ -345,7 +345,7 @@ Both intermediate lists have been removed, and the functional arguments to |map|
 
 \subsection{Which function to inline}
 
-During the supercompilation of an expression, at each step some function needs to be inlined. Which to choose? In most supercompilation work the choice is made following the runtime semantics of the program. But in a language with let expressions this may be inappropriate. If a function in a let binding is inlined, its application when reduced my be simple enough to substitute in the let body. However, if a function in a let body is inlined, the let body may now only refer to the let binding once, allowing the binding to be substituted. Let us take two expressions, based on intermediate steps obtained from real programs (word counting and prime number calculation respectively):
+During the supercompilation of an expression, at each step some function needs to be inlined. Which to choose? In most supercompilation work the choice is made following the runtime semantics of the program. But in a language with let expressions this may be inappropriate. If a function in a let binding is inlined, its application when reduced may be simple enough to substitute in the let body. However, if a function in a let body is inlined, the let body may now only refer to the let binding once, allowing the binding to be substituted. Let us take two expressions, based on intermediate steps obtained from real programs (word counting and prime number calculation respectively):
 
 \begin{tabular}{p{5cm}p{5cm}}
 \begin{code}
@@ -397,13 +397,13 @@ We use the termination criterion suggested by S{\o}rensen and Gl{\"u}ck \cite{so
 \]
 \end{tabular}
 
-We use $\sigma$ to denote the spine of an expression, with $s_1,\ldots,s_n$ being its subexpressions. We test for equivalence of $\sigma_1$ and $\sigma_2$ using the $\sim$ relation, a weakened form of equality where all variables are considered equal. We terminate the supercompilation of an expression |y| if on the chain of reductions from |main| to |y| we have encountered an expression |x| such that $x \unlhd y$.
+The homeomorphic embedding uses the relations dive and couple. The dive relation checks if the left term is contained as a child of the right term, while the couple relation checks if both terms have the same outer shell. We use $\sigma$ to denote the spine of an expression, with $s_1,\ldots,s_n$ being its subexpressions. We test for equivalence of $\sigma_1$ and $\sigma_2$ using the $\sim$ relation, a weakened form of equality where all variables are considered equal. We terminate the supercompilation of an expression |y| if on the chain of reductions from |main| to |y| we have encountered an expression |x| such that $x \unlhd y$.
 
 In addition to using the homeomorphic embedding, we also terminate if further unfolding cannot yield any improvement to the root of the expression. For example, if the root of an expression is a constructor application, no further unfolding will change the root constructor. When terminating for this reason, we always residuate the outer spine of the expression, without applying any generalisation.
 
 \subsection{Generalisation}
 
-When the termination criterion has been met, it is necessary to discard information about the current expression, so that the supercompilation terminates. We always residuate the outer spine of the expression, but first we attempt to generalise the expression so that the information lost is minimal. The paper by S{\o}rensen and Gl{\"u}ck provides a method for generalisation, which works by taking the most specific generationalisation of the current expression and expression which is a homeomorphic embedding of it.
+When the termination criterion has been met, it is necessary to discard information about the current expression, so that the supercompilation terminates. We always residuate the outer spine of the expression, but first we attempt to generalise the expression so that the information lost is minimal. The paper by S{\o}rensen and Gl{\"u}ck provides a method for generalisation, which works by taking the most specific generalisation of the current expression and expression which is a homeomorphic embedding of it.
 
 The most specific generalisation of two expressions $s$ and $t$, $\text{msg}(s,t)$, is produced by applying the following rewrite rule to the initial triple $(x,\{x=s\},\{x=t\})$, resulting in a common expression and two sets of bindings.
 
@@ -837,7 +837,7 @@ There are three main areas for future work:
 \item[Compilation Speed] The compilation times are tolerable for benchmarking and a final optimised release, but not for general use. Basic profiling shows that over 90\% of supercompilation time is spent testing for a homeomorphic embedding, which is currently done in a na\"{i}ve manner -- dramatic speedups should be possible.
 \end{description}
 
-The Programming Language Shootout\footnote{\url{http://shootout.alioth.debian.org/}} has shown that low-level Haskell can compete with with low-level imperative languages such as C. Our goal is that Haskell programs can be written in a high-level declarative style, yet still perform competitively.
+The Programming Language Shootout\footnote{\url{http://shootout.alioth.debian.org/}} has shown that low-level Haskell can compete with low-level imperative languages such as C. Our goal is that Haskell programs can be written in a high-level declarative style, yet still perform competitively.
 
 \paragraph{Acknowledgements} We would like to thank Simon Peyton Jones, Simon Marlow and Tim Chevalier for help understanding the low-level details of GHC, and Peter Jonsson for helpful discussions and presentation suggestions.
 

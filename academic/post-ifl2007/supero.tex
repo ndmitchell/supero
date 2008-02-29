@@ -249,7 +249,7 @@ let v = x in (case y of {p_1 -> y_1 ; ... ; p_n -> y_n})
 
 let v = x in y
     => y[v/x]
-    where x {-" \hbox{is a lambda, variable, or used once in } "-} y
+    where x {-" \hbox{is a lambda, a variable, or } "-} v {-" \hbox{is used once in } "-} y
 
 let v = c x_1 ... x_n in y
     =>  let v_1 = x_1 in
@@ -263,7 +263,7 @@ let v = c x_1 ... x_n in y
 \label{fig:simplify}
 \end{fig}
 
-The supercompilation of an expression proceeds by repeatedly inlining a function application until some termination criterion is met. Once the termination criterion holds, the expression is generalised before the outer spine becomes part of the residual program and all subexpressions are assigned names. After each inlining step, the expression is simplified using the rules in Figure \ref{fig:simplify}. There are three key decisions in the supercompilation of an expression:
+The supercompilation of an expression proceeds by repeatedly inlining a function application until some termination criterion is met. Once the termination criterion holds, the expression is generalised before the outer spine becomes part of the residual program and all immediate subexpressions are assigned names. After each inlining step, the expression is simplified using the rules in Figure \ref{fig:simplify}. There are three key decisions in the supercompilation of an expression:
 
 \begin{enumerate}
 \item Which function to inline.
@@ -649,7 +649,7 @@ In this program |caf| would only be computed once. If a CAF is inlined then this
 The most comprehensive inter-language benchmarking effort is the Programming Language Shootout\footnote{\url{http://shootout.alioth.debian.org/}}. In the shootout a variety of tasks are implemented in many languages and benchmarked against each other. Unfortunately, in order to ensure a balanced comparison, many restrictions are placed upon the solutions -- some of which severely hamper lazy languages. Inspired by their attempt, we have defined some simpler benchmarks on which it is possible to directly compare Haskell to C.
 \end{comment}
 
-The benchmarks we have chosen are inspired by the Unix \texttt{wc} command -- namely character, word and line counting. We require the program to read from the standard input, and write out the number of elements in the file. To ensure that we test computation speed, not IO speed (which is usually determined by the buffering strategy, rather than optimisation) we demand that all input is read using the standard C |getchar| function only. Any buffering improvements, such as reading in blocks or memory mapping of files, could be performed equally in all compilers.
+The benchmarks we have used to experiment with are inspired by the Unix \texttt{wc} command -- namely character, word and line counting. We require the program to read from the standard input, and write out the number of elements in the file. To ensure that we test computation speed, not IO speed (which is usually determined by the buffering strategy, rather than optimisation) we demand that all input is read using the standard C |getchar| function only. Any buffering improvements, such as reading in blocks or memory mapping of files, could be performed equally in all compilers.
 
 All the C versions are implemented following a similar pattern to Figure \ref{fig:c_words}. Characters are read in a loop, with an accumulator recording the current value. Depending on the program, the body of the loop decides when to increment the accumulator. The Haskell versions all follow the same pattern as in the Introduction, merely replacing |words| with |lines|, or removing the |words| function for character counting.
 

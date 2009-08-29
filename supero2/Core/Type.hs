@@ -4,19 +4,22 @@ module Core.Type where
 
 import Data.Generics
 
-data Core = Var String -- a locally defined variable
-          | Fun String -- a top-level function
-          | Con String -- a constructor
-          | Prim String -- a primitive
+
+type VarName = String -- a locally defined variable
+type FunName = String -- a top-level function
+type ConName = String -- a constructor
+type PrmName = String -- a primitive
+
+type Pat = (ConName,[VarName])
+
+data Core = Var VarName
+          | Fun FunName
+          | Con ConName
+          | Prm PrmName 
           | App Core Core
-          | Lam String Core
-          | Let String Core Core
-          | Case Core [((String,[String]),Core)]
+          | Let VarName Core Core
+          | Case Core [(Pat,Core)]
             deriving (Data,Typeable,Eq)
-
-
-lams (x:xs) y = Lam x $ lams xs y
-lams [] y = y
 
 apps x (y:ys) = apps (App x y) ys
 apps x [] = x

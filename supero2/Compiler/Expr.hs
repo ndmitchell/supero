@@ -5,18 +5,25 @@ import Data.Maybe
 
 type Name = String
 
--- Invariant: No duplicate names
-type Prog e = [(Name,e)]
 
--- Invariant: Must not mention any function names in the first part
--- Second list of names are suggested names (may be "")
-type Residual e = (e, [(Name,e)])
+type Call e = (Name, [String])
 
-class (Show e, Eq e) => Expr e where
-    step :: Prog e -> e -> Either (Residual e) [e]
+-- First part is the list of expressions to supercompile
+-- Second list is how to put them back together
+type Residual e = ([e], [Call e] -> e)
+
+-- i is some precomputed information about a source function
+-- e is an expression in the src or dest language
+class (Show e, Eq e) => Expr i e where
+    step :: (Name -> (i,e)) -> e -> Either (Residual e) [e]
     (<<|) :: [e] -> e -> Maybe (Residual e)
-    residual :: e -> [Name] -> e
+    call :: Name -> [String] -> e -- to construct expressions in the result program
 
 
 resolve :: Prog e -> Name -> e
 resolve xs x = fromMaybe (error $ unwords $ "Couldn't resolve" : x : "in" : map fst xs) $ lookup x xs
+
+
+
+name :: e -> (Name, [e])
+call :: Name -> [String] -> e

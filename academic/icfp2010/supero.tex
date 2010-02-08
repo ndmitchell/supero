@@ -1,0 +1,487 @@
+\documentclass{sigplanconf}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{natbib}
+\usepackage{multirow}
+\usepackage{setspace}
+\usepackage{balance}
+
+\include{paper}
+%include paper.fmt
+
+%format << = "[\!["
+%format >> = "]\!]"
+
+\newcommand{\unknown}{XXX}
+
+\begin{document}
+
+\conferenceinfo{ICFP 2010}{}
+% \CopyrightYear{2009}
+% \copyrightdata{978-1-60558-508-6/09/09}
+
+\titlebanner{\today{} - \currenttime{}}        % These are ignored unless
+\preprintfooter{}   % 'preprint' option specified.
+
+\title{Simpler Supercompilation}
+% \subtitle{}
+
+\authorinfo{Neil Mitchell}
+           {Standard Chartered, UK}
+           {\verb"ndmitchell@gmail.com"}
+
+\maketitle
+
+\begin{abstract}
+Supercompilation is a technique for program optimisation. Unfortunately, most standard supercompilers are relatively complex. We present a new supercompiler that makes a number of alternative decisions, and is somewhat simpler. The key differences to other supercompilers come in our treatment of let expressions, our overall setup, and the termination argument. We have implemented our supercompiler and benchmarked it on a number of nofib programs, showing competitive performance. We have also put our supercompiler to practical use, by optimising a library for parsing HTML, and by using it to check the equivalence of open expressions in a lint style program.
+\end{abstract}
+
+\category{D.3}{Software}{Programming Languages}
+
+\terms
+Languages
+
+\keywords
+Haskell, optimisation, supercompilation
+
+\section{Introduction}
+
+Supercompilation is a technique for program optimisation. It's particularly well suited for applying massive fusion and specialisation, however previous supercompilation techniques have strayed away from their roots. We believe a supercompiler should should be close to an evaluator.
+
+The idea can be simply stated as taken an open term, and optimise it. Remove all layers of abstraction. inverting the flow of control. Taking the program and rewriting it. For example this program:
+
+\begin{code}
+main = print . length . words =<< getContents
+\end{code}
+
+A normal compiler would emit statements that build up thunks and then apply them. A good optimising compiler would probably transform the code so that |getContents| is executed first. A supercompiler (such as \cite{me:ifl2007}) would transform the program to one whose very first action was to read a character from the standard input. In addition, the |length . words| part of the pipeline is turned into a finite state machine, with the state encoding in the program counter. These types of transformation are typical from a supercompiler. In general, it's great at removing the levels of abstraction people often add to their programs.
+
+The initial motivation for supercompilation can be described as "evaluating an open term". However recent supercompiler design has graduated towards a design based on a driver and simplifier -- containing rules such as case/case, which are more simplification rules than evaluation rules. By restarting from the point of a program evaluation we have arrived at an alternative supercompiler design -- one we believe to be simpler.
+
+In particular, standard Supercompilation tends to involve lots of rules of what to do in various circumstances, or implicitly invoke a simplifier. Supercompilers also tend to use homeomorphic embedding to ensure termination, but homeomorphic embedding can be expensive, and is somewhat complex. We have come up with an alternative termination rule, that achieves good compilation, but is both simple and fast.
+
+\subsection{Contributions}
+
+We present a new method for supercompilation that is simpler than previous ones. We then test our supercompiler on some of the nofib benchmark programs. Next we use our supercompiler in practice (one of the only recent examples of actually \textit{using} a supercompiler for a real purpose) to optimise an HTML parser, and to prove equality of expressions for a program rewriter.
+
+\section{Method}
+
+Our supercompilation method is radically different from others. We start by presenting a Core language in \S\label{sec:core} which has a number of differences from other languages -- in particular in it's treatment of let. We next present the overall algorithm for supercompilation, which involves several stages: evaluating an expression (\S\label{sec:evaluation}), splitting an expression when no evaluation can occur (\S\label{sec:splitting}), deciding when to terminate (\S\label{sec:termination}) and splitting when termination should occur (\S\label{sec:splitterm}). We present each part in the following section, along with the running example of map/map fusion. We work on the following example:
+
+\begin{code}
+root f g x = map g (map f x)
+
+map f x = case x of
+    [] -> []
+    y:ys -> f y : map f ys
+\end{code}
+
+This expression applies map twice -- the expression |map f x| produces a list that is immediately consumed by the outer |map|. A supercompiler will remove this intermediate list, traversing the input list once, and creating an output list.
+
+\subsection{Core Language}
+\label{sec:core}
+
+\begin{figure}
+\begin{code}
+type Var = String
+type Fun = String
+type Con = String
+
+data Exp = Let [(Var,Exp)] Var
+         | Case Var [(Pat, Exp)]
+         | App Var Var
+         | Con Con [Var]
+         | Var Var
+         | Fun Fun
+
+data Pat = Pat Con [Var]
+
+data Func = Func Fun [Var] Exp
+
+type Prog = Fun -> Func
+\end{code}
+\caption{Core Language}
+\label{fig:core}
+\end{figure}
+
+Our Core language is similar to many others. A few points to note:
+
+\begin{itemize}
+\item We have Var in many places that would normally have an expression. A standard Core language could be translated to ours by inserting let bindings.
+\item In typical Core languages a distinction is made between let and letrec. Our let binding does allow values bound in a variable block to be used within that let block, but there must be an equivalent rewrite which doesn't use letrecs. This flexibility comes in handy later on.
+\item We don't have default patterns in case expressions, or literals. Both can be added (see \S\label{sec:extensions}), but are of little interest while working with the supercompiler.
+\end{itemize}
+
+We write expressions using standard Haskell syntax (i.e. |let| for |Let|, |case/of| for |Case| etc.). Rewriting our example in this reduced Core language gives:
+
+\begin{code}
+root f g x =
+    let v_1 = map
+        v_2 = f
+        v_3 = let w_1 = map
+                  w_2 = g
+                  w_3 = x
+                  w_12 = w_1 w_2
+                  w_123 = w_12 w_3
+              in w_123
+        v_12 = v_1 v_2
+        v_123 = v_12 v_3
+    in v_123
+
+map f x = case x of
+    [] -> []
+    y:ys -> let v_1 = f
+                v_2 = y
+                v_12 = v_1 v_2
+                w_1 = map
+                w_2 = f
+                w_3 = ys
+                w_12 = w_1 w_2
+                w_123 = w_12 w_3
+                r = (:) v_12 w_123
+            in r
+\end{code}
+
+Of course, this notation is rather tedious. Instead of often use |<<| brackets |>>| to denote that we later replace them, and typically only expand the root, leaving |map| as:
+
+\begin{code}
+map f x = case x of
+    [] -> []
+    y:ys -> << f y : map f ys >>
+\end{code}
+
+
+\subsection{Normalised Core}
+
+Given our Core language above it is easy to define a normalised simplified form. Our simplified form outlaws the following patterns:
+
+\begin{itemize}
+\item |App v w|, where |v| is bound to a |Con| - the |App| can be replaced with a Con of higher arity.
+\item |Case v w|, where |v| is bound to a |Con| - the expression can be explored.
+\item |Let vs w|, where any of the expressions bound in |vs| is a |Let| - the expression can be lifted - renaming if necessary.
+\item |Let vs w|, where any of the expressions bound in |vs| is a |Var| - we can replace the expression.
+\end{itemize}
+
+For example with normalisation we write |root| as:
+
+\begin{code}
+root f g x =
+    let v_1 = map
+        w_1 = map
+        w_12 = w_1 g
+        w_123 = w_12 x
+        v_12 = v_1 f
+        v_123 = v_12 w_123
+    in v_123
+\end{code}
+
+We can also normalise the names in the expression trivially, but tend not when presenting examples to make them easier to follow. We could mandate that common subexpression elimination was applied, but have not done so.
+
+\subsection{Manager}
+
+Many supercompilers are based around the concept of ``driving'' expressions, where the code traverses an expression applying optimisation. We instead prefer to split the evaluation (or driving) of expressions from the other aspects of a supercompiler. The idea of the manager is that it makes use of the other parts of a supercompiler.
+
+Our method can be summarised in three points:
+
+\begin{itemize}
+\item Given an open expression, we evaluate it for a number of steps, then split it into a residual function (which goes in the result program), and a list of inner expressions which we supercompile.
+\item If we ever encounter an expression we've already supercompiled, we use the residual function from before.
+\item When evaluating an open expression we stop when either we can't evaluate any further (a free variable is in the way), or when a termination criteria says we should.
+\end{itemize}
+
+This method is encapsulated in our |supercompile| function in Figure \ref{fig:supercompile}. In particular, to track which expressions have been seen it makes use of a |Result| Monad defined in Figure \ref{fig:result}.
+
+Termination is handled by having a context of which expressions have been seen before (encapsulated by |Term|), which is added to with the |(+=)| operator, and queried with the |termination| function (\S\ref{sec:term}). Once we have decided to terminate, we call |stop| to reduce the expression (\S\ref{sec:term_split}).
+
+We use the function |reduce| to evaluate an expression until it's stopped either by termination, or by not being able to evaluate it any further.
+
+\begin{figure}
+\begin{code}
+supercompile :: Env -> Term -> Func -> Result ()
+supercompile env t name | terminate t x = f t name (stop t x)
+                        | otherwise = do
+        let (x',t') = reduce env x
+        res <- seen x' ; case res of
+            Just y -> addSeen y x >> addResult name (forward y)
+            _ -> addSeen name x' >> f ((t += x') += x) name t'
+    where
+        f t name (xs',gen) = do
+            (names,acts) <- mapAndUnzipM (g t) xs'
+            sequence_ acts
+
+        g t x = do
+            res <- seen x ; case res of
+                Just y -> return (y, return ())
+                Nothing -> do
+                    y <- freshName
+                    return (y, supercompile env t y x)
+\end{code}
+\caption{The |supercompile| function.}
+\label{fig:supercompile}
+\end{figure}
+
+\begin{figure}
+\begin{code}
+addSeen :: ...
+\end{code}
+\caption{The |Result| monad.}
+\label{fig:result}
+\end{figure}
+
+
+The important point about the driver is that we terminate, we use a fresh driving expression per thing, and we get reduced forms out.
+
+So, harping back to our initial example, we first evaluate until we get:
+
+\begin{code}
+root f g x = << map f (map g x) >>
+\end{code}
+
+
+
+case x of
+   [] -> []
+   x:xs -> f (g x) : ...
+\end{code}
+
+We then end up tying back so in the |...| we write |root f g xs|, making a fused version.
+
+\subsection{Evaluation}
+\label{sec:eval}
+
+The evaluation step is easy, follow from the root expression upwards until we hit a |Fun|. Once we do, expand it out replacing with it's body, provided it has enough arguments not to be a lambda.
+
+\subsection{Evaluation Splitting}
+\label{sec:eval_split}
+
+If we are stopped because a free variable is sat in an interesting position we residuate. There are two cases:
+
+\paragraph{Case on a free variable}
+
+We lift the free variable out, perform the case on it, and rerun the expression multiple times with different bindings for the pattern. Essentially we make the free variable slightly more concrete, and rerun.
+
+\paragraph{Free variable in an application}
+
+We do roughly the same trick, lifting the free variable upwards.
+
+
+
+\subsection{Termination}
+\label{sec:term}
+
+We tag each expression within the first let with it's origin. We then compare to previous values.
+
+\subsubsection{Argument for Termination}
+
+The termination is obvious because it must be. We have a finite alphabet, and an initial expression.
+
+
+\subsection{Termination Splitting}
+\label{sec:term_split}
+
+We don't need to ensure anything too bad, just that at the end we no longer hit the termination criteria.
+
+
+\subsection{Argument for Correctness}
+
+We have not shown the correctness of our supercompiler, but have tested it extensively. The termination argument follows from each section separately, in that we only ever transform an expression in semantics preserving ways.
+
+\subsection{Post-processing}
+
+We often need to post-process quite a bit, in particular we make the following simple transformations.
+
+\subsection{Comparison to Other Supercompilers}
+
+It has no lambda, which makes it different from most, but exactly like Jason Reich's.
+
+It has let everywhere, unlike most supercompilers which almost relegate let to a second class system.
+
+It doesn't use homeomorphic embedding.
+
+It never rewrites expressions, allowing for the tantilising opportunity to partially evaluate the supercompiler.
+
+We use a local termination pile, which means the optimisation of a program is not based on what has passed before.
+
+\subsection{Extensions}
+\label{sec:extensions}
+
+A real supercompiler needs slightly more flexibility, and the one we have implemented does indeed have all these
+
+\subsubsection{Primitives}
+
+Primitive functions are crucially important, but can be handled by simply treating them like free variables - everything works out.
+
+\subsubsection{Literals}
+
+We extend Patt to possibly match on a primitive, and add a primitive value in. In all other respects we can ignore primitives.
+
+\subsubsection{Case Defaults}
+
+Again, we just augment Patt.
+
+\section{Examples}
+
+Here are some examples of supercompiled functions, with a little bit of commentary.
+
+\subsection{Specialisation}
+
+Give map head as an example.
+
+\subsection{Fusion}
+
+You've already seen map/map, but it's important to remember that with our supercompiler lists are not special in any way. For example, if we wrote the identical program on the data type |data MyList alpha = MyNil || MyCons alpha (MyList alpha)| we'd get exactly the same fusion. To give an example:
+
+\begin{code}
+data Tree alpha = Leaf alpha | Branch (Tree alpha) (Tree alpha)
+
+root x = flatten (mapTree (+1) x)
+flatten -- with continuations
+mapTree -- standard fmap on Tree
+\end{code}
+
+And we get the right result out.
+
+\subsection{Residual values}
+
+Of course, we can't specialise out |reverse|, for example:
+
+\begin{code}
+reverse = foldl (flip (:)) []
+\end{code}
+
+But we do get a nice efficient version of |reverse|, that has |foldl| specialised and optimised.
+
+\section{Benchmarks}
+\label{sec:benchmarks}
+
+The standard nofib ones, eek!
+
+\subsection{Execution Speed}
+
+See how great we do, yay.
+
+\subsection{Compilation Speed}
+
+Our compiler is quite quick, we've broken in down in to the time to compile and the result. The tricks we use to speed up compilation are variable normalising, using a map for let expressions, and we could also reduce the termination keys in to |Int|, but we haven't bothered yet.
+
+Our compiler is whole program, although we could split it up by defining interface points which are not violated. We haven't bothered to do so yet.
+
+\section{Case Studies}
+
+We have aimed for a practical supercompiler, and in this section we outline two practical purposes to which we have already deployed our supercompiler.
+
+\subsection{Optimisation of HTML Parsing}
+\label{sec:tagsoup}
+
+The TagSoup library \cite{tagsoup} is a simple parser for XML/HTML, based on the HTML 5 specification. Given a String, TagSoup produces a list of tokens (such as tag open, tag close, attribute). The parser was deliberately written in a way that mirrors the HTML 5 specification, which is based around a state passing approach. Each rule has been modelled in the most direct way, and then a supporting library simplifies it. For example, section 9.2.4.10 of the HTML 5 specification states:
+
+\begin{quote}
+9.2.4.10 Attribute value (double-quoted) state
+
+Consume the next input character:
+
+U+0022 QUOTATION MARK (") - Switch to the after attribute value (quoted) state.
+
+U+0026 AMPERSAND (\&) - Switch to the character reference in attribute value state, with the additional allowed character being U+0022 QUOTATION MARK (").
+
+EOF - Parse error. Reconsume the EOF character in the data state.
+
+Anything else - Append the current input character to the current attribute's value. Stay in the attribute value (double-quoted) state.
+\end{quote}
+
+And the corresponding code is:
+
+\begin{code}
+-- 9.2.4.10 Attribute value (double-quoted) state
+attValueDQuoted S{..} = pos $ case hd of
+    '\"' -> afterAttValueQuoted tl
+    '&' -> charRefAttValue attValueDQuoted (Just '\"') tl
+    _ | eof -> errWant "\"" & dat s
+    _ -> hd & attValueDQuoted xml tl
+\end{code}
+
+Here |tl| is the next state, |hd| is the current character, and the initial |pos| call emits position information. The |(&)| operator is used to place a token on the output stream. However, this high level of abstraction has a noticeable performance penalty, for each output token there are several intermediate values created. While work on list fusion can often reduce intermediate lists, the values here have much more structure than lists, and thus this work is not appropriate. There is a strong desire not to complicate the specification by adding details that improve performance.
+
+The code is split as 308 lines translated from the spec, followed by 191 lines implementing the operations and putting together the results in the right format.
+
+We slightly prime the supercompiler. The optimisation is controlled by 4 booleans, and by freezing them we manage to take fast paths -- for example when generating a stream without position information then |pos| calls are entirely eliminated. We did the same trick with GHC, but it was negligible -- mainly we suspect that the SpecConstr wasn't able to specialise through all the loops, which would have eliminated it. Plus there is no opportunity for fusion.
+
+One might ask whether optimising an HTML parser is worthwhile, but the answer is decidedly yes. The TagSoup library is used for DNA processing, and nightly gets run over 40Gb of XML files. The bottleneck is currently TagSoup, but with these transformations we eliminate that.
+
+\subsection{Equality of Expressions}
+\label{sec:hlint}
+
+The HLint program \cite{hlint} is a tool for helping improve Haskell source code. A large number of its hints are based on replacing one open expression with another. For example, if the user writes |concat (map f (xs++ys))| it will suggest replacing it with |concatMap f (xs++ys)|. It works by having a list of open expressions it uses for replacement:
+
+\begin{code}
+forall f x . concat (map f x) ==> concatMap f x
+\end{code}
+
+These rules are written in a supporting file, and there are many of them. Recently one bug was filed stating that one of the rules (involving |foldl| and |map| fusion) was incorrect. After fixing that another incorrect hint was discovered. The intention is clearly that in most cases the left and right expressions are equal. More accurately, the left and right open expressions should be equal. A supercompiler transforms a program and often produces equivalent expressions.
+
+We supercompiled the left and right hand sides. Of the \unknown{} rules, they fit in to three categories:
+
+\paragraph{Type class based on both sides}
+
+If both the left and the right have type classes, i.e. |not (a == b) ==> a /= b|, we can't check anything. This rule is not true in Haskell unless the standard typeclass rules have been followed. This pattern accounts for \unknown{} rules.
+
+\paragraph{Type class on the right hand side}
+
+For example |(\(x,y) -> (f x, g y)) ==> f *** g|, while this is somewhat true, it is actually a generalisation. (Note that there is a second condition that f and g do not contain x or y in them). The first expression works on tuples only, while the second is generalise to all arrrows -- of which tuples are one special case. This pattern accounts for 2 rules.
+
+\paragraph{Remaining examples}
+
+These are examples where the equality of both sides is true, and both should be equivalent. Of the remaining ones, we can prove them. Most examples are trivial, but some are slightly more involved (i.e. map fusion rules). For example we were able to prove:
+
+\begin{code}
+\end{code}
+
+We can't prove \unknown{} examples. Here are two representative examples:
+
+\paragraph{Reduction}
+
+\begin{code}
+(if a then True else False) ==> a
+\end{code}
+
+Here the examples are not equivalent, technically, as the right could be of any type. It would be possible to compress the right hand side in a post processing, but we don't yet do that.
+
+\paragraph{Strictness}
+
+We cannot prove:
+
+\begin{code}
+error "Use isPrefixOf" = (take i s == t) ==> ((i == length t) && (t `isPrefixOf` s))
+\end{code}
+
+The idea here is that people write |take 4 s == "ICFP"|, when they should have written |"ICFP" `isPrefixOf` s|. Usually the first term |(4 == length "ICFP")| will be eliminated. In addition the rule has a side condition that both |i| and |t| must be concrete literals. The supercompiler produces different expressions for both sides. this is in fact important -- the first expression is lazy in the spine of the |t|, while the right hand side is not. Unless the condition is applied, which the supercompiler can't see.
+
+We currently have no way to tell the supercompiler that an expression is fully evaluated, but perhaps we should and include strictness information throughout.
+
+
+\section{Related Work}
+
+We have extensively covered the related work in supercompilation in \S\label{sec:comparison}. Our work is definately classed as a supercompiler, but makes a large number of novel decisions. In particular, where often supercompiler authors have a choice at some points, many of our design decisions are forced upon us. We hope that this leads to decisions that naturally fit together. Whatever the result, our supercompiler is certainly a new point on the design space.
+
+Work on list fusion etc. is usually limited to lists, which isn't great.
+
+Partial evaluation has it's place, but supercompilers tend to be better for changing data -- for example the tagsoup would have frozen the parameters with partial evaluation, but not eliminated intermediate data structures.
+
+One intruiging possibility is that our supercompiler as described may actually be a great target for partial evaluation. The program being supercompiled is static, and in our supercompiler is not perturbed to the extent of other supercompilers.
+
+\section{Conclusions and Future Work}
+
+Need more benchmarks, integrate into a production quality compiler (GHC). Our supercompiler has been designed to run faster, but does it really do so?
+
+We have presented a supercompiler which is simple, and has found practical use. What a great result.
+
+
+\subsection{Acknowledgements}
+
+Thanks to lots of people for helpful ideas and discussions. Particularly I'd like to thank Jason Reich, Simon Peyton Jones, Max Bolingbroke and Peter Jonsson.
+
+\bibliographystyle{plainnat}
+\bibliography
+
+\end{document}

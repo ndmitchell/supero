@@ -67,7 +67,7 @@ We present a new method for supercompilation that is simpler than previous ones.
 
 \section{Method}
 
-Our supercompilation method is radically different from others. We start by presenting a Core language in \S\label{sec:core} which has a number of differences from other languages -- in particular in it's treatment of let. We next present the overall algorithm for supercompilation, which involves several stages: evaluating an expression (\S\label{sec:evaluation}), splitting an expression when no evaluation can occur (\S\label{sec:splitting}), deciding when to terminate (\S\label{sec:termination}) and splitting when termination should occur (\S\label{sec:splitterm}). We present each part in the following section, along with the running example of map/map fusion. We work on the following example:
+Our supercompilation method is radically different from others. We start by presenting a Core language in \S\ref{sec:core} which has a number of differences from other languages -- in particular in it's treatment of let. We next present the overall algorithm for supercompilation, which involves several stages: evaluating an expression (\S\ref{sec:evaluation}), splitting an expression when no evaluation can occur (\S\ref{sec:splitting}), deciding when to terminate (\S\ref{sec:termination}) and splitting when termination should occur (\S\ref{sec:splitterm}). We present each part in the following section, along with the running example of map/map fusion. We work on the following example:
 
 \begin{code}
 root f g x = map g (map f x)
@@ -110,7 +110,7 @@ Our Core language is similar to many others. A few points to note:
 \begin{itemize}
 \item We have Var in many places that would normally have an expression. A standard Core language could be translated to ours by inserting let bindings.
 \item In typical Core languages a distinction is made between let and letrec. Our let binding does allow values bound in a variable block to be used within that let block, but there must be an equivalent rewrite which doesn't use letrecs. This flexibility comes in handy later on.
-\item We don't have default patterns in case expressions, or literals. Both can be added (see \S\label{sec:extensions}), but are of little interest while working with the supercompiler.
+\item We don't have default patterns in case expressions, or literals. Both can be added (see \S\ref{sec:extensions}), but are of little interest while working with the supercompiler.
 \end{itemize}
 
 We write expressions using standard Haskell syntax (i.e. |let| for |Let|, |case/of| for |Case| etc.). Rewriting our example in this reduced Core language gives:
@@ -178,6 +178,8 @@ root f g x =
 
 We can also normalise the names in the expression trivially, but tend not when presenting examples to make them easier to follow. We could mandate that common subexpression elimination was applied, but have not done so.
 
+One possible extension would be to automatically expand some functions whose termination was guaranteed - for example |($)|, |(.)|, |const|, |id|, |otherwise|. This could only be done for expressions which decreased in size.
+
 \subsection{Manager}
 
 Many supercompilers are based around the concept of ``driving'' expressions, where the code traverses an expression applying optimisation. We instead prefer to split the evaluation (or driving) of expressions from the other aspects of a supercompiler. The idea of the manager is that it makes use of the other parts of a supercompiler.
@@ -190,32 +192,23 @@ Our method can be summarised in three points:
 \item When evaluating an open expression we stop when either we can't evaluate any further (a free variable is in the way), or when a termination criteria says we should.
 \end{itemize}
 
-This method is encapsulated in our |supercompile| function in Figure \ref{fig:supercompile}. In particular, to track which expressions have been seen it makes use of a |Result| Monad defined in Figure \ref{fig:result}.
+This method is encapsulated in our |supercompile| function in Figure \ref{fig:supercompile}, and the helper functions in Figure \ref{fig:result}. The |Result| functions take care of spotting seen functions and inserting forwarding expressions etc. Broadly speaking, point 1 is addressed by |supercompile|, point 2 is addressed by the |Result| monad and point 3 is addressed by |reduce| with a little help from |supercompile|.
 
 Termination is handled by having a context of which expressions have been seen before (encapsulated by |Term|), which is added to with the |(+=)| operator, and queried with the |termination| function (\S\ref{sec:term}). Once we have decided to terminate, we call |stop| to reduce the expression (\S\ref{sec:term_split}).
 
-We use the function |reduce| to evaluate an expression until it's stopped either by termination, or by not being able to evaluate it any further.
+We use the function |reduce| to evaluate an expression until it's stopped either by termination, or by not being able to evaluate it any further. The |reduce| function makes use of a local termination context.
 
 \begin{figure}
 \begin{code}
-supercompile :: Env -> Term -> Func -> Result ()
-supercompile env t name | terminate t x = f t name (stop t x)
-                        | otherwise = do
-        let (x',t') = reduce env x
-        res <- seen x' ; case res of
-            Just y -> addSeen y x >> addResult name (forward y)
-            _ -> addSeen name x' >> f ((t += x') += x) name t'
-    where
-        f t name (xs',gen) = do
-            (names,acts) <- mapAndUnzipM (g t) xs'
-            sequence_ acts
+type FuncBody = ([Var], Exp)
+type Split = ([FuncBody], [Fun] -> Func)
 
-        g t x = do
-            res <- seen x ; case res of
-                Just y -> return (y, return ())
-                Nothing -> do
-                    y <- freshName
-                    return (y, supercompile env t y x)
+supercompile :: Env -> Term -> Func -> Result ()
+supercompile env t = do
+    let (xs,gen) = if terminate t x then stop t x else reduce x
+    ys <- map assignName xs
+    addResult $ gen $ map funcName ys
+    mapM_ (supercompile env (t+=x) ys
 \end{code}
 \caption{The |supercompile| function.}
 \label{fig:supercompile}
@@ -223,7 +216,33 @@ supercompile env t name | terminate t x = f t name (stop t x)
 
 \begin{figure}
 \begin{code}
-addSeen :: ...
+data R = R {seen :: [(FuncBody,Fun)], result :: [Func], fresh :: [Fun]} 
+type Result alpha = State R alpha
+
+-- We use the syntactic sugar
+-- |label := value = modify $ \r -> r{label = value}|
+
+assignName :: FuncBody -> Result Func
+assignName body = do
+    seen <- gets seen
+    case lookup body seen of
+        Just y -> return $ func y body
+        Nothing -> do
+            name:fresh <- gets fresh
+            seen := (bod,name) : seen
+            return $ func name body
+
+addResult :: Func -> Result ()
+addResult func = do
+    seen <- gets seen
+    case lookup (funcBody func) seen of
+        Just y -> do
+            seen := [(a, if b == funcName func then y else b) | (a,b) <- seen]
+            result := forward (funcName func) y : result
+        Nothing -> do
+            seen := (funcBody func, funcName func) : seen
+            result := func
+
 \end{code}
 \caption{The |Result| monad.}
 \label{fig:result}
@@ -239,7 +258,7 @@ root f g x = << map f (map g x) >>
 \end{code}
 
 
-
+\begin{code}
 case x of
    [] -> []
    x:xs -> f (g x) : ...
@@ -247,10 +266,29 @@ case x of
 
 We then end up tying back so in the |...| we write |root f g xs|, making a fused version.
 
+We have presented our manager in a great amount of detail -- deliberately. When writing a supercompile it turns out that the most subtle aspect is actually the manager. There are some important points -- you must always assign names before making the supercompile call (to ensure that recursive functions terminate). The use of forwarding methods is important to keep the complexity down, and can be resolved during post processing (\S\ref{sec:postprocess}). Very small changes result in it not terminating. The only differences between this code, and the code used in our actual supercompiler, is that our version has additional logging behaviour to allow the effects of supercompilation to be debugged!
+
 \subsection{Evaluation}
 \label{sec:eval}
 
 The evaluation step is easy, follow from the root expression upwards until we hit a |Fun|. Once we do, expand it out replacing with it's body, provided it has enough arguments not to be a lambda.
+
+We can transform our code in to a zipper:
+
+\begin{code}
+eval :: Func -> [(Var, Exp)]
+eval (Func _ free bod)
+    where bind = fromLet bod
+\end{code}
+
+More concretely, we define the next executable part as:
+
+\begin{code}
+exec (Let vs x) = exec vs[x]
+exec (Case v x) = exec v
+exec 
+\end{code}
+
 
 \subsection{Evaluation Splitting}
 \label{sec:eval_split}
@@ -263,19 +301,52 @@ We lift the free variable out, perform the case on it, and rerun the expression 
 
 \paragraph{Free variable in an application}
 
-We do roughly the same trick, lifting the free variable upwards.
+We do roughly the same trick, lifting the free variable upwards. In this case it's important that we don't loose sharing of any of the intermediate forms, so we first lift all the necessary ones upwards.
 
 
 
 \subsection{Termination}
 \label{sec:term}
 
-We tag each expression within the first let with it's origin. We then compare to previous values.
+We tag each expression within the first let with it's origin. We then compare to previous values. The idea is that it must go down.
+
+\subsubsection{Termination Rule}
+
+In general, given a quasi normal rule:
+
+\[
+\forall i, j \bullet i < j \Rightarrow x_i \succ y_i
+\]
+
+which is awesome
+
+\[
+x \succ y = x \subset_{set} y \vee x \supset_{bag} y
+\]
+
+Given a bag of values drawn from the alphabet $\Sigma$, a sequence is well formed if there does not exist an $x_i \subset x_j, where j > i$. To give some examples:
+
+Well formed:
+
+[a,aaaaab,aaab,b]
+
+\subsubsection{Tracking Names}
+
+How we track names around all the places.
 
 \subsubsection{Argument for Termination}
 
 The termination is obvious because it must be. We have a finite alphabet, and an initial expression.
 
+Given an alphabet $\Sigma$, each variable has been either seen or unseen.
+
+If all variables have been seen, then you can prove there are a finite remaining number. If one variable hasn't been seen then either you never introduce it (in which case you).
+
+Induction on the size of $\Sigma$:
+
+$\Sigma = 1$ - you can have exactly one item, the second one terminates.
+
+$\Sigma = n+1$. You have a sequence before you hit a sigma, if you were to never hit a sigma that would terminate. Then you hit a sigma with a finite value |m|.
 
 \subsection{Termination Splitting}
 \label{sec:term_split}
@@ -459,10 +530,25 @@ The idea here is that people write |take 4 s == "ICFP"|, when they should have w
 
 We currently have no way to tell the supercompiler that an expression is fully evaluated, but perhaps we should and include strictness information throughout.
 
+\paragraph{Finding a bug}
+
+We found a bug. In HLint 1.6.19 there was a rule to reduce |foldr/map| with the rule:
+
+\begin{code}
+foldr f z (map g x) ==> foldr (f . g) z x
+\end{code}
+
+Unfortunately we also got the equivalent for |foldr1|, namely:
+
+\begin{code}
+foldr1 f (map g x) ==> foldr1 (f . g) x
+\end{code}
+
+This rule is not true, and our supercompiler spotted it.
 
 \section{Related Work}
 
-We have extensively covered the related work in supercompilation in \S\label{sec:comparison}. Our work is definately classed as a supercompiler, but makes a large number of novel decisions. In particular, where often supercompiler authors have a choice at some points, many of our design decisions are forced upon us. We hope that this leads to decisions that naturally fit together. Whatever the result, our supercompiler is certainly a new point on the design space.
+We have extensively covered the related work in supercompilation in \S\ref{sec:comparison}. Our work is definately classed as a supercompiler, but makes a large number of novel decisions. In particular, where often supercompiler authors have a choice at some points, many of our design decisions are forced upon us. We hope that this leads to decisions that naturally fit together. Whatever the result, our supercompiler is certainly a new point on the design space.
 
 Work on list fusion etc. is usually limited to lists, which isn't great.
 

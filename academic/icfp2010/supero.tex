@@ -13,6 +13,16 @@
 %format << = "[\!["
 %format >> = "]\!]"
 %format += = "+\!\!\!\!="
+%format ==> = "\Longrightarrow{}"
+
+%format w_1  = "\Varid{w_1}"
+%format w_2  = "\Varid{w_2}"
+%format w_3  = "\Varid{w_3}"
+%format w_12  = "\Varid{w_12}"
+%format w_123  = "\Varid{w_123}"
+%format v_3  = "\Varid{v_3}"
+%format v_4  = "\Varid{v_4}"
+
 
 \newcommand{\unknown}{XXX}
 
@@ -35,7 +45,7 @@
 \maketitle
 
 \begin{abstract}
-Supercompilation is a technique for program optimisation, which can often eliminate the overhead of programmer abstractions. We present a new design for a supercompiler, rethinking many of the decisions that have become common in previous supercompilation work. The result is a supercompiler that we find simpler, and offers good performance both at compile time and runtime. We have implemented our supercompiler and benchmarked it a selection of programs from the nofib benchmark suite, which run faster than both GHC and our previous supercompiler. We then put our supercompiler to practical use, optimising an HTML parsing library, and checking the equivalence of open expressions used as rewrite rules.
+Supercompilation is a program optimisation technique, which can often eliminate the overhead of programmer abstractions. We present a new design for a supercompiler, rethinking many of the decisions that have become common in previous supercompilation work. The result is a supercompiler that we find simpler, and offers good performance both at compile time and runtime. We have implemented our supercompiler and benchmarked it on a selection of programs from the nofib benchmark suite, which run faster than both GHC and our previous supercompiler. We then put our supercompiler to practical use, optimising an HTML parsing library, and checking the equivalence of open expressions used as rewrite rules.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -80,42 +90,42 @@ In addition, we make the following contributions:
 \section{Method}
 \label{sec:method}
 
-This section describes our design for a supercompiler. We first present a Core language (\S\ref{sec:core}), along with rules for normalisation (\S\ref{sec:simplify}). We then present the overall algorithm in (\S\ref{sec:manager}, which ties together the answers to the questions:
+This section describes our supercompiler. We first present a Core language (\S\ref{sec:core}), along with simplification rule (\S\ref{sec:simplify}). We then present the overall algorithm (\S\ref{sec:manager}), which uses answers to the following questions:
 
 \begin{itemize}
 \item How do you evaluate an open term? (\S\ref{sec:eval})
-\item What happens if you can't evaluate an open term any further? (\S\ref{sec:eval_split})
+\item What happens if you can't evaluate an open term further? (\S\ref{sec:eval_split})
 \item How do you know when to stop? (\S\ref{sec:term})
 \item What happens if you have to stop? (\S\ref{sec:term_split})
 \end{itemize}
 
-Throughout we make use of the following example:
+Throughout this section we use the following example:
 
 \begin{code}
-root f g x = map g (map f x)
+root g f x = map g (map f x)
 
 map f x = case x of
     []    -> []
     y:ys  -> f y : map f ys
 \end{code}
 
-This example applies map twice -- the expression |map f x| produces a list that is immediately consumed by the outer |map|. List fusion \cite{gill:shortcut_deforestation} can be used to remove the intermediate list, and a good supercompiler should also remove the intermediate list.
+This example applies |map| twice -- the expression |map f x| produces a list that is immediately consumed by |map g|. A good supercompiler should remove the intermediate list.
 
 \subsection{Core Language}
 \label{sec:core}
 
 \begin{figure}
 \begin{code}
-type Var  = String
-type Fun  = String
-type Con  = String
+type Var  = String -- variable names
+type Fun  = String -- function names
+type Con  = String -- constructor names
 
-data Exp  = Var Var
-          | Fun Fun
-          | Con Con [Var]
-          | App Var Var
-          | Let [(Var,Exp)] Var
-          | Case Var [(Pat, Exp)]
+data Exp  =  Var Var
+          |  Fun Fun
+          |  Con Con [Var]
+          |  App Var Var
+          |  Let [(Var,Exp)] Var
+          |  Case Var [(Pat, Exp)]
 
 type Pat = Exp -- restricted to Con
 \end{code}
@@ -123,47 +133,37 @@ type Pat = Exp -- restricted to Con
 \label{fig:core}
 \end{figure}
 
-Our Core language for expressions is given in Figure \ref{fig:core}.
-
-Our Core language is similar to many others. A few points to note:
+Our Core language for expressions is given in Figure \ref{fig:core}, and has much in common with Administrative Normal Form \cite{flanagan:continuations}. There are a few points to note:
 
 \begin{itemize}
-\item We have Var in many places that would normally have an expression. A standard Core language could be translated to ours by inserting let bindings.
-\item In typical Core languages a distinction is made between let and letrec. Our let binding does allow values bound in a variable block to be used within that let block, but there must be an equivalent rewrite which doesn't use letrecs. This flexibility comes in handy later on.
-\item We don't have default patterns in case expressions, or literals. Both can be added (see \S\ref{sec:extensions}), but are of little interest while working with the supercompiler.
+\item We require variables in many places that would normally permit expressions. A standard Core language (such as from \citet{ghc_core}) could be translated to ours by inserting let bindings.
+\item In many Core languages a distinction is made between let and letrec. We allow expressions bound at a let to refer to variables bound at the same let, but disallow recursion. An alternative description is that we allow recursive let, but only if there is an equivalent nested non-recursive let that can represent the same expression. For example we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
+\item We don't have default patterns in case expressions, or literals. Both can be added (see \S\ref{sec:extensions}), but are of little interest when describing a supercompiler.
 \end{itemize}
 
-We write expressions using standard Haskell syntax (i.e. |let| for |Let|, |case/of| for |Case| etc.). Rewriting our example in this reduced Core language gives:
+We write expressions using standard Haskell syntax (i.e. |let| for |Let|, |case/of| for |Case| etc.). Rewriting our |map/map| example in our Core language gives:
 
 \begin{code}
-root f g x =
-    let v_1 = map
-        v_2 = f
-        v_3 = let w_1 = map
-                  w_2 = g
-                  w_3 = x
-                  w_12 = w_1 w_2
-                  w_123 = w_12 w_3
-              in w_123
-        v_12 = v_1 v_2
-        v_123 = v_12 v_3
-    in v_123
+root g f x =  let  v_1 = map
+                   v_2 = let  w_1 = map
+                              w_2 = w_1 f
+                              w_3 = w_2 x
+                         in   w_3
+                   v_3 = v_1 g
+                   v_4 = v_3 v_2
+              in   v_4
 
 map f x = case x of
     [] -> []
-    y:ys -> let v_1 = f
-                v_2 = y
-                v_12 = v_1 v_2
-                w_1 = map
-                w_2 = f
-                w_3 = ys
-                w_12 = w_1 w_2
-                w_123 = w_12 w_3
-                r = (:) v_12 w_123
-            in r
+    y:ys -> let  v_1 = f y
+                 w_1 = map
+                 w_2 = w_1 f
+                 w_3 = w_2 ys
+                 r = (:) v_1 w_3
+            in   r
 \end{code}
 
-Of course, this notation is rather tedious. Instead of often use |<<| brackets |>>| to denote that we later replace them, and typically only expand the root, leaving |map| as:
+Our Core language is rather verbose, so we sometimes use |<< bullet >>| brackets to represent expressions in a standard Core language, that could always be translated to our Core language. For example with |map|:
 
 \begin{code}
 map f x = case x of
@@ -172,49 +172,40 @@ map f x = case x of
 \end{code}
 
 
-\subsection{Normalised Core}
+\subsection{Simplified Core}
 \label{sec:simplify}
 
-Given our Core language above it is easy to define a normalised simplified form. Our simplified form requires that the root of a function be a |Let|, and that the bindings of that |Let| must not be of the following form:
+We now define a simplified form for our Core language. When working with Core expressions we assume they are always simplified, and we can easily simplify Core expressions. Our simplified form requires that all variables are unique, that the root of a function be a |Let|, and that the expressions bound at the root |Let| must not have the following form:
 
 \begin{itemize}
-\item |App v w|, where |v| is bound to a |Con| - the |App| can be replaced with a Con of higher arity.
-\item |Case v w|, where |v| is bound to a |Con| - the expression can be explored.
-\item |Let vs w|, where any of the expressions bound in |vs| is a |Let| - the expression can be lifted - renaming if necessary.
-\item |Let vs w|, where any of the expressions bound in |vs| is a |Var| - we can replace the expression with it's inlining.
-\item All bound variables are unique.
+\item |App v w|, where |v| is bound to a |Con| -- the |App| can be replaced with a Con of higher arity.
+\item |Case v w|, where |v| is bound to a |Con| -- the |Case| can be replaced with the appropriate alternative.
+\item |Let vs w| -- the nested bindings can be brought to the root |Let|, renaming variables if necessary.
+\item |Var v| -- we can remove the binding by replacing the bound variable with |v| everywhere.
 \end{itemize}
 
-For example with normalisation we write |root| as:
+\todo{also eliminate all unused variables, and the root may be zero bindings.}
+
+For example the simplified version of |root| is:
 
 \begin{code}
-root f g x =
-    let v_1 = map
-        w_1 = map
-        w_12 = w_1 g
-        w_123 = w_12 x
-        v_12 = v_1 f
-        v_123 = v_12 w_123
-    in v_123
+root g f x =  let  v_1 = map
+                   w_1 = map
+                   w_2 = w_1 f
+                   w_3 = w_2 x
+                   v_3 = v_1 g
+                   v_4 = v_3 w_3
+              in   v_4
 \end{code}
-
-We can also normalise the names in the expression trivially, but tend not when presenting examples to make them easier to follow. We could mandate that common subexpression elimination was applied, but have not done so.
-
-Note that we do not enforce details about nested expressions, for example the following is legal:
-
-\begin{code}
-f x =
-    let v = case x of
-                Pat -> let w = True ; q = w in q
-    in v
-\end{code}
-
-The binding |q = w| would be disallowed in the outermost let, but not in the inner ones. It is important to note that normalisation never explores the depths of an expression. This property is important for the way we prove termination.
-
-One possible extension would be to automatically expand some functions whose termination was guaranteed - for example |($)|, |(.)|, |const|, |id|, |otherwise|. This could only be done for expressions which decreased in size.
 
 \subsection{Manager}
 \label{sec:manager}
+
+Our supercompiler is based around a manager, that pulls together all the answers to the interesting supercompilation questions. The important thing about the manager is that it ties back recursion, so is responsible for creating recursive functions. We have deliberately included a large amount of detail in our manager -- in our experience it is the trickiest
+
+Our supercompiler splits 
+
+One of the operationally tricky parts of a supercompierl
 
 Many supercompilers are based around the concept of ``driving'' expressions, where the code traverses an expression applying optimisation. We instead prefer to split the evaluation (or driving) of expressions from the other aspects of a supercompiler. The idea of the manager is that it makes use of the other parts of a supercompiler.
 
@@ -234,53 +225,34 @@ We use the function |reduce| to evaluate an expression until it's stopped either
 
 \begin{figure}
 \begin{code}
+data Func = Func [Var] Exp
 type Env = Fun -> Func
-type Func = (Fun, [Var], Exp)
-type FuncBody = ([Var], Exp)
-type Split = ([FuncBody], [Fun] -> Func)
+data Tree = Tree {pre :: Func, gen :: [Fun] -> Func, children :: [Tree]}
 
-supercompile :: Env -> Term -> Func -> Result ()
-supercompile env t = do
-    let (xs,gen) = if terminate t x then stop t x else reduce env x
-    ys <- map assignName xs
-    addResult $ gen $ map funcName ys
-    mapM_ (supercompile env (t+=x) ys
+supercompile :: Env -> [(Fun,Func)]
+supercompile env = assign $ flatten $ optimise env newTerm
+
+optimise :: Env -> Term -> Func -> Tree
+optimise env t x = Tree x gen (map (supercompile env (t+=x)) cs)
+    where (gen,cs) = if terminate t x then stop t x else reduce env x
+
+reduce :: Env -> Func -> ([Fun] -> Func, [Func])
+reduce env = f newTerm
+    where f t x | terminate t x = stop t x
+                | Just x' <- step env x = f (t += x) x'
+                | otherwise = split x
+
+flatten :: Tree -> [Tree]
+flatten = nubBy (\x y -> pre x == pre y) . f []
+    where f seen t  | pre t `elem` seen = []
+                    | otherwise = t : concatMap (f (t:seen)) (children t)
+
+assign :: [Tree] -> [(Fun,Func)]
+assign ts = [(f t, gen t (map f (children t))) |  t <- ts]
+    where f = fromJust . flip lookup . zip freshNames (map pre ts)
 \end{code}
 \caption{The |supercompile| function.}
 \label{fig:supercompile}
-\end{figure}
-
-\begin{figure}
-\begin{code}
-data R = R {seen :: [(FuncBody,Fun)], result :: [Func], fresh :: [Fun]}
-type Result alpha = State R alpha
-
--- We use the syntactic sugar
--- |label := value = modify $ \r -> r{label = value}|
-
-assignName :: FuncBody -> Result Func
-assignName body = do
-    seen <- gets seen
-    case lookup body seen of
-        Just y -> return $ func y body
-        Nothing -> do
-            name:fresh <- gets fresh
-            seen := (bod,name) : seen
-            return $ func name body
-
-addResult :: Func -> Result ()
-addResult func = do
-    seen <- gets seen
-    case lookup (funcBody func) seen of
-        Just y -> do
-            seen := [(a, if b == funcName func then y else b) | (a,b) <- seen]
-            result := forward (funcName func) y : result
-        Nothing -> do
-            seen := (funcBody func, funcName func) : seen
-            result := func
-\end{code}
-\caption{The |Result| monad.}
-\label{fig:result}
 \end{figure}
 
 
@@ -344,7 +316,7 @@ stack[i] = (v_i, App _ a_i)   where i `elem` [1..n]
 new = Let (zip args (map Var [a_1..a_n])) bod
 \end{code}
 
-Then we replace variable |v_n| with |new| in the original expression.
+Then we replace variable |v_n| with |new| in the original expression. Then we apply the simplification rules again \ref{sec:simplify}.
 
 \subsubsection{Multiple Step Reduction}
 
@@ -360,12 +332,14 @@ reduce env = f newTerm
 
 How awesome.
 
+Note the local termination context.
+
 Going back to our root evaluation, we'd end up with the sequence...
 
 \subsection{Evaluation Splitting}
 \label{sec:eval_split}
 
-If evaluation cannot proceed any further then we look at which case we have arrived in, and make an appropriate split. The idea of the split is that we take whatever construct is blocking evaluation and solve it separately, leaving remaining terms which we can evaluate. There are three distinct cases.
+If evaluation cannot proceed any further then we look at which case we have arrived in, and make an appropriate split. The idea of the split is that we take whatever construct is blocking evaluation and solve it separately, leaving remaining terms which we can evaluate. There are three distinct cases. More description here.
 
 \subsubsection{Case on a free variable}
 
@@ -592,6 +566,14 @@ We add primitives in to the language, and allow |Patt| to be both |Con| and |Lit
 
 Again, we just augment Patt. There are slight complexities to evaluation splitting when you are dealing with the default branch (don't bind the variable, just project out the right branch), but these aren't too challenging.
 
+\subsubsection{Common Subexpression Elimination}
+
+If we require a simplified let has no duplicate expressions we can do this trivially. We don't because we'd need to be careful about avoiding spaceleaks.
+
+\subsubsection{Inlining Simple Functions}
+
+One possible extension would be to automatically expand some functions whose termination was guaranteed - for example |($)|, |(.)|, |const|, |id|, |otherwise|. This could only be done for expressions which decreased in size.
+
 \section{Examples}
 \label{sec:examples}
 
@@ -684,7 +666,7 @@ One might ask whether optimising an HTML parser is worthwhile, but the answer is
 
 Note that our HTML parser is a perfect use case for supercompilation. There is no hot-spot in the program that takes up more time, the problem is that the overhead of the abstraction is throughout. The abstraction is nicely chosen to map to an external document, so the abstraction cannot easily be altered. We are also constrained by speed. Supercompilation delivers nicely, removing all the abstractions to make them valuable at compile time, and yet removed by runtime.
 
-\subsection{Equality of Expressions}
+\subsection{Equality of Open Expressions}
 \label{sec:hlint}
 
 The HLint program \cite{hlint} is a tool for helping improve Haskell source code. A large number of its hints are based on replacing one open expression with another. For example, if the user writes |concat (map f (xs++ys))| it will suggest replacing it with |concatMap f (xs++ys)|. It works by having a list of open expressions it uses for replacement:
@@ -701,7 +683,7 @@ We supercompiled the left and right hand sides. Of the \unknown{} rules, they fi
 
 If both the left and the right have type classes, i.e. |not (a == b) ==> a /= b|, we can't check anything. This rule is not true in Haskell unless the standard typeclass rules have been followed. This pattern accounts for \unknown{} rules.
 
-\paragraph{Type class on the right hand side}
+\paragraph{Generalisation}
 
 For example |(\(x,y) -> (f x, g y)) ==> f *** g|, while this is somewhat true, it is actually a generalisation. (Note that there is a second condition that f and g do not contain x or y in them). The first expression works on tuples only, while the second is generalise to all arrrows -- of which tuples are one special case. This pattern accounts for 2 rules.
 
@@ -714,7 +696,7 @@ These are examples where the equality of both sides is true, and both should be 
 
 We can't prove \unknown{} examples. Here are two representative examples:
 
-\paragraph{Reduction}
+\paragraph{Generalisation}
 
 \begin{code}
 (if a then True else False) ==> a

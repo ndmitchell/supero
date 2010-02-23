@@ -144,13 +144,13 @@ Our Core language for expressions is given in Figure \ref{fig:core}, and has muc
 We write expressions using standard Haskell syntax (i.e. |let| for |Let|, |case/of| for |Case| etc.). Rewriting our |map/map| example in our Core language gives:
 
 \begin{code}
-root g f x =  let  v_1 = map
-                   v_2 = let  w_1 = map
-                              w_2 = w_1 f
-                              w_3 = w_2 x
-                         in   w_3
-                   v_3 = v_1 g
-                   v_4 = v_3 v_2
+root g f x =  let  v_1 =  map
+                   v_2 =  let  w_1 = map
+                               w_2 = w_1 f
+                               w_3 = w_2 x
+                          in   w_3
+                   v_3 =  v_1 g
+                   v_4 =  v_3 v_2
               in   v_4
 
 map f x = case x of
@@ -201,28 +201,6 @@ root g f x =  let  v_1 = map
 \subsection{Manager}
 \label{sec:manager}
 
-Our supercompiler is based around a manager, that pulls together all the answers to the interesting supercompilation questions. The important thing about the manager is that it ties back recursion, so is responsible for creating recursive functions. We have deliberately included a large amount of detail in our manager -- in our experience it is the trickiest
-
-Our supercompiler splits 
-
-One of the operationally tricky parts of a supercompierl
-
-Many supercompilers are based around the concept of ``driving'' expressions, where the code traverses an expression applying optimisation. We instead prefer to split the evaluation (or driving) of expressions from the other aspects of a supercompiler. The idea of the manager is that it makes use of the other parts of a supercompiler.
-
-Our method can be summarised in three points:
-
-\begin{itemize}
-\item Given an open expression, we evaluate it for a number of steps, then split it into a residual function (which goes in the result program), and a list of inner expressions which we supercompile.
-\item If we ever encounter an expression we've already supercompiled, we use the residual function from before.
-\item When evaluating an open expression we stop when either we can't evaluate any further (a free variable is in the way), or when a termination criteria says we should.
-\end{itemize}
-
-This method is encapsulated in our |supercompile| function in Figure \ref{fig:supercompile}, and the helper functions in Figure \ref{fig:result}. The |Result| functions take care of spotting seen functions and inserting forwarding expressions etc. Broadly speaking, point 1 is addressed by |supercompile|, point 2 is addressed by the |Result| monad and point 3 is addressed by |reduce| with a little help from |supercompile|.
-
-Termination is handled by having a context of which expressions have been seen before (encapsulated by |Term|), which is added to with the |(+=)| operator, and queried with the |termination| function (\S\ref{sec:term}). Once we have decided to terminate, we call |stop| to reduce the expression (\S\ref{sec:term_split}).
-
-We use the function |reduce| to evaluate an expression until it's stopped either by termination, or by not being able to evaluate it any further. The |reduce| function makes use of a local termination context.
-
 \begin{figure}
 \begin{code}
 data Func = Func [Var] Exp
@@ -230,11 +208,12 @@ type Env = Fun -> Func
 data Tree = Tree {pre :: Func, gen :: [Fun] -> Func, children :: [Tree]}
 
 supercompile :: Env -> [(Fun,Func)]
-supercompile env = assign $ flatten $ optimise env newTerm
+supercompile env = assign $ flatten $ optimise env $ Func [] (Fun "main")
 
-optimise :: Env -> Term -> Func -> Tree
-optimise env t x = Tree x gen (map (supercompile env (t+=x)) cs)
-    where (gen,cs) = if terminate t x then stop t x else reduce env x
+optimise :: Env -> Func -> Tree
+optimise env = f newTerm
+    where f t x = Tree x gen (map (f (t+=x)) cs)
+            where (gen,cs) = if terminate t x then stop t x else reduce env x
 
 reduce :: Env -> Func -> ([Fun] -> Func, [Func])
 reduce env = f newTerm
@@ -252,11 +231,35 @@ assign ts = [(f t, gen t (map f (children t))) |  t <- ts]
     where f = fromJust . flip lookup . zip freshNames (map pre ts)
 \end{code}
 \caption{The |supercompile| function.}
-\label{fig:supercompile}
+\label{fig:manager}
 \end{figure}
 
+Our supercompiler is based around a manager, that calls the other parts of a supercompiler. The manager has two main purposes, to ensure termination (by calling the termination functions) and to tie back recursive functions. In our experience the act of tieing recursion is often one of the trickiest aspects when writing a supercompiler, so we deliberately choose to give all the details. The complete code of our manager is given in Figure \ref{fig:manager}. We start by giving an intuition for how the manager works, then describe each function individually.
 
-The important point about the driver is that we terminate, we use a fresh driving expression per thing, and we get reduced forms out.
+The supercompiler starts with an unoptimised function, which calls other functions in the original program. After supercompilation, the result is an optimised function, which calls functions in the optimised program. If a function is recursive then the 
+
+The manager first builds an infinite tree of optimised 
+
+
+
+
+The main  of the manager is dedicated to tying back recursive functions -- in our experience one of the trickiest aspects of supercompilation -- yet often handled implicitly in existing supercompilers. We have deliberately included the complete code for this aspect, as it tends to be surprisingly subtle. The code for our manager is given in Figure \ref{fig:manager}. Each function is responsible for performing some aspect of the compilation, so we explain each in turn.
+
+\paragraph{Data types} A function (|Func|) is a list of variables and an expression, and can be understood as a lambda expression taking the variables and resulting in the expression. An environment (|Env|) is a mapping between function names and function bodies, and refers to the unoptimised input source. The idea of supercompilation is that we supercompile a |Func| into a potentially infinite tree of supercompiled functions, often making use of other supercompiled functions. A |Tree| contains three members: |pre| is the function before optimisation function; |gen| is a generator to get the optimised function; |children| is the functions that the supercompiled result calls. To get the optimised code we need to assign names for all the children, then pass these names to |gen|.
+
+\paragraph{Termination critera} In writing our functions we assume a termination scheme. The function |newTerm| constructs a new termination context, |(+=)| adds a function to the termination context, and |stop t x| returns |True| if it is not permissible to continue given a particular function and termination context. We demand that if we continually test using |stop|, then add the function with |(+=)|, then eventually |stop| will return |True|, ensuring termination.
+
+\paragraph{|supercompile|} The |supercompile| function puts all the parts together. Reading from right to left, we first generated an infinite tree by optimising the expression |main|, we then flatten the tree to a finite number of resultant functions, and finally assign names to each of the result functions.
+
+\paragraph{|optimise|} The |optimise| function constructs the infinite tree of result functions. While the tree is infinite, we demand that on any path from the root of the tree we must encounter the same |pre| value more than once. To ensure this criteria we use a termination context.
+
+\paragraph{|reduce|} The |reduce| function optimises a function by repeatedly evaluating it. If we can't evaluate any further we call |split|. We use a local termination context to ensure termination.
+
+\paragraph{|flatten|} The |flatten| function takes a tree and traverses a finite portion, assuming the termination criteria given in |optimise|.
+
+\paragraph{|assign|} finally assigns names to each function in the result.
+
+It is important to note that of the functions available when we call |flatten| we can think of non-deterministically picking one for each |pre| value. Given that each function may have been compiled with a different termination context in |optimise| these may have different results -- but all are semantically equivalent.
 
 So, harping back to our initial example, we first evaluate until we get:
 
@@ -273,14 +276,10 @@ case x of
 
 We then end up tying back so in the |...| we write |root f g xs|, making a fused version.
 
-We have presented our manager in a great amount of detail -- deliberately. When writing a supercompile it turns out that the most subtle aspect is actually the manager. There are some important points -- you must always assign names before making the supercompile call (to ensure that recursive functions terminate). The use of forwarding methods is important to keep the complexity down, and can be resolved during post processing (\S\ref{sec:postprocess}). Very small changes result in it not terminating. The only differences between this code, and the code used in our actual supercompiler, is that our version has additional logging behaviour to allow the effects of supercompilation to be debugged!
-
 \subsection{Evaluation}
 \label{sec:eval}
 
 The evaluation step is easy, follow from the root expression upwards until we hit a |Fun|. Once we do, expand it out replacing with it's body, provided it has enough arguments not to be a lambda.
-
-\subsubsection{One Step Evaluation}
 
 We can transform our code in to a zipper:
 
@@ -317,22 +316,6 @@ new = Let (zip args (map Var [a_1..a_n])) bod
 \end{code}
 
 Then we replace variable |v_n| with |new| in the original expression. Then we apply the simplification rules again \ref{sec:simplify}.
-
-\subsubsection{Multiple Step Reduction}
-
-And reduction is just:
-
-\begin{code}
-reduce :: Env -> Func -> Split
-reduce env = f newTerm
-    where f t x | terminate t x = stop t x
-                | Just x' <- step env x = f (t += x) x'
-                | otherwise = split x
-\end{code}
-
-How awesome.
-
-Note the local termination context.
 
 Going back to our root evaluation, we'd end up with the sequence...
 
@@ -548,6 +531,10 @@ It never rewrites expressions, allowing for the tantilising opportunity to parti
 We use a local termination pile, which means the optimisation of a program is not based on what has passed before. This hopefully leads to better predictability.
 
 It's simple. The details provided in this paper are complete -- we have left nothing out.
+
+Better separation with the manager and the other aspects.
+
+Much easier handling of recursive functions.
 
 \subsection{Extensions}
 \label{sec:extensions}

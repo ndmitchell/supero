@@ -22,6 +22,8 @@
 %format ?> = "]\!]"
 %format += = "+\!\!\!\!="
 %format ==> = "\Longrightarrow{}"
+%format <=| = "\unlhd{}"
+%format <| = "\lhd{}"
 
 %format w_1  = "\Varid{w_1}"
 %format w_2  = "\Varid{w_2}"
@@ -39,9 +41,17 @@
 %format p_m = "\Varid{p_m}"
 %format s_m = "\Varid{s_m}"
 %format v_j = "\Varid{v_j}"
+%format v_5 = "\Varid{v_5}"
+%format v_6 = "\Varid{v_6}"
+%format x_3 = "\Varid{x_3}"
+%format x_4 = "\Varid{x_4}"
+%format x_m = "\Varid{x_m}"
+%format s_m_1 = "\Varid{s_{m-1}}"
+%format w_m = "\Varid{w_m}"
 
 
 \newcommand{\unknown}{XXX}
+\newcommand{\name}[3]{\ensuremath{\langle\mathsf{#1},\mathsf{#2},\mathsf{#3}\rangle}}
 
 \begin{document}
 
@@ -93,7 +103,7 @@ We hope that from the descriptions given in this paper a user is able to write t
 
 \subsection{Contributions}
 
-Our primary contribution is the design of a new supercompiler (\S\ref{sec:method}). Our supercompiler has many differences from previous supercompilers (\S\ref{sec:comparison}), including a new core language, a substantially different treatment of let expressions, a transformation that never manipulates inside expressions and an entirely new termination criteria. The result is relatively simple, yet still powerful.
+Our primary contribution is the design of a new supercompiler (\S\ref{sec:method}). Our supercompiler has many differences from previous supercompilers (\S\ref{sec:comparison}), including a new core language, a substantially different treatment of let expressions, a transformation that never manipulates inside expressions and an entirely new termination criteria. The result is simpler than previous supercompilers, yet still powerful.
 
 In addition, we make the following contributions:
 
@@ -107,8 +117,9 @@ In addition, we make the following contributions:
 \section{Method}
 \label{sec:method}
 
-This section describes our supercompiler. We first present a Core language (\S\ref{sec:core}), along with simplification rule (\S\ref{sec:simplify}). We then present the overall algorithm (\S\ref{sec:manager}), which uses answers to the following questions:
+This section describes our supercompiler. We first present a Core language (\S\ref{sec:core}), along with simplification rules (\S\ref{sec:simplify}). We then present the overall algorithm (\S\ref{sec:manager}), which uses answers to the following questions:
 
+\todo{reduce the space between bullet points}
 \begin{itemize}
 \item How do you evaluate an open term? (\S\ref{sec:eval})
 \item What happens if you can't evaluate an open term further? (\S\ref{sec:eval_split})
@@ -116,14 +127,14 @@ This section describes our supercompiler. We first present a Core language (\S\r
 \item What happens if you have to stop? (\S\ref{sec:term_split})
 \end{itemize}
 
-Throughout this section we use the following example:
+\noindent Throughout this section we use the following example:
 
 \begin{code}
 root g f x = map g (map f x)
 
-map f x = case x of
-    []    -> []
-    y:ys  -> f y : map f ys
+map f x = case  x of
+                []    -> []
+                y:ys  -> f y : map f ys
 \end{code}
 
 This example applies |map| twice -- the expression |map f x| produces a list that is immediately consumed by |map g|. A good supercompiler should remove the intermediate list.
@@ -133,18 +144,18 @@ This example applies |map| twice -- the expression |map f x| produces a list tha
 
 \begin{figure}
 \begin{code}
-type Var  = String -- variable names
-type Fun  = String -- function names
-type Con  = String -- constructor names
+type Var   =   String -- variable names
+type Fun   =   String -- function names
+type Con   =   String -- constructor names
 
-data Exp  =  Var Var
-          |  Fun Fun
-          |  Con Con [Var]
-          |  App Var Var
-          |  Let [(Var,Exp)] Var
-          |  Case Var [(Pat, Exp)]
+data Exp   =   Var Var
+           |   Fun Fun
+           |   Con Con [Var]
+           |   App Var Var
+           |   Let [(Var,Exp)] Var
+           |   Case Var [(Pat, Exp)]
 
-type Pat = Exp -- restricted to Con
+type Pat   =   Exp -- restricted to |Con|
 \end{code}
 \caption{Core Language}
 \label{fig:core}
@@ -154,11 +165,11 @@ Our Core language for expressions is given in Figure \ref{fig:core}, and has muc
 
 \begin{itemize}
 \item We require variables in many places that would normally permit expressions. A standard Core language (such as from \citet{ghc_core}) could be translated to ours by inserting let bindings.
-\item In many Core languages a distinction is made between let and letrec. We allow expressions bound at a let to refer to variables bound at the same let, but disallow recursion. An alternative description is that we allow recursive let, but only if there is an equivalent nested non-recursive let that can represent the same expression. For example we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
+\item In many Core languages a distinction is made between standard let bindings and recursive let bindings. We allow expressions bound at a let to refer to variables bound at the same let, but disallow recursion. An alternative description is that we allow recursive let, but only if there is an equivalent nested non-recursive let that can represent the same expression. For example we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
 \item We don't have default patterns in case expressions, or literals. Both can be added (see \S\ref{sec:extensions}), but are of little interest when describing a supercompiler.
 \end{itemize}
 
-We write expressions using standard Haskell syntax (i.e. |let| for |Let|, |case/of| for |Case| etc.). Rewriting our |map/map| example in our Core language gives:
+We write expressions using standard Haskell syntax (i.e. |let| for |Let|, |case| for |Case| etc.). Rewriting the |map/map| example in our Core language gives:
 
 \begin{code}
 root g f x =  let  v_1 =  map
@@ -170,32 +181,29 @@ root g f x =  let  v_1 =  map
                    v_4 =  v_3 v_2
               in   v_4
 
-map f x = case x of
-    [] ->   let  q = []
-            in   q
-    y:ys -> let  v_1 = f y
-                 w_1 = map
-                 w_2 = w_1 f
-                 w_3 = w_2 ys
-                 q = (:) v_1 w_3
-            in   q
+map f x = case  x of
+                []    ->   let  q    = []
+                           in   q
+                y:ys  ->   let  v_1  = f y
+                                w_1  = map
+                                w_2  = w_1 f
+                                w_3  = w_2 ys
+                                q    = (:) v_1 w_3
+                           in   q
 \end{code}
 
-Our Core language is rather verbose, so we sometimes use a standard Core language, that could always be translated to our Core language. For example with |map|:
+Our Core language is rather verbose, so sometimes we write expressions using a standard Core language, assuming these are translated to our Core language when necessary. For example, we might write |map| as:
 
 \begin{code}
-map f x = case x of
-    [] -> []
-    y:ys -> f y : map f ys
+map f x = case  x of
+                []    -> []
+                y:ys  -> f y : map f ys
 \end{code}
-
-Here we assume that if we were interested in the actual bodies in the alternative we'd translate it.
-
 
 \subsection{Simplified Core}
 \label{sec:simplify}
 
-We now define a simplified form for our Core language. When working with Core expressions we assume they are always simplified, and we can easily simplify Core expressions. Our simplified form requires that all variables are unique, that the root of a function be a |Let|, and that the expressions bound at the root |Let| must not have the following form:
+We now define a simplified form for our Core language. When working with Core expressions we assume they are always simplified, and after constructing new expressions we always simplify them. Our simplified form requires that all variables are unique, that the root of a function be a let expression, and that the expressions bound at the root let must \textit{not} have the following form:
 
 \begin{itemize}
 \item |App v w|, where |v| is bound to a |Con| -- the |App| can be replaced with a Con of higher arity.
@@ -204,21 +212,37 @@ We now define a simplified form for our Core language. When working with Core ex
 \item |Var v| -- we can remove the binding by replacing the bound variable with |v| everywhere.
 \end{itemize}
 
-\todo{also eliminate all unused variables, and the root may be zero bindings.}
-
-For example the simplified version of |root| is:
+We can also remove any bindings which are not used. These simplifications may result in a root let expression with no bindings. As an example, we can apply these rules to the following expression:
 
 \begin{code}
-root g f x =  let  v_1 = map
-                   w_1 = map
-                   w_2 = w_1 f
-                   w_3 = w_2 x
-                   v_3 = v_1 g
-                   v_4 = v_3 w_3
-              in   v_4
+let  v_1  = f
+     v_2  = Con x
+     v_3  = v_2 y
+     v_4  = let w_1 = y in v_1 w_1
+     v_5  = case v_3 of Con a b -> v_4 a
+in   v_5
 \end{code}
 
-For termination we also require that binding's are given in a predictable order, and that all variable names are normalised. We don't typically write functions in this style, since it makes them harder to read, but we could. The termination relies on it!
+\noindent To give:
+
+\begin{code}
+let  v_1  = f
+     v_4  = v_1 y
+     v_5  = v_4 x
+in   v_5
+\end{code}
+
+As another example, the simplified version of |root| is:
+
+\begin{code}
+root g f x =  let  v_1  = map
+                   w_1  = map
+                   w_2  = w_1 f
+                   w_3  = w_2 x
+                   v_3  = v_1 g
+                   v_4  = v_3 w_3
+              in   v_4
+\end{code}
 
 \subsection{Manager}
 \label{sec:manager}
@@ -236,15 +260,15 @@ supercompile env =
     assign $ flatten $ optimise env $ env "main"
 
 optimise :: Env -> Lambda -> Tree
-optimise env = f newTerm
-    where f t x = Tree x gen (map (f (t+=x)) cs)
-            where (gen,cs) = if terminate t x  then stop t x
-                                               else reduce env x
+optimise env = f []
+    where  f t x | terminate (<=|) t x = g (stop t x) t
+                 | otherwise = g (reduce env x) (x:t)
+           g (gen,cs) t = Tree x gen (map (f t) cs)
 
 reduce :: Env -> Lambda -> ([Fun] -> Lambda, [Lambda])
-reduce env = f newTerm
-    where f t x | terminate t x = stop t x
-                | Just x' <- step env x = f (t += x) x'
+reduce env = f []
+    where f t x | terminate (<|) t x = stop t x
+                | Just x' <- step env x = f (x:t) x'
                 | otherwise = split x
 
 flatten :: Tree -> [Tree]
@@ -260,40 +284,50 @@ assign ts = [(f t, gen t (map f (children t))) |  t <- ts]
 \label{fig:manager}
 \end{figure}
 
-Our supercompiler is based around a manager, that calls the other parts of the supercompiler. The manager has two main purposes, to ensure termination (by calling the termination functions) and to tie back recursive functions. In our experience the act of tieing recursion is often one of the trickiest aspects when writing a supercompiler, so we deliberately choose to give all the details. The complete code of our manager is given in Figure \ref{fig:manager}. We start by giving an intuition for how the manager works, then describe each function individually.
-
-The supercompiler starts with a source program, and generates a target program. Expressions from these programs are distinct -- target expressions cannot refer to source functions and vice versa. The source and target program are semantically identical, but it is hoped the target program will be more optimised. We use the type |Lambda| to represent an expression which may be enclosed within a lambda, and the type |Env| to represent a mapping from function names to lambdas. While we can think of |Lambda| as a function, another interpretation is that |Exp| is an \textit{open expression}, whose free variables are listed in |Lambda|, turning it in to a \textit{closed expression}.
-
-The manager first builds a tree tree, where each node in the tree has a source expression (|pre|) which represents it's semantics. The target expression associated with the source expression may call other target functions, however these functions do not yet have names. Therefore, we store target expressions as a generator that when given the function names produces the target expression (|gen|), and a list of trees representing the target functions it needs to call (|children|). We then flatten this tree, ensuring identical functions are only represented once, and assign names to get the target program. If a target function is recursive then the initial tree will be infinite, but the flattened tree will always be finite due to the termination criteria.
-
-We rely on a termination scheme, which we define in \S\ref{sec:term}. The function |newTerm| constructs a new termination context, |(+=)| adds an expression to the termination context, and |terminate t x| returns |True| if it is not permissible to continue given a particular expression and termination context. We demand that for any infinite sequence of expressions, |terminate| will eventually return |True| if we keep adding with |(+=)|. More concretely, |terminates newTerm xs|, where |xs| is an infinite list, will always return |True| rather than diverging:
-
+\begin{figure}
 \begin{code}
-terminates t (x:xs) = terminate t x || terminates (t += x) xs
+step :: Env -> Lambda -> Maybe Lambda -- \S\ref{sec:eval}
+split :: Lambda -> ([Fun] -> Lambda, [Lambda]) -- \S\ref{sec:eval_split}
+
+type History = [Lambda]
+(<|),(<=) :: Lambda -> Lambda -> Bool -- \S\ref{sec:term}
+terminate  :: (Lambda -> Lambda -> Bool)
+           -> History -> Lambda -> Bool -- \S\ref{sec:term}
+stop :: History -> Lambda -> ([Fun] -> Lambda, [Lambda])
+    -- \S\ref{sec:term_split}
 \end{code}
+\caption{Auxiliary definitions for Figure \ref{fig:manager}.}
+\label{fig:manager2}
+\end{figure}
+
+Our supercompiler is based around a manager, that integrates the answers to the questions of supercompilation. The manager itself has two main purposes: to ensure termination, and to tie back recursive functions. In our experience the act of tieing recursion is often one of the trickiest aspects when writing a supercompiler, so we deliberately choose to give plenty of detail. The code for our manager is given in Figure \ref{fig:manager}, making use of a some auxiliary functions whose types are given in \ref{fig:manager2}. We start by giving an intuition for how the manager works, then describe each part separately.
+
+The supercompiler takes a source program, and generates a target program. Functions in these programs are distinct -- target expressions cannot refer to source functions. The source and target program are semantically identical, but it is hoped the target program runs faster. We use the type |Lambda| to represent an expression enclosed within a lambda, and the type |Env| to represent a mapping from function names to lambda expressions. We can think of |Lambda| as a function, or as an \textit{open expression} whose free variables are listed in the lambda.
+
+The manager first builds a tree tree, where each node in the tree is has a source expression (|pre|). The associated target expression may call other target functions, but these functions do not yet have names. Therefore, we store target expressions as a generator that when given the function names produces the target expression (|gen|), and a list of trees representing the target functions it needs to call (|children|). We then flatten this tree, ensuring identical functions are only represented once, and supply names to each node to generate the target program. If a target function is recursive then the initial tree will be infinite, but the flattened tree will always be finite due to the termination scheme defined in \S\ref{sec:term}.
 
 \newcommand{\function}[1]{\paragraph{\textsf{#1:}}\hspace{-3mm}}
 
-\function{supercompile} This function puts all the parts together. Reading from right to left, we first generated an infinite tree by optimising the expression |main|, we then flatten the tree to a finite number of resultant functions, and finally assign names to each of the result functions.
+\function{supercompile} This function puts all the parts together. Reading from right to left, we first generate a potentially infinite tree by optimising the expression |main|, we then flatten the tree to a finite number of resultant functions, and finally assign names to each of the result functions.
 
-\function{optimise} This function constructs the infinite tree of result functions. While the tree is infinite, we demand that on any path from the root of the tree we must encounter the same |pre| value more than once. To ensure this criteria we use a termination context. If we are forced to terminate we call |stop|, which splits the function into several functions and ensures each of them pass the termination criteria. If the termination criteria do not force us to stop, then we call |reduce| to perform reductions on the expression.
+\function{optimise} This function constructs the tree of result functions. While the tree may be infinite, we demand that any infinite path from the root must encounter the same |pre| value more than once. We require that for any infinite sequence |ts| with no repeats, there must exist an |i| such that |terminate (<=||) (take i ts) (ts !! i+1)| returns |True|. If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |split ts| only produces subexpressions which pass the termination test. If the termination criteria do not force us to stop, then we call |reduce| to evaluate the expression.
 
-\function{reduce} This function optimises a function by repeatedly evaluating it calling |step|. If we can't evaluate any further we call |split|. We use a local termination context to ensure termination of this part.
+\function{reduce} This function optimises a function by repeatedly evaluating it by calling |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence |ts|, there must exist an |i| such that |terminate (<||) (take i ts) (ts !! i+1)| returns |True|.
 
-\function{flatten} This function takes a tree and extracts a finite number of functions from it, assuming the termination criteria given in |optimise|. It is important to note that of the functions available when we call |flatten| we can think of non-deterministically picking one for each |pre| value. Given that each function may have been compiled with a different termination context in |optimise| these may have different results -- but all are semantically equivalent.
+\function{flatten} This function takes a tree and extracts a finite number of functions from it, assuming the termination restrictions given in |optimise|. Our |flatten| function will only keep one tree associated with each source expression. These trees may be different if one resulted from a call to |stop|, while another from a call to |reduce| -- but all are semantically equivalent.
 
-\function{assign} This function assigns names to each target function, and constructs the target expressions by calling |gen|. We assume the function |freshNames| returns the infinite list of fresh variable names.
+\function{assign} This function assigns names to each target function, and constructs the target expressions by calling |gen|. We assume the function |freshNames| returns the infinite list of fresh function names.
 
 \subsubsection{The Example}
 \label{sec:manager_example}
 
-So, revisiting our initial example, we first call |optimise| with:
+Revisiting our initial example, |supercompile| first calls |optimise| with:
 
 \begin{code}
 \g f x -> map g (map f x)
 \end{code}
 
-The termination context is empty, so we call |reduce| which calls |step| until we reach the code:
+The termination context is empty, so we call |reduce| which calls |step| repeatedly until we reach the expression:
 
 \begin{code}
 \g f x ->  let  v = case  w of
@@ -305,25 +339,27 @@ The termination context is empty, so we call |reduce| which calls |step| until w
            in   v
 \end{code}
 
-Now we can't step any further since what we really need is the result of |x|. We therefore split to achieve:
+The |step| function now returns |Nothing|, since the root cannot be reduced without the result of |x|. We therefore call |split| which results in:
 
 \begin{code}
-\g f x ->  case  x of
-                 []    -> <? let v = ...; w = ...; x = [] in v ?>
-                 z:zs  -> <? let v = ...; w = ...; x = z:zs in v ?>
+\g f x -> case  x of
+                []    -> <? let v = ...; w = ...; x = [] in v ?>
+                z:zs  -> <? let v = ...; w = ...; x = z:zs in v ?>
 \end{code}
 
-We then optimise the previous expression, but with |x| bound to one of the alternatives. To represent this we use the |<? bullet ?>| notation, this entire expression represents a |([Fun] -> Lambda, [Lambda])|. The |<? bullet ?>| parts are replaced with function names, all the free variables needed in the child expressions become lambdas. When optimising, the case where |x| is empty is |[]| is simple -- the simplification rules from \S\ref{sec:simplify} kick in to immediately give |[]| as the result. For the other case, we first get:
+To represent a value of type |([Fun] -> Lambda, [Lambda])| we use the |<? bullet ?>| notation to identify particular children of an expression. The first component of the resulting pair takes a function name for each child and constructs the target expression. The second component is the list of children. For each child, all the free variables needed become arguments to the lambda, and are passed forward by the target expression.
+
+When optimising the first child expression, where |x = []|, the simplification rules from \S\ref{sec:simplify} immediately produce |[]| as the result. For the other child, we first get:
 
 \begin{code}
 \g f z zs ->
-    let  v = case  w  of {[] -> []; y  :ys  -> g  y  : map g  ys  }
-         w = case  x  of {[] -> []; z  :zs  -> f  z  : map f  zs  }
+    let  v = case  w  of [] -> []; y  :ys  -> g  y  : map g  ys
+         w = case  x  of [] -> []; z  :zs  -> f  z  : map f  zs
          x = z:zs
     in   v
 \end{code}
 
-Which then get's simplified to:
+Which simplifies to:
 
 \begin{code}
 \g f z zs ->  let  v = q : qs
@@ -334,23 +370,24 @@ Which then get's simplified to:
               in   v
 \end{code}
 
-Now we try step, but this stops immediately, as the root of this expression is a |(:)| that can't be evaluated. We therefore call split and end up with:
+Calling |step| produces |Nothing|, as the root of this expression is a |(:)| that can't be evaluated. We therefore call |split| which results in:
 
 \begin{code}
 \g f z zs ->  let  q = <? g (f z) ?>
                    qs = <? map g (map f zs) ?>
-              in   q : qs
+                   v = q : qs
+              in   v
 \end{code}
 
-Now when optimising |g (f z)| we will get no optimisation, as there is no information known. When optimising |map g (map f zs)| we will immediately hit the termination criteria, and |stop| will be called. However, the |flatten| function will notice that in both times we start from the same expression, and therefore give them both the same name creating a recursive function. In this example the calls to |map/map| have different variable names, so don't look identical, but if we reassigned the variables in a systematic way after each step we would (but it's also a lot harder to follow if the variables keep getting renamed!). The end function, with names assigned, is:
+When optimising |g (f z)| we get no optimisation, as there is no available information. To optimise |map g (map f zs)| we do exactly the same steps as we have already done. However, the |flatten| function will spot that both nodes have the same |pre| expression (modulo free variables), and give them both the same name, creating a recursive function. We then assign names using |assign|. For the purposes of display (not optimisation), we apply a number of simplifications given in \S\ref{sec:postprocess}. The end result is:
 
 \begin{code}
-main g f x = case x of
-    [] -> []
-    z:zs -> g (f z) : main g f zs
+main g f x = case  x of
+                   []    -> []
+                   z:zs  -> g (f z) : main g f zs
 \end{code}
 
-Note that the end version has exactly one case and has automatically fused the intermediate list. Here we've applied a number of simplifications listed in \S\ref{sec:postprocess}.
+The final version has automatically removed the intermediate list, with no extra knowledge about the |map| function or it's fusion rules.
 
 \subsection{Evaluation}
 \label{sec:eval}
@@ -358,10 +395,10 @@ Note that the end version has exactly one case and has automatically fused the i
 \begin{figure}
 \begin{code}
 force :: Exp -> Maybe Var
-force (Case v _  ) = Just v
-force (App v _   ) = Just v
-force (Var v     ) = Just v
-force _ = Nothing
+force (Case  v _  )  = Just v
+force (App   v _  )  = Just v
+force (Var   v    )  = Just v
+force _              = Nothing
 
 stack :: Lambda -> [(Var, Exp)]
 stack (Lambda _ (Let bind v)) = f v
@@ -373,72 +410,99 @@ stack (Lambda _ (Let bind v)) = f v
 \label{fig:stack}
 \end{figure}
 
-Evaluation is based around the |step| function. Given an expression, |step| inlines a function and returns |Just|, or if no function can be inlined returns |Nothing|. To choose which function to inline, we look at which function would be entered next if we were simply evaluating the expression. We replace this function with it's body, provided it has enough arguments not to result in a lambda.
+Evaluation is based around the |step| function. Given an expression, |step| inlines a function body and returns |Just|, or if no suitable function can be inlined returns |Nothing|. We always inline the function which would be evaluated next during normal evaluation, replacing the function with it's body, provided it has enough arguments not to result in a lambda.
 
 To be more precise, we define the evaluation stack of an expression as the sequence of let bindings that would be evaluated in order, along with their associated expressions. A function to calculate the stack is given in Figure \ref{fig:stack}. Looking at the original example:
 
 \begin{code}
-\g f x =  let  v_1 = map
-               w_1 = map
-               w_2 = w_1 f
-               w_3 = w_2 x
-               v_3 = v_1 g
-               v_4 = v_3 w_3
+\g f x =  let  v_1  = map
+               w_1  = map
+               w_2  = w_1 f
+               w_3  = w_2 x
+               v_3  = v_1 g
+               v_4  = v_3 w_3
           in   v_4
 \end{code}
 
-The evaluation stack for this expression will be |[v_1,v_3,v_4]|. The stack is computed from the right, starting at the body of the let. From |v_4|  we arrive at the expression |v_3 w_3|, which will need to first evaluate |v_3|. Similarly the evaluation of |v_3| will require evaluating |v_1| first. Therefore, to evaluate this expression we will start by evaluating |v_1|, and thus |map|.
+The evaluation stack for this expression will be |[v_1,v_3,v_4]|. The stack is computed from the right, starting at the body of the let. From |v_4| we arrive at the expression |v_3 w_3|, which will need to first evaluate |v_3|. Similarly the evaluation of |v_3| will require evaluating |v_1| first. Therefore, to evaluate this expression we will start by evaluating |v_1|, and thus |map|.
 
-We can define the step function as matching the following stack configuration:
-
-\begin{code}
-stack[0]              = (v_1, Fun x)
-stack[i `elem` 1..n]  = (v_i, App _ w_i)
-    where  Lambda args bod = env x
-           n = length args
-\end{code}
-
-This configuration requires the top of the stack to be a function |x|, with |n| arguments. We then require the next |n| entries on the stack to be |App| values. Given this stack configuration we can replace the variable |v_n| with:
+We scan down the stack, find sufficient arguments, inline the body, and replace the expression bound to |v_4| with:
 
 \begin{code}
-Let (zip args (map Var [w_1..w_n])) bod
-\end{code}
-
-For simplicity we assume |args| are distinct from |w_1..w_n|, if this is not the case than |args| and |body| can be renamed. After changing |v_n| we apply the simplification rules (\S\ref{sec:simplify}).
-
-Going back to our example, we'd replace |v_4| with:
-
-\begin{code}
-let  f = g
-     x = w_3
+let  f  = g
+     x  = w_3
 in   case  x of
-           [] -> []
-           y:ys -> f y : map f ys
+           []    -> []
+           y:ys  -> f y : map f ys
 \end{code}
 
-The simplification will immediately eliminate the |f| and |x| bindings.
+Simplification will immediately eliminate the |f| and |x| bindings.
+
+More generally, we can match any expression with the following pattern:
+
+\begin{code}
+\free ->  let  s_1  = f
+               s_2  = s_1 w_2
+               s_m  = s_m_1 w_m
+               v_1  = e_1
+               v_n  = e_n
+          in   v
+where f = \x_2 x_m -> e'
+\end{code}
+
+Here we have used |s_1| to represent the first element of the stack, which must be a function. The elements |s_2..s_m| must all be applications on the stack, and must be equal to the arity of the lambda expression bound to |f|. We allow any other variables |v_1..v_n| bound to expressions |e_1..e_n| to be present. Given this configuration we can rewrite to:
+
+\begin{code}
+\free ->  let  s_1  = f
+               s_2  = s_1 w_2
+               s_m  = let x_2 = w_2; x_m = w_m in e'
+               v_1  = e_1
+               v_n  = e_n
+          in   v
+\end{code}
+
+As always, after generating a new expression we immediately apply the simplification rules (\S\ref{sec:simplify}), which will eliminate the nested let expression bound to |s_m|.
+
+\subsubsection{Special Empty Case}
+
+As a special case, we replace the pattern:
+
+\begin{code}
+\free ->  let  v = f
+          in   v
+where f = \x_1 x_n -> e
+\end{code}
+
+With:
+
+\begin{code}
+\free x_1 x_n -> e
+\end{code}
+
+We include this rule to ensure that we can evaluate even the smallest expression, so even with a very restrictive termination function we can still make progress.
 
 \subsection{Evaluation Splitting}
 \label{sec:eval_split}
 
-If evaluation cannot proceed we split the expression to produce a target function, and a list of children expressions for further optimisation. When splitting an expression there are three concerns:
+If evaluation cannot proceed we split to produce a target expression, and a list of child expressions for further optimisation, using the |<? bullet ?>| notation described in \S\ref{sec:manager_example}. When splitting an expression there are three concerns:
 
-\paragraph{Permit further optimisation:} When splitting we hope that the construct that is blocking evaluation will be placed in the target expression, and that the children will be suitable for further evaluation.
+\paragraph{Permit further optimisation:} We aim to place any constructs blocking evaluation in the target expression, so that the children are suitable for further optimisation.
 
-\paragraph{No loss of sharing:} A variable may not be duplicated into multiple children expressions, if that means that at runtime it will be evaluated multiple times. In essence, the target program cannot evaluate some functions more than the source program.
+\paragraph{No loss of sharing:} A variable may not be duplicated if that causes it to be evaluated multiple times at runtime. The target program cannot remove sharing present in the source program.
 
-\paragraph{Keep expressions together:} Every time we separate expressions by turning a bound variable (whose right-hand side is available for optimisation) in to a free variable we have lost some optimisation opportunities. In many cases this goal is in direct contradiction with no loss of sharing, in which case we always favour no loss of sharing.
+\paragraph{Keep expressions together:} If we turn a bound variable in to a free variable we loose optimisation opportunities, as the right-hand side of the variable is no longer available for optimisation. We aim to keep as many expressions together as possible, but not at the cost of loosing sharing.
 
-We write the residual expression in unrestricted Core language, which we assume is transformed in to our Core language. We split in three different ways depending on the type of expression at the top the stack (as defined by Figure \ref{fig:stack}). We now describe the three different ways to split, starting with examples, then defining the rules.
+\smallskip
+We split in one of three different ways, depending on the type of expression at the top of the stack (as described in \S\ref{sec:eval}). We now describe each of the three ways to split, in each case we start with an example, then define the general rule.
 
 \subsubsection{Case Expression}
 
-If the top of the stack is a case expression then we make the target a case expression, and under each alternative we create a child expression identical to the original expression, but with the case scrutinee bound to the appropriate pattern. For example, given:
+If the top of the stack is a case expression then the target is a similar case expression, and under each alternative we create a child expression with the case scrutinee bound to the appropriate pattern. For example, given:
 
 \begin{code}
 \x ->  let   v = case  x of
-                       [] -> []
-                       y:ys -> add y ys
+                       []    -> []
+                       y:ys  -> add y ys
        in    v
 \end{code}
 
@@ -454,19 +518,19 @@ We produce the residual expression:
                     in   x ?>
 \end{code}
 
-We take each expression in |<? bullet ?>| brackets, and simplify it. We then take all the free variables bound in the expression and passing them as arguments. We then put them back together with function names. For example, the first variable immediately simplifies to |[]|. This expression takes no variables. Looking more closely at the second alternative, we start with the lambda expression:
+Looking more closely at the second alternative, we start with the expression:
 
 \begin{code}
-\y ys ->  let  v = case x of [] -> []; y:ys -> add y ys
-               x = y : ys
-          in v
+\y ys ->  let  v  = case x of [] -> []; y:ys -> add y ys
+               x  = y : ys
+          in   v
 \end{code}
 
-This lambda expression immediately simplifies to:
+This expression immediately simplifies to:
 
 \begin{code}
 \y ys ->  let  v = add y ys
-          in v
+          in   v
 \end{code}
 
 One important point is that for the first alternative we \textit{do not} pass in the variables |y| and |ys| -- these variables are not included in the lambda. In general we do not pass onwards any free variables which are obviously redundant after the simplification rules have been applied. By making this restriction we ensure that the number of free variables in a function cannot grow without bound -- as the expressions are bounded and therefore they can only use a finite number of free variables. We limit the free variables for all types of split operation.
@@ -484,17 +548,16 @@ The general rule is that the target is the case on the top of the stack, and the
 
 \begin{code}
 \free -> case x of
-    p_1 -> <? let  s_1 = case x of p_1 -> e_1'; p_m -> e_m'
-                   v_1 = e_1; v_n = e_n; x = p_1 in v ?>
-    p_m -> <? let  s_1 = case x of p_1 -> e_1'; p_m -> e_m'
-                   v_1 = e_1; v_n = e_n; x = p_m in v ?>
+    p_1  -> <? let  s_1 = case x of p_1 -> e_1'; p_m -> e_m'
+                    v_1 = e_1; v_n = e_n; x = p_1 in v ?>
+    p_m  -> <? let  s_1 = case x of p_1 -> e_1'; p_m -> e_m'
+                    v_1 = e_1; v_n = e_n; x = p_m in v ?>
 \end{code}
 
 \subsubsection{Function}
+\label{sec:eval_split_function}
 
-If the top of the stack is a function, that means that it must have insufficient arguments for the evaluation to take place. To deal with this under application we need to introduce a lambda. When introducing a lambda it is important that we do not reduce the sharing.
-
-At the point we are stopping the set of variables bound in the let can be divided in to those which are on the stack and those which are not. For each variable not on the stack, we add the stack variables with their expressions as bindings. For the body of the let, we add a lambda along with all the stack variables and their bodies. To give an example, imagine we have:
+If the top of the stack is a function when we get to split, then there must be insufficient arguments for evaluation to take place. To deal with the lack of arguments we introduce a lambda. The key point when introducing a lambda is that we do not reduce sharing. Consider the following example:
 
 \begin{code}
 \x ->  let  s_1 = add
@@ -504,7 +567,7 @@ At the point we are stopping the set of variables bound in the let can be divide
        in   s_2
 \end{code}
 
-It would certainly be tempting to rewrite |\x -> ...| as |\x y -> ...|, but this potentially duplicates the expensive computation of |v_2|. Instead we look at the variables on the stack (|s_1| and |s_2|) and duplicate their bindings at every site:
+Here the |add| function takes two arguments, but has only been given one. It is tempting to rewrite |\x -> ...| as |\x y -> ...|, but this potentially duplicates the expensive computation of |v_2|. Instead we take the variables on the stack (|s_1| and |s_2|) and duplicate their bindings everywhere:
 
 \begin{code}
 \x ->  let  v_1 =  let s_1 = add; s_2 = s_1 v_2 in expensive
@@ -528,14 +591,14 @@ We could now produce the residual expression:
        in   \y ->  <? let s_1 = add; s_2 = s_1 v_2 in s_2 y ?>
 \end{code}
 
-However, note that we have now split the bindings for |v_1| and |v_2| apart, when there is no real need. We therefore move binding |v_1| under |v_2|, because it is only referred to by |v_4|, to give:
+However, we have now split the bindings for |v_1| and |v_2| apart, when there is no real need. We therefore move binding |v_1| under |v_2|, because it is only referred to by |v_2|, to give:
 
 \begin{code}
 \x ->  let  v_2 =  <? let v_1 = expensive in v_1 x ?>
        in   \y ->  <? let s_1 = add; s_2 = s_1 v_2 in y ?>
 \end{code}
 
-We now optimise the body of |v_2| and the under the lambda which introduces |y|. Note that assuming |add| has arity two, we'll now be able to inline |add|. We loose the sharing on some PAP's, but they aren't too important, since they didn't do anything good anyway. Be careful that |y| must be the last variable in the inner lambda, since then we can eliminate it without requiring a language supporting let.
+We will now continue to optimise the body of |v_2| and the under the lambda introducing |y|. Provided |add| has arity two, we'll now be able to inline |add|. We have duplicated the partial applications along the stack, but that is acceptable as they are cheap and have a small fixed cost. To accommodate the inner lambda in the target expression we can either permit target expressions to be a richer language than our Core language from \S\ref{sec:core}, or we can arrange for the final argument of the child lambda to be |y|, in which case it can be passed by partial application rather than explicit lambda.
 
 More generally, given:
 
@@ -545,7 +608,7 @@ More generally, given:
                s_1  = f
                s_2  = e_2'
                s_m  = e_m'
-          in   s_n
+          in   s_m
 \end{code}
 
 We rewrite:
@@ -556,11 +619,11 @@ We rewrite:
           in   \y ->  <? let s_1 = f; s_2 = e_2'; s_m = e_m' in s_m y ?>
 \end{code}
 
-We then move any binding |v_i| under |v_j| if |v_i| is only used within the body of |v_j|.
+We then repeatedly move any binding |v_i| under |v_j| if |v_i| is only used within the body of |v_j|.
 
 \subsubsection{Anything Else}
 
-The final case applies to anything else, including a constructor, a single variable, and an application to an unknown variable. The split is defined in a similar way as for function, but ignoring the complexity of a lambda. Taking the example of:
+The final rule applies to any expression where the top of the stack is not a case expression or function, including a constructor, a variable, and an application to an unknown variable. Given the example:
 
 \begin{code}
 \x y ->  let  v_1 = expensive
@@ -572,13 +635,13 @@ The final case applies to anything else, including a constructor, a single varia
 We simply put all the variables other than the first on the stack inside |<? bullet ?>| brackets:
 
 \begin{code}
-\x y -> let v_1 = <? expensive ?>
-            v_2 = <? v_1 x ?>
-            v_3 = Con v_2 y v_2
-        in v_3
+\x y ->  let  v_1 = <? expensive ?>
+              v_2 = <? v_1 x ?>
+              v_3 = Con v_2 y v_2
+         in   v_3
 \end{code}
 
-We then perform the same sharing operation, noting that |v_1| is only used within |v_2|, to give:
+We then perform the same sharing transformation as for functions, noting that |v_1| is only used within |v_2|, to give:
 
 \begin{code}
 \x y ->  let  v_2 = <? let v_1 = expensive in v_1 x ?>
@@ -604,12 +667,34 @@ We rewrite to:
           in   v
 \end{code}
 
-Then do the sharing trick. Note that the expression |e_1| ends up in the target program, which is fine provided it is not a function, which it isn't because of the second rule. This rule is valid for case expressions, but is unnecessarily restrictive as case doesn't need to worry about sharing.
+We then repeatedly move any binding |v_i| under |v_j| if |v_i| is only used within the body of |v_j|. This rule is not suitable if |e_1'| is a function, as that expression ends up in the target program. This rule is suitable for case expressions, but is unnecessarily restrictive as case doesn't need to worry about sharing.
 
 \subsection{Termination}
 \label{sec:term}
 
-The termination rule is responsible for checking that whenever we proceed down a list of expressions we eventually stop. We first describe the mathematical basis of the termination rule, then explain how to apply it to expressions. Finally we show an example of how the termination rule catches non-termination. The intuition is that each expression is a list of expressions bound within the root let, and each subexpression tracks where it came from in the source program. Each successive root let expression must contain either new subexpressions, or fewer subexpressions compared to previous versions.
+The termination rule is responsible for ensuring that whenever we proceed down a list of expressions we eventually stop. We first describe the mathematical basis of the termination rule, then explain how to apply it to expressions. Finally we show an example of how the termination rule catches non-termination. The intuition is that each expression is a list of expressions bound within the root let, and each subexpression tracks where it came from in the source program. Each successive root let expression must contain either new subexpressions, or fewer subexpressions compared to previous versions.
+
+\subsubsection{Termination Guarantees}
+
+Split will stay fininte, termination will be smaller, with equal will repeat.
+
+Need to state first what the guarantees are:
+
+ Given a history of previously seen expressions |t|, |terminate op t x| returns |True| if it is not permissible to continue given a particular expression and termination context. We reply on |pass (<||)| will always generate a finite list, and |pass (<=||)| will always generate a list with a finite number of members. We rely on |split| with a particular termination context can only generate a finite number of members.
+
+\function{optimise} This function constructs the tree of result functions. While the tree may be infinite, we demand that any infinite path from the root must encounter the same |pre| value more than once. We require that for any infinite sequence |ts| with no repeats, there must exist an |i| such that |terminate (<=||) (take i ts) (ts !! i+1)| returns |True|. If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |split ts| only produces subexpressions which pass the termination test. If the termination criteria do not force us to stop, then we call |reduce| to evaluate the expression.
+
+\function{reduce} This function optimises a function by repeatedly evaluating it by calling |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence |ts|, there must exist an |i| such that |terminate (<||) (take i ts) (ts !! i+1)| returns |True|.
+
+
+
+\begin{code}
+pass  :: (History -> Lambda -> Bool)
+      -> [Lambda] -> [Lambda]
+pass op = f []
+    where f t (x:xs) | op t x = x : f (x:t) xs
+          f t _ = []
+\end{code}
 
 \subsubsection{Termination Rule}
 
@@ -617,6 +702,10 @@ For termination we need an ordering $\lhd$ such that for every infinite sequence
 
 \[
 x \lhd y = x \subset_{set} y \vee x \supset_{bag} y
+\]
+
+\[
+x \unlhd y = x \subset_{set} y \vee x \supseteq_{bag} y
 \]
 
 We call a sequence $e_1 \ldots e_n$ well formed iff:
@@ -643,9 +732,15 @@ But the following sequences are not:
 
 Given a finite alphabet $\Sigma$, our ordering is safe. There can only be $2^{\#\Sigma}$ functions that introduce new variables. Given a sequence which doesn't introduce new variables it must terminate as to be a bag subset it must be strictly decreasing.
 
+We can then define the termination function defined in \ref{fig:manager2} as:
+
+\begin{code}
+terminate op hs x = any (not . op x) hs
+\end{code}
+
 \subsubsection{Tracking Names}
 
-Every expression throughout the program is assigned a name, which is carefully tracked. A name is a triple, $<f,e,c>$ where $f$ is a function name, $e$ is an expression index and $c$ is a constructor count. We label every expression in the source program with $f$ being the function it comes from, $e$ being a unique index within that function and $c$ being $0$. When manipulating expressions we need to track and update names:
+Every expression throughout the program is assigned a name, which is carefully tracked. A name is a triple, \name{\mathit{f}}{\mathit{e}}{\mathit{c}} where $f$ is a function name, $e$ is an expression index and $c$ is a constructor count. We label every expression in the source program with |f| being the function it comes from, $e$ being a unique index within that function and $c$ being $0$. When manipulating expressions we need to track and update names:
 
 \begin{itemize}
 \item If we rename bound variables, we do not update the expression names.
@@ -657,6 +752,8 @@ Every expression throughout the program is assigned a name, which is carefully t
 It is easy to see there are a finite number of names. Each function labels it's subexpressions in advance, so there can only be a finite number. We only increase the constructor count to get new names, and we can only do this up to the arity of a given constructor. Therefore, there are only a finite number of names.
 
 We gain could merge the function name and subexpression index, but that would be harder to track down which expressions come from where.
+
+For some termination properties we require that bindings are given in a predictable order, with normalised variable names. Such an order can be defined by naming all free variables starting with |v_1| for the let body, and naming variables as they are reached from |v_1|. For examples we do not continually renormalise variable names, as it makes them harder to follow.
 
 \subsubsection{Example}
 
@@ -680,80 +777,55 @@ Here the |rev| call builds up an accumulator argument, which will be equal to th
 Focusing on the second alternative, we now add |rev [] xs| to the termination context, and continue optimising |rev (y:acc) ys|. This leads to the sequence of expressions:
 
 \begin{code}
-\xs -> rev [] xs
-\x_1 xs -> rev (x_1:[]) xs
-\x_1 x_2 xs -> rev (x_1:x_2:[]) xs
+\x_1 -> rev [] x_1
+\x_1 x_2 -> rev (x_1:[]) x_2
+\x_1 x_2 x_3 -> rev (x_1:x_2:[]) x_3
 ...
 \end{code}
 
 We can rewrite these lines in our core language, with annotations for the names:
 
 \begin{code}
-\xs ->
-    let  v_1 = {- <main,1,0> -} rev
-         v_2 = {- <main,2,0> -} []
-         v_3 = {- <main,3,0> -} v_1 v_2
-         v_4 = {- <main,4,0> -} v_3 xs
+\x_1 ->
+    let  v_1 = {-"\name{main}{1}{0}"-}  rev
+         v_2 = {-"\name{main}{2}{0}"-}  []
+         v_3 = {-"\name{main}{3}{0}"-}  v_1 v_2
+         v_4 = {-"\name{main}{4}{0}"-}  v_3 x_1
     in   v_4
-\x_1 xs ->
-    let  v_1 = {- <rev,1,0> -} rev
-         v_2 = {- <main,2,0> -} []
-         v_3 = {- <rev,2,0> -} x_1:v_2
-         v_4 = {- <rev,3,0> -} v_1 v_3
-         v_5 = {- <rev,4,0> -} v_4 xs
+\x_1 x_2 ->
+    let  v_1 = {-"\name{rev}{1}{0}"-}   rev
+         v_2 = {-"\name{main}{2}{0}"-}  []
+         v_3 = {-"\name{rev}{2}{0}"-}   x_1:v_2
+         v_4 = {-"\name{rev}{3}{0}"-}   v_1 v_3
+         v_5 = {-"\name{rev}{4}{0}"-}   v_4 x_2
     in   v_5
-\x_1 x_2 xs ->
-    let  v_1 = {- <rev,1,0> -} rev
-         v_2 = {- <main,2,0> -} []
-         v_3 = {- <rev,2,0> -} x_1:v_2
-         v_4 = {- <rev,2,0> -} x_2:v_3
-         v_5 = {- <rev,3,0> -} v_1 v_4
-         v_6 = {- <rev,4,0> -} v_5 xs
+\x_1 x_2 x_3 ->
+    let  v_1 = {- \name{rev}{1}{0}   -} rev
+         v_2 = {- \name{main}{2}{0}  -} []
+         v_3 = {- \name{rev}{2}{0}   -} x_1:v_2
+         v_4 = {- \name{rev}{2}{0}   -} x_2:v_3
+         v_5 = {- \name{rev}{3}{0}   -} v_1 v_4
+         v_6 = {- \name{rev}{4}{0}   -} v_5 x_3
     in   v_6
 \end{code}
 
 Applying our termination criteria, the first two items lead to a well formed sequence, but comparing the second and third we find $e_2 \ntriangleleft e_3$. The first item is permitted because it is the first. The second is permitted as it introduces many new names (such as $<rev,1,0>$). The third item has no additional names to the second, and is not a bag subset (it is in fact a bag superset). Therefore when optimising we stop after the second and reduce it.
 
+We then end up with the sequence:
 
-
+\begin{code}
+\x_1 -> rev [] x_1                          -- |reduce|
+\x_1 x_2 -> rev (x_1:[]) x_2                -- |reduce|
+\x_1 x_2 x_3 -> rev (x_1:x_2:[]) x_3        -- |stop|
+\x_1 x_2 x_3 -> rev (x_1:x_2) x_3           -- |reduce|
+\x_1 x_2 x_3 x_4 -> rev (x_1:x_2:x_3) x_4   -- |stop|
+\x_1 x_2 x_3 -> rev (x_1:x_2) x_3           -- |reduce|
+\x_1 x_2 x_3 x_4 -> rev (x_1:x_2:x_3) x_4   -- |stop|
+\x_1 x_2 x_3 -> rev (x_1:x_2) x_3           -- |reduce|
+... -- repeat the last 2 lines
+\end{code}
 
 Notes: The first would be a homeomorphic embedding - we are in this case less severe than the homeo, but that's not the goal. Because of the simplify rules we end up with a fairly normal form, so it's pretty good that way.
-
-
-
-Taking the second and third lines, we can rewrite them in their let form (using vector application to keep the exaple simpler), annotated with names:
-
-\begin{code}
-let v = <foldl,1,0> foldl
-    
-
-We follow it through, and show that it requires termination at the right place. Note that we have unfolded exactly one buffering of the accumulator, which is rather nice.
-
-\begin{code}
-! <<reverse xs>>
-\xs -> foldl snoc [] xs
-
-<<foldl snoc [] xs>>
-\xs -> case xs of
-    [] -> []
-    x:xs -> foldl snoc (snoc [] x) xs
-
-! <<foldl snoc (snoc [] x) xs>>
-\x xs -> case xs of
-    [] -> x:[]
-    y:ys -> foldl snoc (snoc (snoc [] x) y) ys
-
-! <<foldl snoc (snoc (snoc [] x) y) ys>>
-! <<foldl snoc (snoc t y) ys>>
-
-! <<foldl snoc (snoc t y) xs>>
-\x xs -> case xs of
-    [] -> x:[]
-    z:zs -> foldl snoc (snoc (snoc t y) z) zs
-
-! <<foldl snoc (snoc (snoc t y) z) zs>>
-! <<foldl snoc (snoc t y) xs>>
-\end{code}
 
 
 \subsubsection{Argument for Termination}
@@ -765,11 +837,28 @@ Note that we rely on free variables being normalised in a consistent manner to c
 \subsection{Termination Splitting}
 \label{sec:term_split}
 
-We don't need to ensure anything too bad, just that at the end we no longer hit the termination criteria. If we were to bind all variables separately at the top-level, then we'd no longer have termination (by the rule of singleton sets never being too small).
+If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |split ts| only produces subexpressions which pass the termination test.
 
-We start with all variables at the top, then increase sharing as in \S\ref{sec:eval_split}, with the rule that none of the termination criteria are violated. Running over the map/map fusion example from above we never hit the termination criteria.
+The requirement is that after split we must be in a finite set based on the terminate. We can do this trivially by making sure we don't violate |terminate (<=||)|.
 
-As a very special case, if there is only one context there we reduce the number of free variables. This ensures we can't have increasingly more free variables even though there is nothing changing (as a singleton can never hit the termination criteria).
+We first split everything to each variable, i.e:
+
+\begin{code}
+\free ->  let  v_1 = <? e_1 ?>
+               v_n = <? e_n ?>
+          in   v
+\end{code}
+
+Now merge variable |v_i| under |v_j| provided:
+
+\begin{itemize}
+\item The function |terminate (<=||) t| does not kick in.
+\item They are not all merged (must be strictly smaller).
+\item They don't loose sharing.
+\end{itemize}
+
+
+We don't need to ensure anything too bad, just that at the end we no longer hit the termination criteria for a finite nuber of times. If we were to bind all variables separately at the top-level, then we'd no longer have termination (by the rule of singleton sets never being too small) under |(<=||)|.
 
 \subsection{Argument for Correctness}
 
@@ -782,14 +871,14 @@ We often need to post-process quite a bit, in particular we make the following s
 
 If two functions are equal we can make them the same.
 
-If a function is called in exactly one place in a non-recursive way we can inline it.
+If a function is called in exactly one place we can inline it.
 
 We could have merged these functions in with the rest of the transformations but it would be a lot harder.
 
 \subsection{Comparison to Other Supercompilers}
 \label{sec:comparison}
 
-It has no lambda, which makes it different from most, but exactly like Jason Reich's.
+It has no lambda, which makes it different from most, but exactly like Jason Reich's first one.
 
 It has let everywhere, unlike most supercompilers which almost relegate let to a second class system.
 
@@ -808,7 +897,7 @@ Much easier handling of recursive functions.
 \subsubsection{No Lambda}
 \label{sec:nolambda}
 
-We don't have lambdas because to simplify them you can duplicate an arbitrary amount of crap. Given a lambda you can bind it twice with different values, which complicates things. Note that a case can only ever resolve to one value, and only bind variables once.
+We don't have lambdas because to simplify them you can duplicate an arbitrary amount of crap. Given a lambda you can bind it twice with different values, which complicates things. Note that a case can only ever resolve to one value, and only bind variables once. While the addition of lambda would make the splitting when a function has insufficient free variables easier (\S\ref{sec:eval_split_function}), it makes it much harder to use our simplified termination ordering.
 
 \subsection{Extensions}
 \label{sec:extensions}
@@ -1018,6 +1107,8 @@ We can implement this construct much more efficiently, in particular significant
 We can change names to be a function name and subexpression index combined. We can also free up the last 6 bits to store the constructor count, allowing over 60 million subexpressions even with 32 bit integers. We now have very efficient names.
 
 We can pre-resolve in to a decision table or finite state machine very easily. However, it's not really necessary - the basic test is dead fast, if you use ordered lists.
+
+We currently keep a list of history built using |(:)|, but that's very inefficient. If instead we have a termination context that can manipulate expressions and store more structure it can go faster.
 
 \subsection{Run Time Performance}
 

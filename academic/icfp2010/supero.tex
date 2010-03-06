@@ -49,9 +49,15 @@
 %format s_m_1 = "\Varid{s_{m-1}}"
 %format w_m = "\Varid{w_m}"
 
-
 \newcommand{\unknown}{XXX}
 \newcommand{\name}[3]{\ensuremath{\langle\mathsf{#1},\mathsf{#2},\mathsf{#3}\rangle}}
+\newcommand{\lemma}[1]{\subsubsection*{\textit{Lemma: #1}}}
+
+\newcommand{\setsup}{\supset_{\mathrm{set}}}
+\newcommand{\setequiv}{\equiv_{\mathrm{set}}}
+\newcommand{\bagsub}{\subset_{\mathrm{bag}}}
+\newcommand{\bagequiv}{\equiv_{\mathrm{bag}}}
+
 
 \begin{document}
 
@@ -167,6 +173,7 @@ Our Core language for expressions is given in Figure \ref{fig:core}, and has muc
 \item We require variables in many places that would normally permit expressions. A standard Core language (such as from \citet{ghc_core}) could be translated to ours by inserting let bindings.
 \item In many Core languages a distinction is made between standard let bindings and recursive let bindings. We allow expressions bound at a let to refer to variables bound at the same let, but disallow recursion. An alternative description is that we allow recursive let, but only if there is an equivalent nested non-recursive let that can represent the same expression. For example we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
 \item We don't have default patterns in case expressions, or literals. Both can be added (see \S\ref{sec:extensions}), but are of little interest when describing a supercompiler.
+\item We assume that the Core language is well-typed, in particular that we never over-apply a constructor.
 \end{itemize}
 
 We write expressions using standard Haskell syntax (i.e. |let| for |Let|, |case| for |Case| etc.). Rewriting the |map/map| example in our Core language gives:
@@ -672,49 +679,24 @@ We then repeatedly move any binding |v_i| under |v_j| if |v_i| is only used with
 \subsection{Termination}
 \label{sec:term}
 
-The termination rule is responsible for ensuring that whenever we proceed down a list of expressions we eventually stop. We first describe the mathematical basis of the termination rule, then explain how to apply it to expressions. Finally we show an example of how the termination rule catches non-termination. The intuition is that each expression is a list of expressions bound within the root let, and each subexpression tracks where it came from in the source program. Each successive root let expression must contain either new subexpressions, or fewer subexpressions compared to previous versions.
+The termination rule is responsible for ensuring that whenever we proceed along a list of expressions we eventually stop. The intuition is that each expression contains a list of expressions at the root let, and each expression tracks where it came from in the source program. Each successive root let expression must contain either new subexpressions, or fewer subexpressions compared to previous versions.
 
-\subsubsection{Termination Guarantees}
-
-Split will stay fininte, termination will be smaller, with equal will repeat.
-
-Need to state first what the guarantees are:
-
- Given a history of previously seen expressions |t|, |terminate op t x| returns |True| if it is not permissible to continue given a particular expression and termination context. We reply on |pass (<||)| will always generate a finite list, and |pass (<=||)| will always generate a list with a finite number of members. We rely on |split| with a particular termination context can only generate a finite number of members.
-
-\function{optimise} This function constructs the tree of result functions. While the tree may be infinite, we demand that any infinite path from the root must encounter the same |pre| value more than once. We require that for any infinite sequence |ts| with no repeats, there must exist an |i| such that |terminate (<=||) (take i ts) (ts !! i+1)| returns |True|. If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |split ts| only produces subexpressions which pass the termination test. If the termination criteria do not force us to stop, then we call |reduce| to evaluate the expression.
-
-\function{reduce} This function optimises a function by repeatedly evaluating it by calling |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence |ts|, there must exist an |i| such that |terminate (<||) (take i ts) (ts !! i+1)| returns |True|.
-
-
-
-\begin{code}
-pass  :: (History -> Lambda -> Bool)
-      -> [Lambda] -> [Lambda]
-pass op = f []
-    where f t (x:xs) | op t x = x : f (x:t) xs
-          f t _ = []
-\end{code}
+In this section we first describe the |terminate|, $\lhd$ and $\unlhd$ functions from a mathematical perspective, then how we apply these functions to expressions. Finally we show an example of how the termination rule catches non-termination.
 
 \subsubsection{Termination Rule}
 
-For termination we need an ordering $\lhd$ such that for every infinite sequence $e_1,e_2 \ldots$ there exist indicies $i < j$ such that $e_i \ntriangleleft e_j$. Orderings which satisfy this criteria are known as well-quasi orderings, and come from Kruskal's Tree Theorem \cite{kruskal:tree}. Most other supercompilers rely on the homeomorphic embedding \cite{leuschel:homeomorphic} over expressions. We instead rely on an ordering over bags (also known as multisets) of values drawn from the finite alphabet $\Sigma$. Our ordering is:
+Our termination orderings are defined over bags (also known as multisets) of values drawn from a finite alphabet $\Sigma$. A bag of values is unordered, but may contain elements more than once. We define our two orderings as:
 
 \[
-x \lhd y = x \subset_{set} y \vee x \supset_{bag} y
+x \lhd y = x \setsup y \vee x \bagsub y
 \]
-
 \[
-x \unlhd y = x \subset_{set} y \vee x \supseteq_{bag} y
+x \unlhd y = x \lhd y \vee x \equiv y
 \]
 
-We call a sequence $e_1 \ldots e_n$ well formed iff:
+A sequence $x_1 \ldots x_n$ is well-formed under $\lhd$ if for all indices $i < j$, $x_j \lhd x_i$ (and respectively for $\unlhd$).
 
-\[
-\forall i,j \bullet i < j \Rightarrow e_i \lhd e_j
-\]
-
-Under our ordering, the following sequences are well formed:
+The following sequences are well-formed under both $\unlhd$ and $\lhd$:
 
 \begin{code}
 [a,aaaaab,aaab,b]
@@ -722,56 +704,90 @@ Under our ordering, the following sequences are well formed:
 [aaaaabbb,aaab,aab]
 \end{code}
 
-But the following sequences are not:
+The following sequences are well-formed under $\unlhd$, but not under $\lhd$:
 
 \begin{code}
 [aaa,aaa]
 [aabb,ab,abb]
-[abc,acc]
 \end{code}
 
-Given a finite alphabet $\Sigma$, our ordering is safe. There can only be $2^{\#\Sigma}$ functions that introduce new variables. Given a sequence which doesn't introduce new variables it must terminate as to be a bag subset it must be strictly decreasing.
-
-We can then define the termination function defined in \ref{fig:manager2} as:
+The following sequences are not well-formed under $\unlhd$ or $\lhd$:
 
 \begin{code}
-terminate op hs x = any (not . op x) hs
+[abc,acc]
+[aa,aaa]
 \end{code}
+
+We define the |terminate| function from Figure \ref{fig:manager2} as:
+
+\begin{code}
+terminate  :: (Lambda -> Lambda -> Bool)
+           -> History -> Lambda -> Bool
+terminate (<) hist x = not $ all (x <) hist
+\end{code}
+
+The |terminate| function checks that given a well-formed sequence (|hist|), adding the expression |x| will keep the sequence well-formed.
+
+\lemma{Any well-formed sequence under $\lhd$ is finite}
+
+Given a finite alphabet $\Sigma$, any well-formed sequence under $\lhd$ is finite. Consider a well-formed sequence $x_1\ldots$. We can partition this sequence into at most $2^\Sigma$ subsequences using set equality. Consider any subsequence $y_1\ldots$. For any two elements in the subsequence, $y_i \setsup y_j$ will be false, because $y_i \setequiv y_j$ due to the partitioning. Therefore, for the sequence to be well-formed, $i < j \Rightarrow y_j \bagsub y_i$. To be a subbag means the cardinality of $y_j$ must be strictly lower than that of $y_i$. Therefore there can be at most $\#y_1+1$ elements in any particular subsequence. Combined with a finite number of subsequences, we show that any well-formed sequence is finite.
+
+\lemma{Any well-formed sequence under $\unlhd$ has a finite number of distinct elements.}
+
+The proof for $\unlhd$ builds on that of $\lhd$. For every subsequence, $i < j \Rightarrow y_j \bagsub y_i \vee y_j \bagequiv y_i$. As we progress along the subsequence the cardinality either decreases, or the element is identical. Therefore, there can be at most $\#y_1+1$ distinct elements. Combined with a finite number of subsequences, this gives a finite number of distinct elements in a well-formed sequence.
 
 \subsubsection{Tracking Names}
 
-Every expression throughout the program is assigned a name, which is carefully tracked. A name is a triple, \name{\mathit{f}}{\mathit{e}}{\mathit{c}} where $f$ is a function name, $e$ is an expression index and $c$ is a constructor count. We label every expression in the source program with |f| being the function it comes from, $e$ being a unique index within that function and $c$ being $0$. When manipulating expressions we need to track and update names:
+Every expression in the source program is assigned a name. A name is a triple, \name{\mathit{f}}{\mathit{e}}{\mathit{c}} where $f$ is a function name, $e$ is an expression index and $c$ is a constructor count. We label every expression in the source program with $f$ being the function it comes from, $e$ being a unique index within that function and $c$ being $0$.\footnote{It is possible to merge the function name and subexpression index, by making the subexpression index globally unique, but this change would make it harder to understand and debug.} When manipulating expressions, we need to track and update names:
 
 \begin{itemize}
 \item If we rename bound variables, we do not update the expression names.
 \item If we extract a subexpression we use the name already assigned to that subexpression.
-\item If we insert new constructor bindings (when splitting on a case) we use the name assigned to the pattern in the original case expression.
-\item If we add variables to the end of a constructor, we increase the constructor count. For example, |let v = C x; w = v y in ...| being transformed to |let v = C x; w = C x y in ...| would have the name for |w| set to the name from |C x| with the constructor count incremented.
+\item If we insert a new constructor (when splitting on a case) we use the name assigned to the pattern in the associated case alternative.
+\item If we add variables to the end of a constructor, we increase the constructor count. For example, |let v = C x; w = v y in ...| being transformed to |let v = C x; w = C x y in ...| would have the name for |C x y| set to the name of |C x| with the constructor count incremented.
 \end{itemize}
 
-It is easy to see there are a finite number of names. Each function labels it's subexpressions in advance, so there can only be a finite number. We only increase the constructor count to get new names, and we can only do this up to the arity of a given constructor. Therefore, there are only a finite number of names.
+We map an expression to a bag of names by taking the names of all subexpressions bound at the root let. We never look at the name of a root let expression, and do not update it when making transformations.
 
-We gain could merge the function name and subexpression index, but that would be harder to track down which expressions come from where.
+\lemma{For any source program, there are a finite number of names}
 
-For some termination properties we require that bindings are given in a predictable order, with normalised variable names. Such an order can be defined by naming all free variables starting with |v_1| for the let body, and naming variables as they are reached from |v_1|. For examples we do not continually renormalise variable names, as it makes them harder to follow.
+All subexpressions are assigned expression indices in advance, so there are only a finite number of function name/index values. We only increase the constructor count when increasing the number of arguments applied to a constructor, which is bounded by the arity of the constructor. Therefore, there are only a finite number of names.
+
+\lemma{There are a finite number of expressions for any bag}
+
+\todo{here}
+
+Given a bag of names, there are only a finite number of expressions that could have generated it. We first assume that we always normalise the free variables in an expression by naming the let body |v_1|, and naming all other variables as they are reached from |v_1|. With this normalisation, a given number of subexpressions can only be combined in a finite number of ways. Since all subexpressions with the same name are equal modulo variable names, then the variable name normalisation makes them actually equal.
+
+\lemma{The termination properties required by \S\ref{sec:manager} are satisfied}
+
+Given a sequence with a finite number of bags, this translates to a sequence with a finite number of expressions. This property follows naturally if there are only a finite number of expressions for a given bag.
+
+
+Combining these two lemmas, and the lemmas about $\lhd$ and $\unlhd$ we end up with an argument for the termination criteria required. To ensure the termination properties required by \S\ref{sec:manager} we require the following two properties:
+
+
+
+The termination properties require a finite alphabet $\Sigma$, therefore we require a finite number of names. 
+
 
 \subsubsection{Example}
 
-Many small examples programs do not make use of the termination criteria. When calculating the map/map program the recursive program it does hit the termination criteria, but the |flatten| function ignores it. For a program to really hit the termination criteria it usually has to store a buffer of memory which it uses later. The classic example of this pattern is |reverse|, which builds up an accumulated list which it uses later. This results in a termination condition in the |optimise| function. We start with the program:
+Many small example programs do not make any real use of the termination criteria -- for example, the |map/map| example never hits the termination criteria. For a program to use the termination criteria it usually has to create a buffer which it uses later. The classic example of this pattern is |reverse|, which builds up an accumulated list which it uses later. The |reverse| style example results in termination being forced by the |optimise| function. We start with the program:
 
 \begin{code}
 main xs = rev [] xs
-rev acc xs = case xs of
-    []    -> acc
-    y:ys  -> rev (y:acc) ys
+rev acc xs = case  xs of
+                   []    -> acc
+                   y:ys  -> rev (y:acc) ys
 \end{code}
 
-Here the |rev| call builds up an accumulator argument, which will be equal to the size of |xs|. We can't keep the accumulator around, or we'd fail. The |optimise| function starts with an empty termination context and the expression |rev [] xs|, and calls |reduce|, which results in:
+The |rev| function builds up an accumulator argument, which will be equal to the size of |xs|. If we tried to specialise the accumulator argument then we'd create an infinite number of specialisations. The |optimise| function starts with an empty termination context and the expression |rev [] xs|, and calls |reduce|, resulting in:
 
 \begin{code}
-\xs -> case xs of
-    []    -> <? [] ?>
-    y:ys  -> <? rev (y:acc) ys ?>
+\xs -> case  xs of
+             []    -> <? [] ?>
+             y:ys  -> <? rev (y:acc) ys ?>
 \end{code}
 
 Focusing on the second alternative, we now add |rev [] xs| to the termination context, and continue optimising |rev (y:acc) ys|. This leads to the sequence of expressions:
@@ -783,33 +799,41 @@ Focusing on the second alternative, we now add |rev [] xs| to the termination co
 ...
 \end{code}
 
-We can rewrite these lines in our core language, with annotations for the names:
+We can rewrite these expressions in our core language, with annotations for the names:
+
+\newlength{\lenmain}
+\newlength{\lenrev}
+\settowidth{\lenmain}{|main|}
+\settowidth{\lenrev}{|rev|}
+\addtolength{\lenmain}{-\lenrev}
+\newcommand{\namemain}[1]{\name{main}{#1}{0}}
+\newcommand{\namerev}[1]{\name{rev\hspace{\lenmain}}{#1}{0}\hspace{1mm}}
 
 \begin{code}
 \x_1 ->
-    let  v_1 = {-"\name{main}{1}{0}"-}  rev
-         v_2 = {-"\name{main}{2}{0}"-}  []
-         v_3 = {-"\name{main}{3}{0}"-}  v_1 v_2
-         v_4 = {-"\name{main}{4}{0}"-}  v_3 x_1
+    let  v_1 = {-"\namemain{1}"-}  rev
+         v_2 = {-"\namemain{2}"-}  []
+         v_3 = {-"\namemain{3}"-}  v_1 v_2
+         v_4 = {-"\namemain{4}"-}  v_3 x_1
     in   v_4
 \x_1 x_2 ->
-    let  v_1 = {-"\name{rev}{1}{0}"-}   rev
-         v_2 = {-"\name{main}{2}{0}"-}  []
-         v_3 = {-"\name{rev}{2}{0}"-}   x_1:v_2
-         v_4 = {-"\name{rev}{3}{0}"-}   v_1 v_3
-         v_5 = {-"\name{rev}{4}{0}"-}   v_4 x_2
+    let  v_1 = {-"\namerev{1}"-}   rev
+         v_2 = {-"\namemain{2}"-}  []
+         v_3 = {-"\namerev{2}"-}   x_1:v_2
+         v_4 = {-"\namerev{3}"-}   v_1 v_3
+         v_5 = {-"\namerev{4}"-}   v_4 x_2
     in   v_5
 \x_1 x_2 x_3 ->
-    let  v_1 = {- \name{rev}{1}{0}   -} rev
-         v_2 = {- \name{main}{2}{0}  -} []
-         v_3 = {- \name{rev}{2}{0}   -} x_1:v_2
-         v_4 = {- \name{rev}{2}{0}   -} x_2:v_3
-         v_5 = {- \name{rev}{3}{0}   -} v_1 v_4
-         v_6 = {- \name{rev}{4}{0}   -} v_5 x_3
+    let  v_1 = {-"\namerev{1}"-}   rev
+         v_2 = {-"\namemain{2}"-}  []
+         v_3 = {-"\namerev{2}"-}   x_1:v_2
+         v_4 = {-"\namerev{2}"-}   x_2:v_3
+         v_5 = {-"\namerev{3}"-}   v_1 v_4
+         v_6 = {-"\namerev{4}"-}   v_5 x_3
     in   v_6
 \end{code}
 
-Applying our termination criteria, the first two items lead to a well formed sequence, but comparing the second and third we find $e_2 \ntriangleleft e_3$. The first item is permitted because it is the first. The second is permitted as it introduces many new names (such as $<rev,1,0>$). The third item has no additional names to the second, and is not a bag subset (it is in fact a bag superset). Therefore when optimising we stop after the second and reduce it.
+Applying our termination criteria, the first two expressions are a well-formed sequence, but comparing the second and third expressions we see that $e_2 \ntrianglelefteq e_3$. The first item is permitted because it is the first. The second is permitted as it introduces many new names (such as |{-"\name{rev}{1}{0}"-}|). The third item has no new names compared to the second, and is not a bag subset (it is in fact a bag superset). Therefore, when optimising, we call |stop| on the third expression.
 
 We then end up with the sequence:
 
@@ -825,23 +849,14 @@ We then end up with the sequence:
 ... -- repeat the last 2 lines
 \end{code}
 
-Notes: The first would be a homeomorphic embedding - we are in this case less severe than the homeo, but that's not the goal. Because of the simplify rules we end up with a fairly normal form, so it's pretty good that way.
-
-
-\subsubsection{Argument for Termination}
-
-We use |(+=)| to add to the sequence. We use |terminate| to check that nothing violates the sequence.
-
-Note that we rely on free variables being normalised in a consistent manner to check for termination.
+As required, we only have a finite number of unique expressions, and will end up with a recursive function in the target program.
 
 \subsection{Termination Splitting}
 \label{sec:term_split}
 
-If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |split ts| only produces subexpressions which pass the termination test.
+If we are forced to terminate we call |stop|, which splits the expression into several subexpressions, much like |split| from \S\ref{sec:eval_split}. We require that |split ts x| only produces subexpressions which pass the termination test |terminate (<=||) ts|. We trivially achieve this by using the termination criteria when writing |split|.
 
-The requirement is that after split we must be in a finite set based on the terminate. We can do this trivially by making sure we don't violate |terminate (<=||)|.
-
-We first split everything to each variable, i.e:
+We first split everything in to a separate variable, i.e:
 
 \begin{code}
 \free ->  let  v_1 = <? e_1 ?>
@@ -853,12 +868,10 @@ Now merge variable |v_i| under |v_j| provided:
 
 \begin{itemize}
 \item The function |terminate (<=||) t| does not kick in.
-\item They are not all merged (must be strictly smaller).
 \item They don't loose sharing.
 \end{itemize}
 
-
-We don't need to ensure anything too bad, just that at the end we no longer hit the termination criteria for a finite nuber of times. If we were to bind all variables separately at the top-level, then we'd no longer have termination (by the rule of singleton sets never being too small) under |(<=||)|.
+We don't need to ensure anything too bad, just that at the end we no longer hit the termination criteria for a finite nuber of times. If we were to bind all variables separately at the top-level, then we'd no longer have termination (by the rule of singleton sets never being too small) under |(<=||)|. And after the empty bag we never go anywhere.
 
 \subsection{Argument for Correctness}
 
@@ -886,6 +899,8 @@ It doesn't use homeomorphic embedding.
 
 It never rewrites expressions, allowing for the tantilising opportunity to partially evaluate the supercompiler.
 
+Our example in \S\ref{sec:term} would have stopped one step earlier with homeomorphic embedding. Notes: The first would be a homeomorphic embedding - we are in this case less severe than the homeo, but that's not the goal. Because of the simplify rules we end up with a fairly normal form, so it's pretty good that way.
+
 We use a local termination pile, which means the optimisation of a program is not based on what has passed before. This hopefully leads to better predictability.
 
 It's simple. The details provided in this paper are complete -- we have left nothing out.
@@ -893,6 +908,8 @@ It's simple. The details provided in this paper are complete -- we have left not
 Better separation with the manager and the other aspects.
 
 Much easier handling of recursive functions.
+
+For termination we need an ordering $\lhd$ such that for every infinite sequence $e_1,e_2 \ldots$ there exist indicies $i < j$ such that $e_i \ntriangleleft e_j$. Orderings which satisfy this criteria are known as well-quasi orderings, and come from Kruskal's Tree Theorem \cite{kruskal:tree}. Most other supercompilers rely on the homeomorphic embedding \cite{leuschel:homeomorphic} over expressions. We instead rely on an ordering over bags (also known as multisets) of values drawn from the finite alphabet $\Sigma$. Our ordering is given previously. Our ordering $\lhd$ is a well-quasi ordering, and $\unlhd$ is the same but with equality.
 
 \subsubsection{No Lambda}
 \label{sec:nolambda}

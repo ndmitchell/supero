@@ -152,12 +152,10 @@ This example applies |map| twice -- the expression |map f x| produces a list tha
 
 \begin{figure}
 \begin{code}
-type Var   =   String -- variable names
-type Fun   =   String -- function names
+type Var   =   String -- variable/function names
 type Con   =   String -- constructor names
 
 data Exp   =   Var Var
-           |   Fun Fun
            |   Con Con [Var]
            |   App Var Var
            |   Let [(Var,Exp)] Var
@@ -169,6 +167,10 @@ type Pat   =   Exp -- restricted to |Con|
 \caption{Core Language}
 \label{fig:core}
 \end{figure}
+
+\todo{change: remove fun everywhere, for evaluation (the only place mentioning fun) just say only evaluate it if it has a body. when passing free variables only include those bound locally (keeps things identical).}
+
+Note: the top is special, as it can have recursion between top-level bindings, but we can't within an expression.
 
 Our Core language for expressions is given in Figure \ref{fig:core}, and has much in common with Administrative Normal Form \cite{flanagan:continuations}. There are a few points to note:
 
@@ -260,19 +262,19 @@ root = \g -> \f -> \x =  let  v_1  = map
 
 \begin{figure}
 \begin{code}
-type Env = Fun -> Exp
+type Env = Var -> Maybe Exp
 data Tree = Tree
     {pre :: Exp, gen :: [Fun] -> Exp, children :: [Tree]}
 
 supercompile :: Env -> [(Fun,Exp)]
 supercompile env =
-    assign $ flatten $ optimise env $ env "main"
+    assign $ flatten $ optimise env $ fromJust $ env "main"
 
 optimise :: Env -> Exp -> Tree
 optimise env = f []
-    where  f t x | terminate (<=|) t x = g (stop t x) t
-                 | otherwise = g (reduce env x) (x:t)
-           g (gen,cs) t = Tree x gen (map (f t) cs)
+    where  f t x | terminate (<=|) t x = g x (stop t x) t
+                 | otherwise = g x (reduce env x) (x:t)
+           g x (gen,cs) t = Tree x gen (map (f t) cs)
 
 reduce :: Env -> Exp -> ([Fun] -> Exp, [Exp])
 reduce env = f []
@@ -283,11 +285,12 @@ reduce env = f []
 flatten :: Tree -> [Tree]
 flatten = nubBy (\x y -> pre x == pre y) . f []
     where f seen t  =  if pre t `elem` seen then [] else
-                       t : concatMap (f (t:seen)) (children t)
+                       t : concatMap (f (pre t:seen)) (children t)
 
 assign :: [Tree] -> [(Fun,Exp)]
 assign ts = [(f t, gen t (map f (children t))) |  t <- ts]
-    where f = flip lookup . zip freshNames (map pre ts)
+    where f t = fromJust $ lookup (pre t) names
+          names = zip (map pre ts) freshNames
 \end{code}
 \caption{The |supercompile| function.}
 \label{fig:manager}

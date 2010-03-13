@@ -1,0 +1,4 @@
+:set -fno-warn-overlapping-patterns
+:load Main
+
+:def mapmap const $ return ":main samples/simple/MapMap.hs"

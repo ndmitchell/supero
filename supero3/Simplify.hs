@@ -1,24 +1,333 @@
-
--- Historical note: I originally wrote using a Core language based on
--- Sem, which had the right kind of simplify operation.
+{-# LANGUAGE PatternGuards #-}
 
 module Simplify(simplify, simplifyProg) where
 
+import Util
 import Type
 import Control.Arrow
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Control.Monad
 import Control.Monad.State
+import Data.Maybe
+import Data.List
+import Data.Generics.Uniplate.Data
+import Debug.Trace
 
 
 simplifyProg :: [(Var,Exp)] -> [(Var,Exp)]
-simplifyProg = map (second simplify)
+simplifyProg = map (second $ transform simplify)
 
 
-
+-- We run relabel 3 times:
+-- first time round gives unique names
+-- then we simplify (assuming unique names)
+-- second time round does GC
+-- third time round does variable normalisation
 simplify :: Exp -> Exp
-simplify = fromRoot . relabel . reduce . relabel . toRoot
+simplify x = f "v" $ f "_2" $ runFreshExp "_1" x $ skipLam reduce =<< relabel Map.empty x
+    where f s x = runFreshExp s x $ relabel Map.empty x
 
+
+runFreshExp :: String -> Exp -> Fresh a -> a
+runFreshExp v x act = runFresh v $ filterFresh (`notElem` free x) >> act
+
+
+skipLam :: (Exp -> Fresh Exp) -> Exp -> Fresh Exp
+skipLam f (Lam n v x) = fmap (Lam n v) $ skipLam f x
+skipLam f x = f x
+
+
+---------------------------------------------------------------------
+-- RELABEL
+
+-- relabel, normalise the order of let bindings, and do a GC pass over unused let expressions
+relabel :: Map.Map Var Var -> Exp -> Fresh Exp
+relabel ren (Lam n v x) = do
+    v2 <- fresh
+    fmap (Lam n v2) $ relabel (Map.insert v v2 ren) x
+
+-- let does the actual GC and reorder
+relabel ren (Let n xs v) = do
+    vs2 <- freshN $ length xs
+    ren <- return $ Map.fromList (zip (map fst xs) vs2) `Map.union` ren
+    let v2 = relabelVar ren v
+    xs2 <- bind ren (zip vs2 $ map snd xs) [v2]
+    return $ Let n xs2 v2  
+    where
+        bind :: Map.Map Var Var -> [(Var,Exp)] -> [Var] -> Fresh [(Var,Exp)]
+        bind ren bs = f []
+            where
+                f seen (t:odo) | Just e <- lookup t bs, t `notElem` seen = do
+                    e2 <- relabel ren e
+                    res <- f (t:seen) (odo ++ free e2)
+                    return $ (t,e2) : res
+                f seen (t:odo) = f seen odo
+                f seen [] = return []
+
+relabel ren (Case n v xs) = do
+    fmap (Case n $ relabelVar ren v) $ mapM (f ren) xs
+    where
+        f ren (Con n c vs,b) = do
+            vs2 <- freshN $ length vs
+            ren <- return $ Map.fromList (zip vs vs2) `Map.union` ren
+            fmap ((,) $ Con n c vs2) $ relabel ren b
+        f ren (Var n v,b) = do
+            v2 <- fresh
+            fmap ((,) $ Var n v2) $ relabel (Map.insert v v2 ren) b
+
+relabel ren (Var n v) = return $ Var n $ relabelVar ren v
+relabel ren (App n v1 v2) = return $ App n (relabelVar ren v1) (relabelVar ren v2)
+relabel ren (Con n c vs) = return $ Con n c $ map (relabelVar ren) vs
+
+relabelVar ren v = Map.findWithDefault v v ren
+
+
+---------------------------------------------------------------------
+-- REDUCE
+
+-- reduce, assuming that let variables are sorted by order of use
+-- i.e. will only depend on variables defined after you
+reduce :: Exp -> Fresh Exp
+reduce (Let n xs v) = do
+    xs2 <- f [] $ reverse xs
+    return $ case lookup v xs2 of
+        Just (Var _ v2) -> Let n xs2 v2
+        _ -> Let n xs2 v
+    where
+        f :: [(Var,Exp)] -> [(Var,Exp)] -> Fresh [(Var,Exp)]
+        f done ((v,e):odo)
+            | Var n v2 <- e =
+                let g xs = [(a,subst [(v,v2)] b) | (a,b) <- xs]
+                in f ((v,e) : g done) (g odo)
+            | Let n xs v2 <- e = f done (reverse xs ++ [(v,Var n v2)] ++ odo)
+            | App n v1 v2 <- e, Just e2@Lam{} <- lookup v1 done = do
+                Lam _ v3 e3 <- relabel Map.empty e2
+                f done ((v,subst [(v3,v2)] e3):odo)
+            | Case n v2 alts <- e, Just (Con _ c vs) <- lookup v2 done =
+                let g (Con _ c2 vs2, x) | c == c2 = [subst (zip vs2 vs) x]
+                    g _ = []
+                    r = head $ concatMap g alts ++ error "confused, no case match..."
+                in f done ((v,r):odo)
+            | otherwise = f ((v,e):done) odo
+        f done [] = return done
+
+
+reduce x = return x
+
+
+
+
+
+
+
+
+
+
+
+
+{-
+
+removeNestedLet :: Exp -> Exp
+removeNestedLet 
+    
+
+
+
+
+
+data SSimp = SSimp {sFresh :: [Var], sBind :: Map.Map Var (Maybe Var, Maybe Exp)}
+
+simp :: Exp -> Exp
+simp x = flip evalState s0 $ do
+        let FlatExp free bind v = toFlat x
+        let free2 = take (length free) $ freshVars 'w'
+        modify $ \s -> s{sBind = Map.insert [] (Nothing, Just $ Let bind v) $ Map.fromList [([a],(Just b,Nothing)) | (a,b) <- zip free free2]}
+        v2 <- var []
+        bind <- gets fromBind
+        return $ fromFlat $ FlatExp (map snd ws) (sortOn fst [(a,b) | (Just a,Just b) <- Map.elems bind]) v2
+    where
+        s0 = SSimp (freshVars 'v') Map.empty
+
+        -- bind a variable, find out where you put it
+        var :: [Var] -> State SSimp Var
+        var v = do
+            s <- gets sBind
+            case s Map.! v of
+                (Just v2, _) -> return v2
+                (Nothing, Just e) -> do
+                    v2 <- fresh
+                    e2 <- ren resolve e
+                    op <- look
+                    e3 <- return $ fuse look e2
+                    modify $ \s -> s
+
+                    case force of
+
+
+
+
+
+
+
+
+-- rename a variable, calling the function on all unbound
+-- and giving fresh names to all bound
+ren :: FreshState s => (Var -> State s (Maybe Var)) -> Exp -> State s Exp
+ren = undefined
+
+
+
+
+
+
+
+
+
+
+
+
+
+simplify1 = fromNest . second renest . toNest
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+data Nest = Nest [(Var, Nest)] Exp deriving Show
+
+
+
+-- convert to the new representation
+toNest :: Exp -> ([Var], Nest)
+toNest (Lam _ v x) = (v:a,b)
+    where (a,b) = toNest x
+toNest x = ([], f x)
+    where
+        f (Let _ xs y) = Nest (map (second f) xs) (Var noname y)
+        f x = Nest [] x
+
+
+
+-- optimise the nested function
+renest :: Nest -> Nest
+renest x = x
+
+
+
+data SFrom = SFrom {fromFresh :: [Var], fromBind :: Map.Map [Var] (Maybe Var, Maybe Exp)}
+
+instance FreshState SFrom where
+    getFresh = fromFresh
+    setFresh x vs = x{fromFresh=vs}
+
+
+-- convert back, doing the relabelling
+-- should also drop all irrelevant ones
+fromNest :: ([Var], Nest) -> Exp
+fromNest (vs,x) = flip evalState (SFrom (freshVars 'v') Map.empty) $ do
+        let ws = zip vs $ freshVars 'w'
+        modify $ \s -> s{fromBind = Map.fromList [([a], (Just b, Nothing)) | (a,b) <- ws]}
+        populate [] x
+        r2 <- var []
+        bind <- gets fromBind
+        return $ fromFlat $ FlatExp (map snd ws) (sortOn fst [(a,b) | (Just a,Just b) <- Map.elems bind]) r2
+    where
+        populate :: [Var] -> Nest -> State SFrom ()
+        populate v (Nest xs y) = do
+            modify $ \s -> s{fromBind = Map.insert v (Nothing,Just y) $ fromBind s}
+            sequence_ [populate (v++[a]) b | (a,b) <- xs]
+
+
+        -- assign a new variable, or look up existing one
+        var :: [Var] -> State SFrom Var
+        var v = do
+            s <- get
+            let op = resolve (Map.keysSet $ fromBind s) v
+            case Map.findWithDefault (error $ "don't know about variable: " ++ show v) v (fromBind s) of
+                (Just v2, _) -> return v2
+                (_, Just (Var _ v)) -> maybe (return v) var $ op v
+                (_, Just e) -> do
+                    v2 <- fresh
+                    e <- exp op e
+                    modify $ \s -> s{fromBind=Map.insert v (Just v2, Just e) $ fromBind s}
+                    return v2
+
+
+        -- process an expression, given a way to resolve variables
+        exp :: (Var -> Maybe [Var]) -> Exp -> State SFrom Exp
+        exp op = f Map.empty
+            where
+                f :: Map.Map Var Var -> Exp -> State SFrom Exp
+                f _ x | trace (pretty x) False = undefined
+                f ren (Var n v1) = liftM (Var n) (g ren v1)
+                f ren (App n v1 v2) = liftM2 (App n) (g ren v1) (g ren v2)
+                f ren (Con n c vs) = liftM (Con n c) (mapM (g ren) vs)
+                f ren (Case n v1 as) = liftM2 (Case n) (g ren v1) (mapM (h ren) as)
+                f ren (Let n vs v1) = do
+                    vs2 <- freshN $ length vs
+                    let ren2 = Map.fromList (zip (map fst vs) vs2) `Map.union` ren
+                    bs <- sequence [liftM2 (,) (g ren2 a) (f ren2 b) | (a,b) <- vs]
+                    liftM (Let n bs) (g ren v1)
+                f ren (Lam n v x) = do
+                    x2 <- f ren x
+                    liftM (Lam n v) $ return x2
+{-                    v2 <- fresh
+                    res <- liftM (Lam n v2) $ f (Map.insert v v2 ren) x
+                    -- res <- {- liftM (Lam n v2) -} (f ren {- (Map.insert v v2 ren) -} x)
+                    return res -}
+                f ren x = error $ "fromNest.exp: " ++ show x
+
+                h :: Map.Map Var Var -> (Pat, Exp) -> State SFrom (Pat, Exp)
+                h ren (Con n c vs,y) = do
+                    vs2 <- freshN $ length vs
+                    y <- f (Map.fromList (zip vs vs2) `Map.union` ren) y
+                    return (Con n c vs2, y)
+                
+                g :: Map.Map Var Var -> Var -> State SFrom Var
+                g ren v = case (Map.lookup v ren, op v) of
+                    (Just v2, _) -> return v2
+                    (_, Just v2) -> var v2
+                    _ -> return v
+
+
+        -- resolve a variable
+        resolve :: Set.Set [Var] -> [Var] -> Var -> Maybe [Var]
+        resolve set root x = listToMaybe [b | a <- reverse $ inits root, let b = a ++ [x], b `Set.member` set]
+
+-}
+
+
+
+{-
 
 
 ---------------------------------------------------------------------
@@ -142,3 +451,5 @@ relabel (ExpRoot free root mp) = flip evalState s0 $ do
         var mp v = case Map.lookup v mp of
             Nothing -> move v
             Just y -> return y
+
+-}

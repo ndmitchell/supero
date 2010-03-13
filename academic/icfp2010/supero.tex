@@ -77,6 +77,8 @@
            {Standard Chartered, UK}
            {\verb"ndmitchell@gmail.com"}
 
+\todo{all v = map things can be eliminated, now Fun is gone}
+
 \maketitle
 
 \begin{abstract}
@@ -413,6 +415,7 @@ force (App   v _  )  = Just v
 force (Var   v    )  = Just v
 force _              = Nothing
 
+-- \todo{now wrong as lambda is in the Exp}
 stack :: Lambda -> [(Var, Exp)]
 stack (Lambda _ (Let bind v)) = f v
     where f v = case  lookup v bind of
@@ -1080,6 +1083,8 @@ We are unaware of any supercompilers before that have tracked expressions, or th
 In some cases, our ordering is certainly less restrictive than the homeomorphic embedding. Our example in \S\ref{sec:term_example} would have stopped one step earlier with homeomorphic embedding. Given a reasonably standard  interpretation of let expressions for homeomorphic embedding, and an embedding which ignores variable names, we can show that homeomorphic embedding is never less restrictive than our ordering. However, this assumes treating the let expression etc. in the same manner, which isn't entirely justified. However, our termination ordering was written with the goal of being simple, understandable, predictable and fast to implement.
 
 We use two separate termination histories, one in |reduce| and one in |optimise|. A particular result of this is that the optimisation of a program is not based on what has passed before. This hopefully leads to better predictability. It also means the termination needs to check many fewer expressions when deciding if to terminate.
+
+Note that the totally different termination criteria and vastly different other bits lead to a generalisation/split strategy that is entirely different, and also very simple.
 
 \subsubsection{The Manager}
 

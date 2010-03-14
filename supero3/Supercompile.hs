@@ -8,6 +8,7 @@ import Terminate
 import Util
 import Data.List
 import Data.Maybe
+import Control.Arrow
 import Data.Generics.Uniplate.Data hiding (children)
 
 ---------------------------------------------------------------------
@@ -41,7 +42,9 @@ flatten = nubBy (\x y -> pre x == pre y) . f []
 
 
 assign :: [Tree] -> [(Var,Exp)]
-assign ts = [(f t, gen t (map f (children t))) |  t <- ts]
+assign ts = -- error $ pretty $ ($ repeat "?") $ fst $ split $
+       -- fromJust $ lookup "f12" [(b,a) | (a,b) <- names]
+        [(f t, gen t (map f (children t))) |  t <- ts]
     where f t = fromJust $ lookup (pre t) names
           names = zip (map pre ts) freshNames 
 
@@ -164,14 +167,21 @@ split x
     | Just (_, Case n v xs) <- s = 
         let alt (p,x) = (p, Box $ Let noname ((v,p):bind) root)
         in debox $ lams free $ Case noname v $ map alt xs
-    | Just (_, Lam{}) <- s =
-        error $ "split a lambda\n" ++ pretty x
+    | Just (v, Lam{}) <- s =
+        debox $ share (const True) $ fromFlat $ FlatExp free [(a, if a == v then boxlam b else Box b) | (a,b) <- bind] root
     | Just (v, _) <- s =
         debox $ share (const True) $ fromFlat $ FlatExp free [(a, if a == v then b else Box b) | (a,b) <- bind] root
     where
         s = stackTop flat
         flat@(FlatExp free bind root) = toFlat x
+        boxlam (Lam n v x) = Lam n v $ boxlam x
+        boxlam x = Box x
 
 
 stop :: History -> Exp -> ([Var] -> Exp, [Exp])
-stop _ x = error $ "stop: " ++ pretty x
+stop hist x = debox $ share (all f . universe) $ fromFlat $ FlatExp free (map (second Box) bind) root
+    where
+        FlatExp free bind root = toFlat x
+
+        f (Box x) = not $ terminate (<=|) hist x
+        f _ = True

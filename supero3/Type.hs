@@ -1,9 +1,10 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Type(
-    Var, Con, Exp(..), Pat, pretty, vars, free, subst, isBox,
+    Var, Con, Exp(..), Pat, pretty, isBox,
+    vars, free, subst,
     FlatExp(..), toFlat, fromFlat, lams,
-    Name, noname, incName,
+    Name, noname, incName, prettyNames, getName,
     Env(..), env,
     fromHSE, toHSE
     ) where
@@ -12,6 +13,7 @@ module Type(
 import Data.Maybe
 import Data.List
 import Data.Data
+import Control.Monad.State
 import Data.Char
 import Language.Haskell.Exts hiding (Exp,Name,Pat,Var,Let,App,Case,Con,name)
 import qualified Language.Haskell.Exts as H
@@ -23,16 +25,6 @@ import qualified Data.Map as Map
 
 type Var = String
 type Con = String
-
-data Name = Name Var Int Int deriving (Data,Typeable,Eq)
-
-noname = Name "<no name>" 0 0
-
-instance Show Name where
-    show x | x == noname = "_"
-    show (Name x y z) = "<"++x++","++show y++","++show z++">"
-
-incName (Name a b c) = Name a b (c+1)
 
 
 data Exp = Var  Name Var
@@ -100,6 +92,44 @@ subst ren e = case e of
 
 
 ---------------------------------------------------------------------
+-- NAMES
+
+data Name = Name Var Int Int deriving (Data,Typeable,Eq,Ord)
+
+noname = Name "<no name>" 0 0
+
+instance Show Name where
+    show x | x == noname = "_"
+    show (Name x y z) = "<"++x++","++show y++","++show z++">"
+
+incName (Name a b c) = Name a b (c+1)
+
+-- pretty print with names for the interesting bits
+prettyNames :: Exp -> String
+prettyNames x = prettyPrint $ Lambda sl (map (PVar . Ident) free) $ H.Let (BDecls $ map f bind) (H.Var $ UnQual $ Ident root)
+    where
+        FlatExp free bind root = toFlat x
+        f (v,x) = PatBind sl (PVar $ Ident v) Nothing (UnGuardedRhs $ H.App (Lit (String $ show $ getName x)) (toExp x)) (BDecls [])
+
+
+getName :: Exp -> Name
+getName (Var n _) = n
+getName (Con n _ _) = n
+getName (App n _ _) = n
+getName (Lam n _ _) = n
+getName (Case n _ _) = n
+getName (Let n _ _) = n
+
+setName :: Exp -> Name -> Exp
+setName (Var _ x) n = Var n x
+setName (Con _ x y) n = Con n x y
+setName (App _ x y) n = App n x y
+setName (Lam _ x y) n = Lam n x y
+setName (Case _ x y) n = Case n x y
+setName (Let _ x y) n = Let n x y
+
+
+---------------------------------------------------------------------
 -- FLAT TYPE
 
 data FlatExp = FlatExp [Var] [(Var,Exp)] Var
@@ -123,12 +153,13 @@ lams (l:ls) x = Lam noname l $ lams ls x
 -- FROM HSE
 
 fromHSE :: Module -> [(Var,Exp)]
-fromHSE (Module _ _ _ _ _ _ xs) = [(f, assignNames f x) | (f,x) <- map fromDecl xs]
+fromHSE (Module _ _ _ _ _ _ xs) = [(f, assignNames f x) | (f,x) <- concatMap fromDecl xs]
 
 
-fromDecl :: Decl -> (Var,Exp)
-fromDecl (PatBind _ (PVar (Ident f)) Nothing (UnGuardedRhs x) (BDecls [])) = (f, fromExp x)
-fromDecl (FunBind [Match _ (Ident f) vars Nothing (UnGuardedRhs x) (BDecls [])]) = (f, fromExp $ Lambda sl vars x)
+fromDecl :: Decl -> [(Var,Exp)]
+fromDecl (PatBind _ (PVar f) Nothing (UnGuardedRhs x) (BDecls [])) = [(fromName f, fromExp x)]
+fromDecl (FunBind [Match _ f vars Nothing (UnGuardedRhs x) (BDecls [])]) = [(fromName f, fromExp $ Lambda sl vars x)]
+fromDecl TypeSig{} = []
 fromDecl x = error $ "Unhandled fromDecl: " ++ show x
 
 
@@ -137,26 +168,39 @@ fromExp (Lambda _ [] x) = fromExp x
 fromExp (Lambda _ (PVar (Ident x):vars) bod) = Lam noname x $ fromExp $ Lambda sl vars bod
 fromExp o@(H.App x y) = Let noname [(f1,fromExp x),(f2,fromExp y),(f3,App noname f1 f2)] f3
     where f1:f2:f3:_ = freshNames o
-fromExp (H.Var (UnQual (Ident x))) = Var noname x
+fromExp (H.Var (UnQual x)) = Var noname $ fromName x
 fromExp (Paren x) = fromExp x
 fromExp o@(H.Case x xs) = Let noname [(f1,fromExp x),(f2,Case noname f1 $ map fromAlt xs)] f2
     where f1:f2:_ = freshNames o
 fromExp (List []) = Con noname "[]" []
 fromExp o@(InfixApp x (QConOp (Special Cons)) y) = Let noname [(f1,fromExp x),(f2,fromExp y),(f3,Con noname ":" [f1,f2])] f3
     where f1:f2:f3:_ = freshNames o
+fromExp o@(InfixApp a (QVarOp b) c) = fromExp $ H.App (H.App (H.Var b) a) c
+fromExp (Lit x) = Con noname (prettyPrint x) []
+fromExp (If a b c) = fromExp $ H.Case a [f "True" b, f "False" c]
+    where f con x = Alt sl (PApp (UnQual $ Ident con) []) (UnGuardedAlt x) (BDecls [])
 fromExp x = error $ "Unhandled fromExp: " ++ show x
 
+
+fromName :: H.Name -> String
+fromName (Ident x) = x
+fromName (Symbol x) = x
 
 fromAlt :: Alt -> (Pat, Exp)
 fromAlt (Alt _ pat (UnGuardedAlt bod) (BDecls [])) = (fromPat pat, fromExp bod)
 fromAlt x = error $ "Unhandled fromAlt: " ++ show x
 
-
 fromPat :: H.Pat -> Pat
+fromPat (PParen x) = fromPat x
 fromPat (PList []) = Con noname "[]" []
-fromPat (PApp (Special Cons) [PVar (Ident x), PVar (Ident y)]) = Con noname ":" [x,y]
+fromPat (PApp (Special Cons) xs) = Con noname ":" $ map fromPatVar xs
 fromPat (PInfixApp a b c) = fromPat $ PApp b [a,c]
+fromPat (PApp (UnQual c) xs) = Con noname (fromName c) $ map fromPatVar xs
 fromPat x = error $ "Unhandled fromPat: " ++ show x
+
+fromPatVar :: H.Pat -> String
+fromPatVar (PVar x) = fromName x
+fromPatVar x = error $ "Unhandled fromPatVar: " ++ show x
 
 
 freshNames :: H.Exp -> [String]
@@ -165,7 +209,12 @@ freshNames x  = ['v':show i | i <- [1..]] \\ [y | Ident y <- universeBi x]
 
 -- Fixup: Assign names properly
 assignNames :: Var -> Exp -> Exp
-assignNames _ x = x
+assignNames fun x = evalState (transformM f x) 0
+    where
+        f x = do
+            modify (+1)
+            i <- get
+            return $ setName x $ Name fun i 0
 
 ---------------------------------------------------------------------
 -- TO HSE
@@ -197,8 +246,8 @@ toVar :: Var -> H.Exp
 toVar x = H.Var $ UnQual $ toName x
 
 toName :: String -> H.Name
-toName x | x == ":" = Symbol x
-         | otherwise = Ident x
+toName xs@(x:_) | isAlphaNum x || x `elem` "'_" = Ident xs
+                | otherwise = Symbol xs
 
 sl = SrcLoc "" 0 0
 

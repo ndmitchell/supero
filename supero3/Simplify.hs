@@ -53,7 +53,9 @@ relabel ren (Let n xs v) = do
     ren <- return $ Map.fromList (zip (map fst xs) vs2) `Map.union` ren
     let v2 = relabelVar ren v
     xs2 <- bind ren (zip vs2 $ map snd xs) [v2]
-    return $ Let n xs2 v2  
+    case xs2 of
+        [(w2,y2)] | w2 == v2 -> return $ y2
+        _ -> return $ Let n xs2 v2  
     where
         bind :: Map.Map Var Var -> [(Var,Exp)] -> [Var] -> Fresh [(Var,Exp)]
         bind ren bs = f []

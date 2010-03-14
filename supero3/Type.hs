@@ -12,6 +12,7 @@ module Type(
 import Data.Maybe
 import Data.List
 import Data.Data
+import Data.Char
 import Language.Haskell.Exts hiding (Exp,Name,Pat,Var,Let,App,Case,Con,name)
 import qualified Language.Haskell.Exts as H
 import Data.Generics.Uniplate.Data
@@ -179,7 +180,7 @@ toExp (Lam _ x y) = Paren $ lambda [PVar $ Ident x] $ toExp y
 toExp (Let _ xs y) = Paren $ H.Let (BDecls $ map toDecl xs) $ toVar y
 toExp (App _ x y) = Paren $ H.App (toVar x) (toVar y)
 toExp (Case _ x y) = Paren $ H.Case (toVar x) (map toAlt y)
-toExp (Con _ c vs) = Paren $ foldl H.App (H.Con $ UnQual $ Ident c) (map toVar vs)
+toExp (Con _ c vs) = Paren $ foldl H.App (H.Con $ UnQual $ toName c) (map toVar vs)
 toExp (Box x) = BracketExp $ ExpBracket $ toExp x
 toExp x = error $ "toExp, todo: " ++ show x
 
@@ -187,11 +188,15 @@ toAlt :: (Pat, Exp) -> Alt
 toAlt (x,y) = Alt sl (toPat x) (UnGuardedAlt $ toExp y) (BDecls [])
 
 toPat :: Pat -> H.Pat
-toPat (Con _ c vs) = PApp (UnQual $ Ident c) (map (PVar . Ident) vs)
+toPat (Con _ c vs) = PApp (UnQual $ toName c) (map (PVar . Ident) vs)
 toPat x = error $ "toPat, todo: " ++ show x
 
 toVar :: Var -> H.Exp
-toVar x = H.Var $ UnQual $ Ident x
+toVar x = H.Var $ UnQual $ toName x
+
+toName :: String -> H.Name
+toName x | x == ":" = Symbol x
+         | otherwise = Ident x
 
 sl = SrcLoc "" 0 0
 

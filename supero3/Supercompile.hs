@@ -53,6 +53,7 @@ freshNames = ["f" ++ show i | i <- [1..]]
 -- BOX NOTATION AND STACKS
 
 -- find the variable bound at the top of the stack
+-- only returns Nothing if no bound variables
 stackTop :: FlatExp -> Maybe (Var,Exp)
 stackTop (FlatExp _ bind v) = f Nothing v
     where f res v = case lookup v bind of
@@ -85,7 +86,13 @@ debox = deboxName . deboxFree
 
 -- name and extract the Box components
 deboxName :: Exp -> ([Var] -> Exp, [Exp])
-deboxName x = error $ "debox name\n:" ++ pretty x
+deboxName x = (regen, boxes)
+    where
+        boxes = nub [y | Box y <- universe x]
+        regen names = transform f x
+            where vs = zip boxes names
+                  f (Box x) = Var noname $ fromJust $ lookup x vs
+                  f x = x
 
 
 -- simplify and give sufficient free variables to Box bits
@@ -103,7 +110,7 @@ deboxFree o = transform f o
 
         apps :: Exp -> [Var] -> Exp
         apps x [] = x
-        apps x xs = Let noname (zip vs $ x : zipWith (App noname) vs (reverse xs)) (last vs)
+        apps x xs = Let noname (zip vs $ x : zipWith (App noname) vs xs) (last vs)
             where vs = ["_box" ++ show i | i <- [0..length xs]]
 
 
@@ -119,11 +126,14 @@ step env x = Nothing
 
 split :: Exp -> ([Var] -> Exp, [Exp])
 split x
+    | Nothing <- s = (const x, [])
     | Just (_, Case n v xs) <- s = 
         let alt (p,x) = (p, Box $ Let noname ((v,p):bind) root)
         in debox $ lams free $ Case noname v $ map alt xs
-    | otherwise =
-        error $ pretty x ++ "\n" ++ show s
+    | Just (_, Lam{}) <- s =
+        error $ "split a lambda\n" ++ pretty x
+    | Just (v, _) <- s =
+        debox $ fromFlat $ FlatExp free [(a, if a == v then b else Box b) | (a,b) <- bind] root
     where
         s = stackTop flat
         flat@(FlatExp free bind root) = toFlat x

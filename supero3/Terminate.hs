@@ -2,15 +2,16 @@
 module Terminate(terminate, (<|), (<=|), newHistory, History, (+=)) where
 
 import Type
+import Debug.Trace
 
 
-newtype History = History [Exp]
+data History = History [Exp]
 
 newHistory = History []
 
 
 terminate :: (Exp -> Exp -> Bool) -> History -> Exp -> Bool
-terminate _ _ _ = False
+terminate _ (History _) _ = False
 
 (<|) :: Exp -> Exp -> Bool
 (<|) = error "<|"
@@ -23,4 +24,4 @@ terminate _ _ _ = False
 
 
 (+=) :: Exp -> History -> History
-(+=) x (History xs) = History $ x:xs
+(+=) x (History xs) = trace (pretty x) $ History $ x:xs

@@ -50,7 +50,7 @@ freshNames = ["f" ++ show i | i <- [1..]]
 
 
 ---------------------------------------------------------------------
--- BOX NOTATION AND STACKS
+-- STACKS
 
 -- find the variable bound at the top of the stack
 -- only returns Nothing if no bound variables
@@ -79,6 +79,9 @@ force (Case n x y) = Just (x, \x -> Case n x y)
 force (Let n x y) = Just (y, Let n x)
 force _ = Nothing
 
+
+---------------------------------------------------------------------
+-- BOXES
 
 debox :: Exp -> ([Var] -> Exp, [Exp])
 debox = deboxName . deboxFree
@@ -115,6 +118,37 @@ deboxFree o = transform f o
 
 
 ---------------------------------------------------------------------
+-- SHARING
+
+simplifyBox = transform f
+    where f (Box x) = Box $ simplify x
+          f x = x
+
+
+-- given a set of expressions
+-- bound to boxes, you may move an expression under a box if it's only used by one
+share :: (Exp -> Bool) -> Exp -> Exp
+share test = f . simplifyBox
+    where f x = head $ [f x2 | (v,x2) <- shareOptions x, test x2] ++ [x]
+
+
+-- each variable is bound at the let, to a box
+-- is used in at most one binding, and not the root
+-- and the binding it is used at is a box
+shareOptions :: Exp -> [(Var, Exp)]
+shareOptions x =
+        [ (v, fromFlat $ FlatExp vars (map inject used ++ delFsts (v:used) bind) root)
+        | (v, Box vx) <- bind, v `notElem` bad, let used = [w | (w,e) <- bind, v `elem` free e], length used <= 1
+        , let inject w = (w,Box $ simplify $ Let noname [(v,vx),("_share",fromBox $ fromJust $ lookup w bind)] "_share")
+        ]
+    where
+        fromBox (Box x) = x
+        bad = nub $ root : concat [free e | (_,e) <- bind, not $ isBox e]
+        frees = concatMap (free . snd) bind
+
+        FlatExp vars bind root = toFlat x
+
+---------------------------------------------------------------------
 -- OPERATIONS
 
 step :: Env -> Exp -> Maybe Exp
@@ -133,7 +167,7 @@ split x
     | Just (_, Lam{}) <- s =
         error $ "split a lambda\n" ++ pretty x
     | Just (v, _) <- s =
-        debox $ fromFlat $ FlatExp free [(a, if a == v then b else Box b) | (a,b) <- bind] root
+        debox $ share (const True) $ fromFlat $ FlatExp free [(a, if a == v then b else Box b) | (a,b) <- bind] root
     where
         s = stackTop flat
         flat@(FlatExp free bind root) = toFlat x
@@ -141,21 +175,3 @@ split x
 
 stop :: History -> Exp -> ([Var] -> Exp, [Exp])
 stop _ x = error $ "stop: " ++ pretty x
-
-
-{-
-\free ->  let  s_1  = case x of p_1 -> e_1' ; p_m -> e_m'
-               v_1  = e_1
-               v_n  = e_n
-          in   v
-\end{code}
-
-\noindent becomes:
-
-\begin{code}
-\free -> case x of
-    p_1  -> <? let  s_1 = case x of p_1 -> e_1'; p_m -> e_m'
-                    v_1 = e_1; v_n = e_n; x = p_1 in v ?>
-    p_m  -> <? let  s_1 = case x of p_1 -> e_1'; p_m -> e_m'
-                    v_1 = e_1; v_n = e_n; x = p_m in v ?>
--}

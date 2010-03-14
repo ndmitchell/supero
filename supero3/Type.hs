@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Type(
-    Var, Con, Exp(..), Pat, pretty, vars, free, subst,
+    Var, Con, Exp(..), Pat, pretty, vars, free, subst, isBox,
     FlatExp(..), toFlat, fromFlat, lams,
     Name, noname, incName,
     Env(..), env,
@@ -49,6 +49,8 @@ instance Eq Exp where
 
 pretty :: Exp -> String
 pretty = prettyPrint . toExp
+
+isBox Box{} = True ; isBox _ = False
 
 
 type Pat = Exp

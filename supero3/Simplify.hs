@@ -106,6 +106,8 @@ reduce (Let n xs v) = do
             | App n v1 v2 <- e, Just e2@Lam{} <- lookup v1 done = do
                 Lam _ v3 e3 <- relabel Map.empty e2
                 f done ((v,subst [(v3,v2)] e3):odo)
+            | App _ v1 v2 <- e, Just e2@(Con n c vs) <- lookup v1 done = do
+                f done ((v,Con (incName n) c (vs++[v2])):odo)
             | Case n v2 alts <- e, Just (Con _ c vs) <- lookup v2 done =
                 let g (Con _ c2 vs2, x) | c == c2 = [subst (zip vs2 vs) x]
                     g _ = []

@@ -12,7 +12,7 @@ newHistory = History []
 
 
 terminate :: (Exp -> Exp -> Bool) -> History -> Exp -> Bool
-terminate (<) (History hist) x = if not $ all (x <) hist then True {- error "here" -} else False
+terminate (<) (History hist) x = if not $ all (x <) hist then True else False
 --    where
 --        info = error $ prettyNames (head hist) ++ "\n AGAINST \n" ++ prettyNames x ++ "\n" ++ show (getBag x ,getBag y)
 --        y = head hist

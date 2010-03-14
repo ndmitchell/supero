@@ -18,7 +18,7 @@ data Tree = Tree {pre :: Exp, gen :: [Var] -> Exp, children :: [Tree]}
 
 
 supercompile :: Env -> [(Var,Exp)]
-supercompile env = assign $ flatten $ optimise env $ fromJust $ env "main"
+supercompile env = resetTime $ assign $ flatten $ optimise env $ fromJust $ env "main"
 
 
 optimise :: Env -> Exp -> Tree
@@ -132,7 +132,10 @@ simplifyBox = transform f
 -- bound to boxes, you may move an expression under a box if it's only used by one
 share :: (Exp -> Bool) -> Exp -> Exp
 share test = f . simplifyBox
-    where f x = head $ [f x2 | (v,x2) <- shareOptions x, test x2] ++ [x]
+    where f x = head $ [f x2 | (v,x2) <- promote "v11" $ shareOptions x, test x2] ++ [x]
+    
+          promote x ys = bs ++ as
+            where (as,bs) = partition ((==) x . fst) ys
 
 
 -- each variable is bound at the let, to a box
@@ -141,7 +144,7 @@ share test = f . simplifyBox
 shareOptions :: Exp -> [(Var, Exp)]
 shareOptions x =
         [ (v, fromFlat $ FlatExp vars (map inject used ++ delFsts (v:used) bind) root)
-        | (v, Box vx) <- bind, v `notElem` bad, let used = [w | (w,e) <- bind, v `elem` free e], length used <= 1
+        | (v, Box vx) <- bind, v `notElem` bad, let used = [w | (w,e) <- bind, v `elem` free e], length used <= 1 || cheap vx
         , let inject w = (w,Box $ simplify $ Let noname [(v,vx),("_share",fromBox $ fromJust $ lookup w bind)] "_share")
         ]
     where
@@ -150,6 +153,10 @@ shareOptions x =
         frees = concatMap (free . snd) bind
 
         FlatExp vars bind root = toFlat x
+
+cheap Var{} = True
+cheap Con{} = True
+cheap _ = False
 
 ---------------------------------------------------------------------
 -- OPERATIONS
@@ -179,8 +186,11 @@ split x
 
 
 stop :: History -> Exp -> ([Var] -> Exp, [Exp])
-stop hist x = debox $ share (all f . universe) $ fromFlat $ FlatExp free (map (second Box) bind) root
+stop hist x = if time 2 then 
+        error $ "STOP:\n" ++ prettyNames x ++ "\n ==>\n" ++ prettyNames res
+        else debox res
     where
+        res = share (all f . universe) $ fromFlat $ FlatExp free (map (second Box) bind) root
         FlatExp free bind root = toFlat x
 
         f (Box x) = not $ terminate (<=|) hist x

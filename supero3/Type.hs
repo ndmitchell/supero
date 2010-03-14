@@ -119,6 +119,7 @@ getName (App n _ _) = n
 getName (Lam n _ _) = n
 getName (Case n _ _) = n
 getName (Let n _ _) = n
+getName (Box _) = noname -- just for debug
 
 setName :: Exp -> Name -> Exp
 setName (Var _ x) n = Var n x
@@ -169,6 +170,7 @@ fromExp (Lambda _ (PVar (Ident x):vars) bod) = Lam noname x $ fromExp $ Lambda s
 fromExp o@(H.App x y) = Let noname [(f1,fromExp x),(f2,fromExp y),(f3,App noname f1 f2)] f3
     where f1:f2:f3:_ = freshNames o
 fromExp (H.Var (UnQual x)) = Var noname $ fromName x
+fromExp (H.Con (UnQual x)) = Con noname (fromName x) []
 fromExp (Paren x) = fromExp x
 fromExp o@(H.Case x xs) = Let noname [(f1,fromExp x),(f2,Case noname f1 $ map fromAlt xs)] f2
     where f1:f2:_ = freshNames o

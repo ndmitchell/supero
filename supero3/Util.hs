@@ -5,6 +5,8 @@ module Util where
 import Data.Function
 import Data.List
 import Control.Monad.State
+import Data.IORef
+import System.IO.Unsafe
 
 
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
@@ -59,3 +61,21 @@ runFresh :: String -> Fresh a -> a
 runFresh v x = evalState x $ SFresh $ freshVars v
 
 
+
+{-# NOINLINE time #-}
+time :: Int -> Bool
+time i = unsafePerformIO $ do
+    n <- readIORef timeRef
+    writeIORef timeRef (n+1)
+    return $ i == n
+
+{-# NOINLINE timeRef #-}
+timeRef :: IORef Int
+timeRef = unsafePerformIO $ newIORef 0
+
+
+{-# NOINLINE resetTime #-}
+resetTime :: a -> a
+resetTime x = unsafePerformIO $ do
+    writeIORef timeRef 0
+    return x

@@ -74,12 +74,11 @@ relabel ren (Case n v xs) = do
             vs2 <- freshN $ length vs
             ren <- return $ Map.fromList (zip vs vs2) `Map.union` ren
             fmap ((,) $ Con n c vs2) $ relabel ren b
-        f ren (Var n v,b) = do
+        f ren (App n v [],b) = do
             v2 <- fresh
-            fmap ((,) $ Var n v2) $ relabel (Map.insert v v2 ren) b
+            fmap ((,) $ App n v2 []) $ relabel (Map.insert v v2 ren) b
 
-relabel ren (Var n v) = return $ Var n $ relabelVar ren v
-relabel ren (App n v1 v2) = return $ App n (relabelVar ren v1) (relabelVar ren v2)
+relabel ren (App n v1 v2) = return $ App n (relabelVar ren v1) (map (relabelVar ren) v2)
 relabel ren (Con n c vs) = return $ Con n c $ map (relabelVar ren) vs
 
 relabelVar ren v = Map.findWithDefault v v ren
@@ -94,20 +93,23 @@ reduce :: Exp -> Fresh Exp
 reduce (Let n xs v) = do
     xs2 <- f [] $ reverse xs
     return $ case lookup v xs2 of
-        Just (Var _ v2) -> Let n xs2 v2
+        Just (App _ v2 []) -> Let n xs2 v2
         _ -> Let n xs2 v
     where
         f :: [(Var,Exp)] -> [(Var,Exp)] -> Fresh [(Var,Exp)]
         f done ((v,e):odo)
-            | Var n v2 <- e =
+            | App n v2 [] <- e =
                 let g xs = [(a,subst [(v,v2)] b) | (a,b) <- xs]
                 in f ((v,e) : g done) (g odo)
-            | Let n xs v2 <- e = f done (reverse xs ++ [(v,Var n v2)] ++ odo)
-            | App n v1 v2 <- e, Just e2@Lam{} <- lookup v1 done = do
+            | Let n xs v2 <- e = f done (reverse xs ++ [(v,App n v2 [])] ++ odo)
+            | App n v1 (v2:vs) <- e, Just e2@Lam{} <- lookup v1 done = do
                 Lam _ v3 e3 <- relabel Map.empty e2
-                f done ((v,subst [(v3,v2)] e3):odo)
+                v4 <- fresh
+                f done ((v4, subst [(v3,v2)] e3):(v,App n v4 vs):odo)
             | App _ v1 v2 <- e, Just e2@(Con n c vs) <- lookup v1 done = do
-                f done ((v,Con (incName n) c (vs++[v2])):odo)
+                f done ((v,Con n c (vs++v2)):odo)
+            | App _ v1 v2 <- e, Just e2@(App n v3 vs) <- lookup v1 done, Just a <- arity v3, a >= length (v2 ++ vs) =
+                f done ((v,App n v3 (vs++v2)):odo)
             | Case n v2 alts <- e, Just (Con _ c vs) <- lookup v2 done =
                 let g (Con _ c2 vs2, x) | c == c2 = [subst (zip vs2 vs) x]
                     g _ = []
@@ -118,12 +120,6 @@ reduce (Let n xs v) = do
 
 
 reduce x = return x
-
-
-
-
-
-
 
 
 

@@ -1,10 +1,10 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, PatternGuards #-}
 
 module Type(
     Var, Con, Exp(..), Pat, pretty, isBox,
-    vars, free, subst,
+    vars, free, subst, arity,
     FlatExp(..), toFlat, fromFlat, lams,
-    Name, noname, incName, prettyNames, getName,
+    Name, noname, prettyNames, getName,
     Env(..), env,
     fromHSE, toHSE
     ) where
@@ -27,9 +27,8 @@ type Var = String
 type Con = String
 
 
-data Exp = Var  Name Var
-         | Con  Name Con [Var]
-         | App  Name Var Var
+data Exp = Con  Name Con [Var]
+         | App  Name Var [Var]
          | Lam  Name Var Exp
          | Case Name Var [(Pat,Exp)]
          | Let  Name [(Var,Exp)] Var
@@ -50,6 +49,10 @@ type Pat = Exp
 
 type Env = Var -> Maybe Exp
 
+arity :: Var -> Maybe Int
+arity x | '\'':xs <- dropWhile (/= '\'') x = Just $ read xs
+        | otherwise = Nothing
+
 
 env :: [(Var,Exp)] -> Env
 env xs = \x -> Map.lookup x mp
@@ -57,9 +60,8 @@ env xs = \x -> Map.lookup x mp
 
 
 vars :: Exp -> [Var]
-vars (Var _ x) = [x]
 vars (Con _ _ xs) = xs
-vars (App _ x y) = [x,y]
+vars (App _ x xs) = x:xs
 vars (Lam _ x y) = x : vars y
 vars (Case _ x y) = x : concat [vars a ++ vars b | (a,b) <- y]
 vars (Let _ x y) = concat [a : vars b | (a,b) <- x] ++ [y]
@@ -67,9 +69,8 @@ vars (Box x) = vars x
 
 
 free :: Exp -> [Var]
-free (Var _ x) = [x]
 free (Con _ _ xs) = nub xs
-free (App _ x y) = nub [x,y]
+free (App _ x xs) = nub $ x:xs
 free (Lam _ x y) = delete x $ free y
 free (Case _ x y) = nub $ x : concat [free b \\ vars a | (a,b) <- y]
 free (Let _ x y) = nub (concatMap (free . snd) x ++ [y]) \\ map fst x
@@ -79,9 +80,8 @@ free (Box x) = free x
 subst :: [(Var,Var)] -> Exp -> Exp
 subst [] x = x
 subst ren e = case e of
-    Var n v -> Var n $ f v
     Con n c vs -> Con n c $ map f vs
-    App n x y -> App n (f x) (f y)
+    App n x ys -> App n (f x) (map f ys)
     Lam n x y -> Lam n x (g [x] y)
     Case n x y -> Case n (f x) [(a, g (vars a) b) | (a,b) <- y]
     Let n x y -> Let n [(a,g (map fst x) b) | (a,b) <- x] $ if y `elem` map fst x then y else f y
@@ -102,7 +102,7 @@ instance Show Name where
     show x | x == noname = "_"
     show (Name x y z) = "<"++x++","++show y++","++show z++">"
 
-incName (Name a b c) = Name a b (c+1)
+setNameNumber (Name a b _) c = Name a b c
 
 -- pretty print with names for the interesting bits
 prettyNames :: Exp -> String
@@ -113,16 +113,14 @@ prettyNames x = prettyPrint $ Lambda sl (map (PVar . Ident) free) $ H.Let (BDecl
 
 
 getName :: Exp -> Name
-getName (Var n _) = n
-getName (Con n _ _) = n
-getName (App n _ _) = n
+getName (Con n _ xs) = setNameNumber n $ length xs
+getName (App n _ xs) = setNameNumber n $ length xs
 getName (Lam n _ _) = n
 getName (Case n _ _) = n
 getName (Let n _ _) = n
-getName (Box _) = noname -- just for debug
+getName (Box x) = getName x
 
 setName :: Exp -> Name -> Exp
-setName (Var _ x) n = Var n x
 setName (Con _ x y) n = Con n x y
 setName (App _ x y) n = App n x y
 setName (Lam _ x y) n = Lam n x y
@@ -154,7 +152,7 @@ lams (l:ls) x = Lam noname l $ lams ls x
 -- FROM HSE
 
 fromHSE :: Module -> [(Var,Exp)]
-fromHSE (Module _ _ _ _ _ _ xs) = [(f, assignNames f x) | (f,x) <- concatMap fromDecl xs]
+fromHSE (Module _ _ _ _ _ _ xs) = assignArities [(f, assignNames f x) | (f,x) <- concatMap fromDecl xs]
 
 
 fromDecl :: Decl -> [(Var,Exp)]
@@ -167,20 +165,23 @@ fromDecl x = error $ "Unhandled fromDecl: " ++ show x
 fromExp :: H.Exp -> Exp
 fromExp (Lambda _ [] x) = fromExp x
 fromExp (Lambda _ (PVar (Ident x):vars) bod) = Lam noname x $ fromExp $ Lambda sl vars bod
-fromExp o@(H.App x y) = Let noname [(f1,fromExp x),(f2,fromExp y),(f3,App noname f1 f2)] f3
+fromExp o@(H.App x y) = Let noname [(f1,fromExp x),(f2,fromExp y),(f3,App noname f1 [f2])] f3
     where f1:f2:f3:_ = freshNames o
-fromExp (H.Var (UnQual x)) = Var noname $ fromName x
+fromExp (H.Var (UnQual x)) = App noname (fromName x) []
 fromExp (H.Con (UnQual x)) = Con noname (fromName x) []
+fromExp (H.Con (Special Cons)) = Con noname ":" []
 fromExp (Paren x) = fromExp x
 fromExp o@(H.Case x xs) = Let noname [(f1,fromExp x),(f2,Case noname f1 $ map fromAlt xs)] f2
     where f1:f2:_ = freshNames o
 fromExp (List []) = Con noname "[]" []
+fromExp (List [x]) = fromExp $ InfixApp x (QConOp (Special Cons)) $ List []
 fromExp o@(InfixApp x (QConOp (Special Cons)) y) = Let noname [(f1,fromExp x),(f2,fromExp y),(f3,Con noname ":" [f1,f2])] f3
     where f1:f2:f3:_ = freshNames o
 fromExp o@(InfixApp a (QVarOp b) c) = fromExp $ H.App (H.App (H.Var b) a) c
 fromExp (Lit x) = Con noname (prettyPrint x) []
 fromExp (If a b c) = fromExp $ H.Case a [f "True" b, f "False" c]
     where f con x = Alt sl (PApp (UnQual $ Ident con) []) (UnGuardedAlt x) (BDecls [])
+fromExp (H.Let (BDecls xs) (H.Var (UnQual x))) = Let noname (concatMap fromDecl xs) (fromName x)
 fromExp x = error $ "Unhandled fromExp: " ++ show x
 
 
@@ -218,6 +219,15 @@ assignNames fun x = evalState (transformM f x) 0
             i <- get
             return $ setName x $ Name fun i 0
 
+
+-- Fixup: Move arity information
+assignArities :: [(Var,Exp)] -> [(Var,Exp)]
+assignArities xs = ("root",App noname (fromJust $ lookup "root" ren) []) : [(fromJust $ lookup a ren, subst ren b) | (a,b) <- xs]
+    where ren = [(a, a ++ "'" ++ show (f b)) | (a,b) <- xs]
+          f (Lam _ _ x) = 1 + f x
+          f _ = 0
+
+
 ---------------------------------------------------------------------
 -- TO HSE
 
@@ -228,10 +238,9 @@ toDecl :: (Var,Exp) -> Decl
 toDecl (f,x) = PatBind sl (PVar $ Ident f) Nothing (UnGuardedRhs $ toExp x) (BDecls [])
 
 toExp :: Exp -> H.Exp
-toExp (Var _ x) = toVar x
 toExp (Lam _ x y) = Paren $ lambda [PVar $ Ident x] $ toExp y
 toExp (Let _ xs y) = Paren $ H.Let (BDecls $ map toDecl xs) $ toVar y
-toExp (App _ x y) = Paren $ H.App (toVar x) (toVar y)
+toExp (App _ x y) = Paren $ foldl H.App (toVar x) $ map toVar y
 toExp (Case _ x y) = Paren $ H.Case (toVar x) (map toAlt y)
 toExp (Con _ c vs) = Paren $ foldl H.App (H.Con $ UnQual $ toName c) (map toVar vs)
 toExp (Box x) = BracketExp $ ExpBracket $ toExp x

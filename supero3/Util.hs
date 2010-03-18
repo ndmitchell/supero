@@ -79,3 +79,7 @@ resetTime :: a -> a
 resetTime x = unsafePerformIO $ do
     writeIORef timeRef 0
     return x
+
+
+fromJustNote msg Nothing = error $ "fromJustNote: " ++ msg
+fromJustNote msg (Just x) = x

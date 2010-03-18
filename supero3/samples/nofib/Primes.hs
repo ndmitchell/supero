@@ -1,19 +1,11 @@
 
-module Main where
+module Main(main) where
 
-{- 
 suCC :: Int -> Int
 suCC x = x + 1
 
 isdivs :: Int  -> Int -> Bool
 isdivs n x = mod x n /= 0
-
-eq x = x == 0
-sub x = x - 1
--}
-
-isdivs x y = prim (IsDivs x y)
-
 
 the_filter :: [Int] -> [Int]
 the_filter ns = case ns of
@@ -23,10 +15,29 @@ the_filter ns = case ns of
 primes :: [Int]
 primes = map head (iterate the_filter (iterate suCC 2))
 
-main x = primes !! x
+root x = primes !! x
 
+#if MAIN
 
--- LIBRARY STUFF --
+main = print (root (1000 :: Int) :: Int)
+
+#endif
+
+#if MAIN_SUPERO
+
+addInt'2 = (+)
+eqInt'2 = (==)
+neqInt'2 = (/=)
+modInt'2 = mod
+
+#endif
+
+#if SUPERO
+
+(+) = addInt'2
+(==) = eqInt'2
+(/=) = neqInt'2
+mod = modInt'2
 
 head x = case x of
     [] -> error "head"
@@ -47,9 +58,8 @@ iterate f x = x : iterate f (f x)
 (!!) :: [a] -> Int -> a
 (!!) xs y = case xs of
     [] -> error "bad"
-    x:xs -> case eq y of
+    x:xs -> case y == 0 of
         True -> x
-        False -> (!!) xs (sub y)
+        False -> (!!) xs (y - 1)
 
-    
-    
+#endif

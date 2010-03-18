@@ -2,7 +2,7 @@
 module Main where
 
 
-main f g x = map f (map g x)
+root f g x = map f (map g x)
 
 map f x = case x of
     y:ys -> f y : map f ys

@@ -1,5 +1,12 @@
 {-# LANGUAGE PatternGuards #-}
 
+{-
+TODO:
+should have a share cheap that does the pre-processing (ctors and paps) with arity
+should favour new names when terminating
+kind of want msg inspired splitting...
+-}
+
 module Supercompile(supercompile) where
 
 import Type
@@ -18,7 +25,7 @@ data Tree = Tree {pre :: Exp, gen :: [Var] -> Exp, children :: [Tree]}
 
 
 supercompile :: Env -> [(Var,Exp)]
-supercompile env = resetTime $ assign $ flatten $ optimise env $ fromJust $ env "main"
+supercompile env = resetTime $ assign $ flatten $ optimise env $ fromJustNote "can't find root" $ env "root"
 
 
 optimise :: Env -> Exp -> Tree
@@ -49,7 +56,7 @@ assign ts = -- error $ pretty $ ($ repeat "?") $ fst $ split $
           names = zip (map pre ts) freshNames 
 
 
-freshNames = ["f" ++ show i | i <- [1..]]
+freshNames = "root" : ["f" ++ show i | i <- [1..]]
 
 
 ---------------------------------------------------------------------
@@ -70,13 +77,12 @@ stackTop (FlatExp _ bind v) = f Nothing v
 -- if at all possible (can't if there is a constructor at the top for example)
 stackVar :: FlatExp -> FlatExp
 stackVar flat@(FlatExp free bind root) = case stackTop flat of
-    Nothing -> FlatExp free [("_fake",Var noname root)] "_fake"
-    Just (v,e) | Just (v2,c2) <- force e -> FlatExp free (("_fake",Var noname v2):(v,c2 "_fake"):delFst v bind) root
+    Nothing -> FlatExp free [("_fake",App noname root [])] "_fake"
+    Just (v,e) | Just (v2,c2) <- force e -> FlatExp free (("_fake",App noname v2 []):(v,c2 "_fake"):delFst v bind) root
     _ -> flat
 
 
 force :: Exp -> Maybe (Var, Var -> Exp)
-force (Var n x) = Just (x, Var n)
 force (App n x y) = Just (x, \x -> App n x y)
 force (Case n x y) = Just (x, \x -> Case n x y)
 force (Let n x y) = Just (y, Let n x)
@@ -97,8 +103,8 @@ deboxName x = (regen, boxes)
         boxes = nub [y | Box y <- universe x]
         regen names = transform f x
             where vs = zip boxes names
-                  f (Box x) = Var noname $ fromJust $ lookup x vs
-                  f x = x
+                  f (Box x) = App noname (fromJust $ lookup x vs) []
+                  f x = remAppBox x
 
 
 -- simplify and give sufficient free variables to Box bits
@@ -107,17 +113,20 @@ deboxFree o = transform f o
     where
         fo = free o
 
-        f (Box x) = apps (Box $ simplify $ lams vs x2) vs
+        f (Box x) = appBox (simplify $ lams vs x2) vs
             where
                 vs = sort $ fx2 \\ fo
                 x2 = simplify x
                 fx2 = free x2
         f x = x
 
-        apps :: Exp -> [Var] -> Exp
-        apps x [] = x
-        apps x xs = Let noname (zip vs $ x : zipWith (App noname) vs xs) (last vs)
-            where vs = ["_box" ++ show i | i <- [0..length xs]]
+
+appBox :: Exp -> [Var] -> Exp
+appBox x vs = Let noname [("_box1",Box x),("_box2",App noname "_box1" vs)] "_box2"
+
+remAppBox :: Exp -> Exp
+remAppBox (Let _ [("_box1",App _ x []),("_box2",App _ "_box1" vs)] "_box2") = App noname x vs
+remAppBox x = x
 
 
 ---------------------------------------------------------------------
@@ -132,10 +141,16 @@ simplifyBox = transform f
 -- bound to boxes, you may move an expression under a box if it's only used by one
 share :: (Exp -> Bool) -> Exp -> Exp
 share test = f . simplifyBox
-    where f x = head $ [f x2 | (v,x2) <- promote "v11" $ shareOptions x, test x2] ++ [x]
-    
-          promote x ys = bs ++ as
-            where (as,bs) = partition ((==) x . fst) ys
+    where f x = head $ [f x2 | (v,x2) <- order x $ shareOptions x, test x2] ++ [x]
+
+
+-- penalise duplicates as they are more expensive, and usually want splitting
+order :: Exp -> [(Var,Exp)] -> [(Var,Exp)]
+order x ys = sortOn f ys
+    where
+        FlatExp vars bind root = toFlat x
+        names = map (getName . snd) bind
+        f y = length $ filter ((==) $ getName $ fromJust $ lookup (fst y) bind) names
 
 
 -- each variable is bound at the let, to a box
@@ -154,7 +169,7 @@ shareOptions x =
 
         FlatExp vars bind root = toFlat x
 
-cheap Var{} = True
+cheap (App _ _ []) = True
 cheap Con{} = True
 cheap _ = False
 
@@ -162,7 +177,7 @@ cheap _ = False
 -- OPERATIONS
 
 step :: Env -> Exp -> Maybe Exp
-step env x | Just (v,Var _ f) <- stackTop flat, Just e <- env f =
+step env x | Just (v,App _ f []) <- stackTop flat, Just e <- env f =
     Just $ simplify $ fromFlat $ FlatExp free ((v,e):delFst v bind) root
     where flat@(FlatExp free bind root) = stackVar $ toFlat x
 step env x = Nothing
@@ -186,7 +201,7 @@ split x
 
 
 stop :: History -> Exp -> ([Var] -> Exp, [Exp])
-stop hist x = if time 2 then 
+stop hist x = if time 10000 then
         error $ "STOP:\n" ++ prettyNames x ++ "\n ==>\n" ++ prettyNames res
         else debox res
     where

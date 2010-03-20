@@ -83,3 +83,6 @@ resetTime x = unsafePerformIO $ do
 
 fromJustNote msg Nothing = error $ "fromJustNote: " ++ msg
 fromJustNote msg (Just x) = x
+
+
+type Id x = x -> x

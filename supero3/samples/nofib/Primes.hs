@@ -19,7 +19,7 @@ root x = primes !! x
 
 #if MAIN
 
-main = print (root (1000 :: Int) :: Int)
+main = print (root (4000 :: Int) :: Int)
 
 #endif
 
@@ -29,6 +29,8 @@ addInt'2 = (+)
 eqInt'2 = (==)
 neqInt'2 = (/=)
 modInt'2 = mod
+subInt'2 = (-)
+error'1 = error
 
 #endif
 
@@ -38,6 +40,8 @@ modInt'2 = mod
 (==) = eqInt'2
 (/=) = neqInt'2
 mod = modInt'2
+(-) = subInt'2
+error = error'1
 
 head x = case x of
     [] -> error "head"

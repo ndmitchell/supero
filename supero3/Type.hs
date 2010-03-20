@@ -159,6 +159,7 @@ fromDecl :: Decl -> [(Var,Exp)]
 fromDecl (PatBind _ (PVar f) Nothing (UnGuardedRhs x) (BDecls [])) = [(fromName f, fromExp x)]
 fromDecl (FunBind [Match _ f vars Nothing (UnGuardedRhs x) (BDecls [])]) = [(fromName f, fromExp $ Lambda sl vars x)]
 fromDecl TypeSig{} = []
+fromDecl DataDecl{} = []
 fromDecl x = error $ "Unhandled fromDecl: " ++ show x
 
 
@@ -170,6 +171,7 @@ fromExp o@(H.App x y) = Let noname [(f1,fromExp x),(f2,fromExp y),(f3,App noname
 fromExp (H.Var (UnQual x)) = App noname (fromName x) []
 fromExp (H.Con (UnQual x)) = Con noname (fromName x) []
 fromExp (H.Con (Special Cons)) = Con noname ":" []
+fromExp (LeftSection x (QVarOp y)) = fromExp $ H.App (H.Var y) x
 fromExp (Paren x) = fromExp x
 fromExp o@(H.Case x xs) = Let noname [(f1,fromExp x),(f2,Case noname f1 $ map fromAlt xs)] f2
     where f1:f2:_ = freshNames o
@@ -181,7 +183,8 @@ fromExp o@(InfixApp a (QVarOp b) c) = fromExp $ H.App (H.App (H.Var b) a) c
 fromExp (Lit x) = Con noname (prettyPrint x) []
 fromExp (If a b c) = fromExp $ H.Case a [f "True" b, f "False" c]
     where f con x = Alt sl (PApp (UnQual $ Ident con) []) (UnGuardedAlt x) (BDecls [])
-fromExp (H.Let (BDecls xs) (H.Var (UnQual x))) = Let noname (concatMap fromDecl xs) (fromName x)
+fromExp o@(H.Let (BDecls xs) x) = Let noname ((f1,fromExp x):concatMap fromDecl xs) f1
+    where f1:_ = freshNames o
 fromExp x = error $ "Unhandled fromExp: " ++ show x
 
 
@@ -222,10 +225,18 @@ assignNames fun x = evalState (transformM f x) 0
 
 -- Fixup: Move arity information
 assignArities :: [(Var,Exp)] -> [(Var,Exp)]
-assignArities xs = ("root",App noname (fromJust $ lookup "root" ren) []) : [(fromJust $ lookup a ren, subst ren b) | (a,b) <- xs]
+assignArities xs = checkPrims $ ("root",App noname (fromJust $ lookup "root" ren) []) :
+                                [(fromJust $ lookup a ren, subst ren b) | (a,b) <- xs]
     where ren = [(a, a ++ "'" ++ show (f b)) | (a,b) <- xs]
           f (Lam _ _ x) = 1 + f x
           f _ = 0
+
+
+checkPrims :: [(Var,Exp)] -> [(Var,Exp)]
+checkPrims xs | null bad = xs
+              | otherwise = error $ "checkPrims failed: " ++ show bad
+    where
+        bad = nub [v | (_,x) <- xs, v <- free x, Nothing <- [arity v]]
 
 
 ---------------------------------------------------------------------

@@ -3,8 +3,6 @@
 {-
 TODO:
 should have a share cheap that does the pre-processing (ctors and paps) with arity
-should favour new names when terminating
-kind of want msg inspired splitting...
 -}
 
 module Supercompile(supercompile) where
@@ -132,16 +130,64 @@ remAppBox x = x
 ---------------------------------------------------------------------
 -- SHARING
 
+-- given a set of expressions bound to boxes, you may:
+-- * move an expression under a box if it's only used by one
+-- * copy an expression under a box if it's cheap
+-- the test function must pass on every expression under a box
+share :: (Exp -> Bool) -> Exp -> Exp
+share test x = fromFlat $ FlatExp vars bind2 root
+    where
+        FlatExp vars bind root = toFlat x
+        norm = filter (not . isBox . snd) bind
+        keep = nub $ root : concatMap (free . snd) norm
+        boxes = [(v, simplify x) | (v,Box x) <- bind]
+        boxes2 = sharer test keep boxes
+        bind2 = norm ++ map (second Box) boxes2
+
+
+data Sharer = Sharer {rank :: Int, var :: Var, val :: Exp, fre :: [Var]}
+
+sharer :: (Exp -> Bool) -> [Var] -> [(Var, Exp)] -> [(Var, Exp)]
+sharer test keep xs = map (\x -> (var x, val x)) $ once $ cheap
+        [mk (length $ filter (== getName b) names) a b | (a,b) <- xs]
+    where
+        mk a b c = Sharer a b c (free c)
+        names = map (getName . snd) xs
+        order = sortBy (\x y -> compare (rank x) (rank y))
+
+        -- move a single variable wherever you can, delete if no longer needed
+        move :: Sharer -> [Sharer] -> [Sharer]
+        move v xs = if var v `elem` keep || any (elem (var v) . fre) xs2 then xs2
+                    else filter ((/=) (var v) . var) xs2
+            where
+                xs2 = map f xs
+                f x | var v `elem` fre x, test $ val x2 = x2
+                    | otherwise = x
+                    where x2 = mk (max (rank v) (rank x)) (var x) (simplify $ Let noname [(var v,val v),("_root",val x)] "_root")
+
+        -- merge all the cheap ones
+        cheap :: [Sharer] -> [Sharer]
+        cheap xs = foldl (flip move) xs $ filter (isCheap . val) $ order xs
+
+        -- merge all the ones used once
+        once :: [Sharer] -> [Sharer]
+        once xs = f poss
+            where frees = concatMap fre xs
+                  poss = [x | x <- order xs, var x `notElem` keep && length (filter (== var x) frees) <= 1]
+
+                  f [] = xs
+                  f (p:ps) | length xs2 == length xs = f ps
+                           | otherwise = once xs2
+                       where xs2 = move p xs
+
+
+{-
+
+
+
 simplifyBox = transform f
     where f (Box x) = Box $ simplify x
           f x = x
-
-
--- given a set of expressions
--- bound to boxes, you may move an expression under a box if it's only used by one
-share :: (Exp -> Bool) -> Exp -> Exp
-share test = f . simplifyBox
-    where f x = head $ [f x2 | (v,x2) <- order x $ shareOptions x, test x2] ++ [x]
 
 
 -- penalise duplicates as they are more expensive, and usually want splitting
@@ -151,7 +197,6 @@ order x ys = sortOn f ys
         FlatExp vars bind root = toFlat x
         names = map (getName . snd) bind
         f y = length $ filter ((==) $ getName $ fromJust $ lookup (fst y) bind) names
-
 
 -- each variable is bound at the let, to a box
 -- is used in at most one binding, and not the root
@@ -168,10 +213,12 @@ shareOptions x =
         frees = concatMap (free . snd) bind
 
         FlatExp vars bind root = toFlat x
+-}
 
-cheap (App _ _ []) = True
-cheap Con{} = True
-cheap _ = False
+isCheap (App _ _ []) = True
+isCheap (App _ x xs) | Just n <- arity x = length xs < n
+isCheap Con{} = True
+isCheap _ = False
 
 ---------------------------------------------------------------------
 -- OPERATIONS
@@ -205,8 +252,5 @@ stop hist x = if time 10000 then
         error $ "STOP:\n" ++ prettyNames x ++ "\n ==>\n" ++ prettyNames res
         else debox res
     where
-        res = share (all f . universe) $ fromFlat $ FlatExp free (map (second Box) bind) root
+        res = share (not . terminate (<=|) hist) $ fromFlat $ FlatExp free (map (second Box) bind) root
         FlatExp free bind root = toFlat x
-
-        f (Box x) = not $ terminate (<=|) hist x
-        f _ = True

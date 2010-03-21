@@ -1,5 +1,11 @@
 
-module Main where
+module Main(main) where
+
+#if STREAM
+import Prelude hiding((!!), iterate, map)
+import Data.List.Stream
+
+#endif
 
 #if MAIN
 

@@ -28,6 +28,7 @@
 %format w_1  = "\Varid{w_1}"
 %format w_2  = "\Varid{w_2}"
 %format w_3  = "\Varid{w_3}"
+%format w_n  = "\Varid{w_n}"
 %format w_12  = "\Varid{w_12}"
 %format w_123  = "\Varid{w_123}"
 %format v_3  = "\Varid{v_3}"
@@ -120,7 +121,7 @@ In addition, we make the following contributions:
 \begin{itemize}
 \item We give examples of how our supercompiler performs (\S\ref{sec:manager_example}, \S\ref{sec:term_example}, \S\ref{sec:examples}), including how it subsumes list fusion and specialisation, and what happens when the termination criteria are needed.
 \item We benchmark the supercompiler on a small range of examples (\S\ref{sec:benchmarks}) -- our supercompiler achieves an improvement of \unknown{}\% when used in combination with GHC, as opposed to GHC alone.
-\item We use our supercompiler to optimise an HTML parser, showing a \unknown{}\% speed increase (\S\ref{sec:tagsoup}). This HTML parser is run daily on 40Gb of input, and previously consumed over two hours of CPU time per day.
+\item We use our supercompiler to optimise an HTML parser, showing a \unknown{}\% speed increase (\S\ref{sec:tagsoup}). This HTML parser is regularly run on many gigabytes of data, and previously consumed several hours of CPU time each run.
 \end{itemize}
 
 \section{Method}
@@ -172,11 +173,10 @@ Our Core language for expressions is given in Figure \ref{fig:core}, and has muc
 \begin{itemize}
 \item We require variables in many places that would normally permit expressions, including let bodies and application. A standard Core language (such as from \citet{ghc_core}) could be translated to ours by inserting let bindings.
 \item In many Core languages a distinction is made between standard let bindings and recursive let bindings. We allow expressions bound at a let to refer to variables bound at the same let, but disallow recursion. An alternative description is that we allow recursive let, but only if there is an equivalent nested non-recursive let that can represent the same expression. For example we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
-\item We don't have default patterns in case expressions, or literals. Both can be added (see \S\ref{sec:extensions}), but are of little interest when describing a supercompiler.
+\item We don't have default patterns in case expressions, or literals. Both can be added, but are of little interest when describing a supercompiler.
 \item We assume that the Core language is well-typed, in particular that we never over-apply a constructor or perform case analysis on a function.
 \item We have vector application, rather than binary application, the reasons for which are described in \S\ref{sec:binaryapp}. We can use an application with no arguments to represent just a variable.
 \item We require all free variables (those from the environment) to occur in the first argument of |App|.
-\item Our case expression does not permit default alternatives. Defaults can be added easily, but aren't strictly needed, and we choose to omit them for simplicity.
 \end{itemize}
 
 We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place. For example a variable bound to a lambda would have an arity of the number of lambda variables it was bound to. For primitives, the arity is the number of arguments before the primitive is actually evaluated. For example, in our example |map| has arity 2 and |root| has arity 3. The arity of |f|, |g| and |x| are all 0, as we don't know their true arity.
@@ -266,8 +266,9 @@ optimise env = f []
 reduce :: Env -> Exp -> ([Var] -> Exp, [Exp])
 reduce env = f []
     where f t x  | terminate (<|) t x = stop t x
-                 | Just x' <- step env x = f (x:t) x'
-                 | otherwise = split x
+                 | otherwise = case  step env x of
+                                     Just x'  -> f (x:t) x'
+                                     Nothing  -> split x
 
 flatten :: Tree -> [Tree]
 flatten = nubBy (\x y -> pre x == pre y) . f []
@@ -943,6 +944,8 @@ Our compiler is whole program, although we could split it up by defining interfa
 
 \todo{This section is not finished}
 
+Tagsoup is used by \cite{malde:using_tagsoup}
+
 The TagSoup library \cite{tagsoup} is a simple parser for XML/HTML, based on the HTML 5 specification. Given a String, TagSoup produces a list of tokens (such as tag open, tag close, attribute). The parser was deliberately written in a way that mirrors the HTML 5 specification, which is based around a state passing approach. Each rule has been modelled in the most direct way, and then a supporting library simplifies it. For example, section 9.2.4.10 of the HTML 5 specification states:
 
 \begin{quote}
@@ -1128,9 +1131,9 @@ What about strictness analysis.
 We have presented a supercompiler which is simple, and has found practical use. What a great result.
 
 
-\subsection{Acknowledgements}
+\subsection*{Acknowledgements}
 
-Thanks to lots of people for helpful ideas and discussions. Particularly I'd like to thank Jason Reich, Simon Peyton Jones, Max Bolingbroke and Peter Jonsson.
+I would like to thank lots of people for helpful ideas and discussions. Particularly I'd like to thank Max Bolingbroke, Jason Reich, Simon Peyton Jones and Peter Jonsson. Thanks to Ketil Malde for providing information for the HTML parsing work.
 
 \bibliographystyle{plainnat}
 \bibliography

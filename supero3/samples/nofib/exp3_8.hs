@@ -1,6 +1,4 @@
 
-data Nat = Z | S Nat deriving (Eq,Ord, Show {-was:Text-})
-
 
 x +& y = case x of
     Z -> y
@@ -28,18 +26,13 @@ root n = int (fromInteger_ 3 ^^^ fromInteger_ n)
 
 #if MAIN
 
-main = print $ root 9
-
-#endif
-
-
-#if MAIN_SUPERO
-
-addInt'2 = (+)
-subInt'2 = (-)
-ltInt'2 = (<)
+addInt'2 = (+) :: Int -> Int -> Int
+subInt'2 = (-) :: Int -> Int -> Int
+ltInt'2 = (<) :: Int -> Int -> Bool
 
 data Nat = Z | S Nat
+
+main = print $ root 9
 
 #endif
 
@@ -48,6 +41,5 @@ data Nat = Z | S Nat
 (+) = addInt'2
 (-) = subInt'2
 (<) = ltInt'2
-
 
 #endif

@@ -27,7 +27,8 @@ main = do
         src <- readFile x
         let res = fleshOut src $ prettyPrint $ toHSE $ supercompile $ env $ simplifyProg $ fromHSE $ desugar $
                         fromParseResult $ parseFileContents $ cpphs ["SUPERO"] src
-        writeFile y res
+        when ("--only" `notElem` opts) $ do
+            writeFile y res
         when ("--compile" `elem` opts) $ do
             withDirectory (takeDirectory x) $ do
                 system_ $ "ghc --make -O2 " ++ takeFileName x ++ " -ddump-simpl -cpp -DMAIN -DMAIN_GHC > " ++ takeFileName x ++ ".log"
@@ -54,5 +55,5 @@ system_ cmd = do
 
 
 fleshOut :: String -> String -> String
-fleshOut orig new = "{-# OPTIONS_GHC -O2 #-}\nmodule Main(main) where\n" ++ f "MAIN" ++ f "MAIN_SUPERO" ++ new ++ "\n\n"
+fleshOut orig new = "{-# OPTIONS_GHC -O2 #-}\nmodule Main(main) where\n" ++ f "IMPORT_SUPERO" ++ f "MAIN" ++ f "MAIN_SUPERO" ++ new ++ "\n\n"
     where f x = unlines $ takeWhile (/= "#endif") $ drop 1 $ dropWhile (/= ("#if " ++ x)) $ lines orig

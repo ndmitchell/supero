@@ -113,7 +113,8 @@ reduce (Let n xs v) = do
             | Case n v2 alts <- e, Just (Con _ c vs) <- lookup v2 done =
                 let g (Con _ c2 vs2, x) | c == c2 = [subst (zip vs2 vs) x]
                     g _ = []
-                    r = head $ concatMap g alts ++ error "confused, no case match..."
+                    r = head $ concatMap g alts ++ error
+                            ("confused, no case match...\n" ++ show n ++ "\n" ++ pretty (Con noname c vs) ++ "\n" ++ pretty e)
                 in f done ((v,r):odo)
             | otherwise = f ((v,e):done) odo
         f done [] = return done

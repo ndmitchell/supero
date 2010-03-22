@@ -1,0 +1,44 @@
+bernouilli
+GHC=0.530
+Supero=non-terminates at compile time
+
+digits-of-e1
+GHC=0.480
+Supero=non-terminates at compile time
+
+digits-of-e2
+GHC=0.230
+Supero=0.091
+
+exp3_8
+GHC=1.521
+Supero=fails to compile result
+
+gen_regexps
+
+integrate
+
+paraffins
+
+primes
+GHC=0.376
+Supero=0.221
+
+queens
+GHC=0.708
+Supero=non-terminates at compile time
+
+rfib
+
+tak
+
+wheel-sieve1
+
+wheel-sieve2
+
+x2n1
+GHC=0.310
+Supero=0.29
+
+
+

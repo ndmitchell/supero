@@ -160,6 +160,7 @@ fromDecl (PatBind _ (PVar f) Nothing (UnGuardedRhs x) (BDecls [])) = [(fromName 
 fromDecl (FunBind [Match _ f vars Nothing (UnGuardedRhs x) (BDecls [])]) = [(fromName f, fromExp $ Lambda sl vars x)]
 fromDecl TypeSig{} = []
 fromDecl DataDecl{} = []
+fromDecl TypeDecl{} = []
 fromDecl x = error $ "Unhandled fromDecl: " ++ show x
 
 
@@ -181,10 +182,15 @@ fromExp o@(InfixApp x (QConOp (Special Cons)) y) = Let noname [(f1,fromExp x),(f
     where f1:f2:f3:_ = freshNames o
 fromExp o@(InfixApp a (QVarOp b) c) = fromExp $ H.App (H.App (H.Var b) a) c
 fromExp (Lit x) = Con noname (prettyPrint x) []
+fromExp x@(NegApp _) = Con noname (prettyPrint x) []
 fromExp (If a b c) = fromExp $ H.Case a [f "True" b, f "False" c]
     where f con x = Alt sl (PApp (UnQual $ Ident con) []) (UnGuardedAlt x) (BDecls [])
 fromExp o@(H.Let (BDecls xs) x) = Let noname ((f1,fromExp x):concatMap fromDecl xs) f1
     where f1:_ = freshNames o
+fromExp o@(Tuple xs) = Let noname
+    ((f1, Con noname (fromTuple xs) (take (length xs) fs)) : zipWith (\f x -> (f,fromExp x)) fs xs) f1
+    where f1:fs = freshNames o
+fromExp (H.Con (Special (TupleCon _ n))) = Con noname (fromTuple $ replicate n ()) []
 fromExp x = error $ "Unhandled fromExp: " ++ show x
 
 
@@ -202,7 +208,12 @@ fromPat (PList []) = Con noname "[]" []
 fromPat (PApp (Special Cons) xs) = Con noname ":" $ map fromPatVar xs
 fromPat (PInfixApp a b c) = fromPat $ PApp b [a,c]
 fromPat (PApp (UnQual c) xs) = Con noname (fromName c) $ map fromPatVar xs
+fromPat (PTuple xs) = Con noname (fromTuple xs) $ map fromPatVar xs
+fromPat (PApp (Special (TupleCon _ n)) xs) = Con noname (fromTuple xs) $ map fromPatVar xs
+fromPat PWildCard = App noname "_wild" []
 fromPat x = error $ "Unhandled fromPat: " ++ show x
+
+fromTuple xs = "(" ++ replicate (length xs - 1) ',' ++ ")"
 
 fromPatVar :: H.Pat -> String
 fromPatVar (PVar x) = fromName x
@@ -262,6 +273,7 @@ toAlt (x,y) = Alt sl (toPat x) (UnGuardedAlt $ toExp y) (BDecls [])
 
 toPat :: Pat -> H.Pat
 toPat (Con _ c vs) = PApp (UnQual $ toName c) (map (PVar . Ident) vs)
+toPat (App _ v []) = PWildCard
 toPat x = error $ "toPat, todo: " ++ show x
 
 toVar :: Var -> H.Exp

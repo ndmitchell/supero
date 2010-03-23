@@ -48,8 +48,11 @@ flatten = nubBy (\x y -> pre x == pre y) . f []
 
 assign :: [Tree] -> [(Var,Exp)]
 assign ts = -- error $ pretty $ ($ repeat "?") $ fst $ split $
-       -- fromJust $ lookup "f12" [(b,a) | (a,b) <- names]
-        [(f t, gen t (map f (children t))) |  t <- ts]
+       --error $ pretty $ fromJust $ lookup "f12" [(b,a) | (a,b) <- names]
+       
+       -- error $ unlines $ [pretty $ simplify x | (x,y) <- names, y `elem` ["f107","f105"]] 
+       
+       [(f t, gen t (map f (children t))) |  t <- ts]
     where f t = fromJust $ lookup (pre t) names
           names = zip (map pre ts) freshNames 
 
@@ -91,7 +94,8 @@ force _ = Nothing
 -- BOXES
 
 debox :: Exp -> ([Var] -> Exp, [Exp])
-debox = deboxName . deboxFree
+debox x | otherwise = (a,b)
+    where (a,b) = deboxName $ deboxFree x
 
 
 -- name and extract the Box components
@@ -156,10 +160,11 @@ sharer test keep xs = map (\x -> (var x, val x)) $ once $ cheap
         order = sortBy (\x y -> compare (rank x) (rank y))
 
         -- move a single variable wherever you can, delete if no longer needed
-        move :: Sharer -> [Sharer] -> [Sharer]
-        move v xs = if var v `elem` keep || any (elem (var v) . fre) xs2 then xs2
-                    else filter ((/=) (var v) . var) xs2
+        move :: Var -> [Sharer] -> [Sharer]
+        move vv xs = if var v `elem` keep || any (elem (var v) . fre) xs2 then xs2
+                     else filter ((/=) (var v) . var) xs2
             where
+                v = head $ filter ((==) vv . var) xs
                 xs2 = map f xs
                 f x | var v `elem` fre x, test $ val x2 = x2
                     | otherwise = x
@@ -167,7 +172,7 @@ sharer test keep xs = map (\x -> (var x, val x)) $ once $ cheap
 
         -- merge all the cheap ones
         cheap :: [Sharer] -> [Sharer]
-        cheap xs = foldl (flip move) xs $ filter (isCheap . val) $ order xs
+        cheap xs = foldl (flip move) xs $ map var $ filter (isCheap . val) $ order xs
 
         -- merge all the ones used once
         once :: [Sharer] -> [Sharer]
@@ -178,7 +183,7 @@ sharer test keep xs = map (\x -> (var x, val x)) $ once $ cheap
                   f [] = xs
                   f (p:ps) | length xs2 == length xs = f ps
                            | otherwise = once xs2
-                       where xs2 = move p xs
+                       where xs2 = move (var p) xs
 
 
 {-
@@ -218,6 +223,7 @@ shareOptions x =
 isCheap (App _ _ []) = True
 isCheap (App _ x xs) | Just n <- arity x = length xs < n
 isCheap Con{} = True
+isCheap (Let _ bind _) = all (isCheap . snd) bind
 isCheap _ = False
 
 ---------------------------------------------------------------------
@@ -244,7 +250,7 @@ split x
         s = stackTop flat
         flat@(FlatExp free bind root) = toFlat x
         boxlam (Lam n v x) = Lam n v $ boxlam x
-        boxlam x = Box x
+        boxlam x = Box $ simplify x
 
 
 stop :: History -> Exp -> ([Var] -> Exp, [Exp])

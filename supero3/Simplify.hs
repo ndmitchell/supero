@@ -49,23 +49,16 @@ relabel ren (Lam n v x) = do
 
 -- let does the actual GC and reorder
 relabel ren (Let n xs v) = do
+    xs <- return $ rebind v xs
     vs2 <- freshN $ length xs
     ren <- return $ Map.fromList (zip (map fst xs) vs2) `Map.union` ren
     let v2 = relabelVar ren v
-    xs2 <- bind ren (zip vs2 $ map snd xs) [v2]
+    xs2 <- mapM (f ren) (zip vs2 $ map snd xs)
     case xs2 of
         [(w2,y2)] | w2 == v2 -> return y2
         _ -> return $ Let n xs2 v2  
     where
-        bind :: Map.Map Var Var -> [(Var,Exp)] -> [Var] -> Fresh [(Var,Exp)]
-        bind ren bs = f []
-            where
-                f seen (t:odo) | Just e <- lookup t bs, t `notElem` seen = do
-                    e2 <- relabel ren e
-                    res <- f (t:seen) (odo ++ free e2)
-                    return $ (t,e2) : res
-                f seen (t:odo) = f seen odo
-                f seen [] = return []
+        f ren (v,x) = fmap ((,) v) $ relabel ren x
 
 relabel ren (Case n v xs) = do
     fmap (Case n $ relabelVar ren v) $ mapM (f ren) xs
@@ -84,6 +77,23 @@ relabel ren (Con n c vs) = return $ Con n c $ map (relabelVar ren) vs
 relabelVar ren v = Map.findWithDefault v v ren
 
 
+-- put in order, and do a GC
+rebind :: Var -> [(Var,Exp)] -> [(Var,Exp)]
+rebind v xs | v `notElem` map fst xs = []
+            | otherwise = [(a, fromJustNote "rebind" $ lookup a xs) | a <- order [] $ need [v]]
+    where
+        -- (a,b) means a relies on b
+        pairs = [(a,b) | (a,b) <- xs, b <- free b, b `elem` map fst xs]
+
+        need seen = if null next then seen else need (seen++next)
+            where next = [b | (a,b) <- pairs, a `elem` seen, b `notElem` seen]
+
+        order done [] = done
+        order done todo = if null a then error "rebind circle" else order (done++a) b
+            where (a,b) = partition f todo
+                  f x = all (\(a,b) -> a /= x || b `elem` done) pairs
+
+
 ---------------------------------------------------------------------
 -- REDUCE
 
@@ -91,7 +101,7 @@ relabelVar ren v = Map.findWithDefault v v ren
 -- i.e. will only depend on variables defined after you
 reduce :: Exp -> Fresh Exp
 reduce (Let n xs v) = do
-    xs2 <- f [] $ reverse xs
+    xs2 <- f [] xs
     return $ case lookup v xs2 of
         Just (App _ v2 []) -> Let n xs2 v2
         _ -> Let n xs2 v

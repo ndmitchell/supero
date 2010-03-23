@@ -11,8 +11,8 @@ GHC=0.230
 Supero=0.091
 
 exp3_8
-GHC=1.521
-Supero=fails to compile result
+GHC=1.89
+Supero=1.75
 
 gen_regexps
 

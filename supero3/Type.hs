@@ -2,7 +2,7 @@
 
 module Type(
     Var, Con, Exp(..), Pat, pretty, isBox,
-    vars, free, subst, arity,
+    vars, free, subst, arity, valid, validId,
     FlatExp(..), toFlat, fromFlat, lams,
     Name, noname, prettyNames, getName,
     Env(..), env,
@@ -90,6 +90,13 @@ subst ren e = case e of
         f x = fromMaybe x $ lookup x ren
         g del x = subst (filter (flip notElem del . fst) ren) x
 
+
+valid :: Exp -> Bool
+valid = all (isJust . arity) . free
+
+validId :: Exp -> Exp
+validId x | valid x = x
+          | otherwise = error $ "Invalid expression:\n" ++ pretty x
 
 ---------------------------------------------------------------------
 -- NAMES
@@ -266,7 +273,6 @@ toExp (App _ x y) = Paren $ foldl H.App (toVar x) $ map toVar y
 toExp (Case _ x y) = Paren $ H.Case (toVar x) (map toAlt y)
 toExp (Con _ c vs) = Paren $ foldl H.App (H.Con $ UnQual $ toName c) (map toVar vs)
 toExp (Box x) = BracketExp $ ExpBracket $ toExp x
-toExp x = error $ "toExp, todo: " ++ show x
 
 toAlt :: (Pat, Exp) -> Alt
 toAlt (x,y) = Alt sl (toPat x) (UnGuardedAlt $ toExp y) (BDecls [])

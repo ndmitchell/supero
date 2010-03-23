@@ -77,13 +77,12 @@
 % \subtitle{}
 
 \authorinfo{Neil Mitchell}
-           {Standard Chartered, UK}
            {\verb"ndmitchell@gmail.com"}
 
 \maketitle
 
 \begin{abstract}
-Supercompilation is a program optimisation technique, which can often eliminate the overhead of programm abstractions. We present a new design for a supercompiler, rethinking many of the decisions that have become common in previous supercompilation work. The result is a supercompiler that we find simpler, and offers good performance both at compile time and runtime. We have implemented our supercompiler and benchmarked it on a small selection of programs from the nofib benchmark suite, which run faster than both GHC and our previous supercompiler. We then put our supercompiler to practical use, optimising an HTML parsing library that processes 40Gb of data every night, doubling the performance.
+Supercompilation is a program optimisation technique, which can often eliminate the overhead of program abstractions. We present a new design for a supercompiler, rethinking many of the decisions that have become common in previous supercompilation work. The result is a supercompiler that we find simpler, and offers good performance both at compile time and runtime. We have implemented our supercompiler and benchmarked it on a small selection of programs from the nofib benchmark suite, which run faster than when compiled with GHC. We have put our supercompiler to practical use, optimising an HTML parsing library used in biological research, reducing the runtime by over an hour.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -96,7 +95,7 @@ Haskell, optimisation, supercompilation
 
 \section{Introduction}
 
-\todo{perhaps switch to tagsoup as the openning example, so I can come back to it? yes - if it works}
+\todo{perhaps switch to tagsoup as the opening example, so I can come back to it? yes - if it works}
 
 Supercompilation is a technique for program optimisation, that is particularly suited to removing the overhead introduced by abstractions. Consider a program that counts the number of words read from the standard input -- in Haskell \cite{haskell} this can be compactly written as:
 
@@ -108,9 +107,9 @@ Reading the program right to left, we first read the standard input as a string 
 
 Sadly the C program is three times faster, even using the advanced optimising compiler GHC \cite{GHC}. The abstractions that make the program concise have a significant runtime cost. In a previous paper on supercompilation \cite{me:supero} we showed how supercompilation can remove these abstractions, to the stage where the Haskell is even faster than the C version (by about 6\%). In the Haskell program after optimisation all the intermediate lists have been removed, and the |length . words| part of the pipeline is translated into a state machine.
 
-One informal description of supercompilation is that you simply ``run the program at compile time''. This description leads to two questions -- what happens if you are blocked on information only available at runtime, and how do you ensure termination? Answering these questions provides the design for a supercompiler. This paper strives to provide simple answers, but which do not reduce the optimisation power. In doing so, we make a large number of departures from the current concensus on supercompiler design.
+One informal description of supercompilation is that you simply ``run the program at compile time''. This description leads to two questions -- what happens if you are blocked on information only available at runtime, and how do you ensure termination? Answering these questions provides the design for a supercompiler. This paper strives to provide simple answers, but which do not reduce the optimisation power. In doing so, we make a large number of departures from the current consensus of supercompiler design.
 
-We hope that from the descriptions given in this paper a user is able to write their own supercompiler. Indeed, we have written a supercompiler following this design which is available online \unknown{}.
+Our supercompiler is better because we've tried to keep it simple. Our document describes all the little details, in full colour. We have left nothing out. In doing so, we've ended up with a supercompiler that is also fast at compile time, and performs well at runtime. We hope that from the descriptions given in this paper a user is able to write their own supercompiler. Indeed, we have written a supercompiler following this design which is available online at \verb"http://community.haskell.org/~ndm". Much of the code (for example Figure \ref{fig:manager}) has been copied verbatim in to our compiler.
 
 \subsection{Contributions}
 
@@ -1059,7 +1058,7 @@ We first describe the related work in the area of supercompilation, particularly
 \subsection{Supercompilation}
 \label{sec:comparison}
 
-Supercompilation was introduced by \citet{supercompilation} for the Refal programming language \cite{refal}. Since this original work, there have been various suggestions of both termination strategies and generalisation/splitting strategies \cite{turchin:generalisation,sorensen:supercompilation,leuschel:homeomorphic}. The original supercompiler maintained both positive and negative knowledge \cite{secher:perfect_supercompilation}, however our implementation uses only positive knowledge (what a variable is, rather than what it cannot be). More recently supercompilation has started to converge towards a common design, described in detail by \citet{klyuchnikov:hosc}, which has much in common with the underlying design present in other papers \cite{me:supero,jonsson:supercompilation}.
+Supercompilation was introduced by \citet{supercompilation} for the Refal programming language \cite{refal}. Since this original work, there have been many suggestions of both termination strategies and generalisation/splitting strategies \cite{turchin:generalisation,sorensen:supercompilation,leuschel:homeomorphic}. The original supercompiler maintained both positive and negative knowledge \cite{secher:perfect_supercompilation}, however our implementation uses only positive knowledge (what a variable is, rather than what it cannot be). More recently supercompilation has started to converge towards a common design, described in detail by \citet{klyuchnikov:hosc}, which has much in common with the underlying design present in other papers \cite{me:supero,jonsson:supercompilation}.
 
 Compared to an increasingly common foundation, our supercompiler is radically different. We have changed many of the ingredients of supercompilation (the treatment of let, termination criteria, how the termination histories are used), but have also changed the way these ingredients are combined (the manager). In particular, many of our choices would not work if applied in isolation to another supercompiler -- for example the termination criteria relies on the treatment of let.
 
@@ -1128,7 +1127,7 @@ What about strictness analysis.
 
 \subsection{Conclusions}
 
-We have presented a supercompiler which is simple, and has found practical use. What a great result.
+We have presented a supercompiler which is simple, and has found practical use. What a great result. By striving for simplicity we think we've got something better than previously.
 
 
 \subsection*{Acknowledgements}

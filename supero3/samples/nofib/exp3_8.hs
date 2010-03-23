@@ -32,7 +32,7 @@ ltInt'2 = (<) :: Int -> Int -> Bool
 
 data Nat = Z | S Nat
 
-main = print $ root 9
+main = print $ (root (9::Int) :: Int)
 
 #endif
 

@@ -1,16 +1,20 @@
 {-# LANGUAGE PatternGuards #-}
 
-module Util where
+module Util(module Util, trace) where
 
 import Data.Function
 import Data.List
 import Control.Monad.State
 import Data.IORef
+import Debug.Trace
 import System.IO.Unsafe
 
 
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
 sortOn f = sortBy (compare `on` f)
+
+
+subset x y = null $ x \\ y
 
 
 delFst :: Eq a => a -> [(a,b)] -> [(a,b)]

@@ -6,9 +6,13 @@ import Prelude hiding (id,seq,null,not,head,tail,fst,snd,flip,concatMap,elem,may
 import qualified Prelude
 import Data.Char
 import Numeric
-
+import System.IO
 
 #if MAIN
+
+main = do
+    hSetBuffering stdout NoBuffering
+    print $ root "<neil a=b>is</here>"
 
 data Position = Position !Int !Int deriving Show
 
@@ -58,6 +62,8 @@ data ParseOptions str = ParseOptions
 
 eqChar'2 = (Prelude.==) :: Char -> Char -> Bool
 eqInt'2 = (Prelude.==) :: Int -> Int -> Bool
+elem'2 = Prelude.elem
+strConcat'2 = (Prelude.++)
 
 #endif
 
@@ -80,7 +86,11 @@ mod = modInt'2
 
 #endif
 
+elem = elem'2
+(&) = strConcat'2
+
 (==) = eqChar'2
+
 
 concat x = case x of
     [] -> []
@@ -119,11 +129,6 @@ maybe nil op x = case x of
 
 concatMap f x = concat (map f x)
 
-elem :: Char -> [Char] -> Bool
-elem x ys = case ys of
-    [] -> False
-    y:ys -> (x == y) || elem x ys
-
 flip f x y = f y x
 
 entData :: String -> [Tag String]
@@ -146,12 +151,12 @@ hexChar y x = case y of
     True -> isHexDigit x
 
 positionChar :: Position -> Char -> Position
-positionChar y x = case y of
+positionChar y x = y {- case y of
     Position r c -> case x == '\n' of
         True -> Position (r+1) 1
         False -> case x == '\t' of
             True -> Position r (c + 8 - mod (c-1) 8)
-            False    -> Position r (c+1)
+            False    -> Position r (c+1) -}
 
 
 
@@ -379,9 +384,7 @@ tagName = \ v_2 v_3 ->
                                           (case (white v_6) of
                                                True -> ((beforeAttName v_2) v_5)
                                                False -> f_17))))
-beforeAttName = beforeAttName_root
-beforeAttName_root
-  = \ v_2 v_3 ->
+beforeAttName = \ v_2 v_3 ->
       (case v_3 of
            S v_5 v_6 v_7 v_8 v_9 -> ((($) v_9)
                                        (let f_18
@@ -447,7 +450,7 @@ beforeAttName_root
                                                                           True -> (case v_2 of
                                                                                       True -> (neilXmlTagClose
                                                                                                  v_5)
-                                                                                      _ -> f_15)
+                                                                                      False -> f_15)
                                                                           False -> f_15))
                                                             in
                                                             (case v_6 == '>' of
@@ -461,9 +464,7 @@ beforeAttName_root
                                           (case (white v_6) of
                                                True -> ((beforeAttName v_2) v_5)
                                                False -> f_18))))
-attName = attName_root
-attName_root
-  = \ v_2 v_3 ->
+attName = \ v_2 v_3 ->
       (case v_3 of
            S v_5 v_6 v_7 v_8 v_9 -> (let def
                                            = ((ampChar v_6) ((attName v_2) v_5))
@@ -532,9 +533,7 @@ attName_root
                                              (case (white v_6) of
                                                   True -> ((afterAttName v_2) v_5)
                                                   False -> f_18)))))
-afterAttName = afterAttName_root
-afterAttName_root
-  = \ v_2 v_3 ->
+afterAttName = \ v_2 v_3 ->
       (case v_3 of
            S v_5 v_6 v_7 v_8 v_9 -> (let def
                                            = ((ampOut AttName) ((ampChar v_6) ((attName v_2) v_5)))
@@ -616,9 +615,7 @@ afterAttName_root
                                              (case (white v_6) of
                                                   True -> ((afterAttName v_2) v_5)
                                                   False -> f_19)))))
-beforeAttValue = beforeAttValue_root
-beforeAttValue_root
-  = \ v_2 v_3 ->
+beforeAttValue = \ v_2 v_3 ->
       (case v_3 of
            S v_5 v_6 v_7 v_8 v_9 -> (let def
                                            = ((ampOut AttVal)
@@ -704,9 +701,7 @@ beforeAttValue_root
                                              (case (white v_6) of
                                                   True -> ((beforeAttValue v_2) v_5)
                                                   False -> f_19)))))
-attValueDQuoted = attValueDQuoted_root
-attValueDQuoted_root
-  = \ v_2 v_3 ->
+attValueDQuoted = \ v_2 v_3 ->
       (case v_3 of
            S v_5 v_6 v_7 v_8 v_9 -> ((($) v_9)
                                        (let f_13
@@ -730,9 +725,7 @@ attValueDQuoted_root
                                           (case v_6 == '"' of
                                                True -> ((afterAttValueQuoted v_2) v_5)
                                                False -> f_13))))
-attValueSQuoted = attValueSQuoted_root
-attValueSQuoted_root
-  = \ v_2 v_3 ->
+attValueSQuoted = \ v_2 v_3 ->
       (case v_3 of
            S v_5 v_6 v_7 v_8 v_9 -> ((($) v_9)
                                        (let f_13
@@ -756,9 +749,7 @@ attValueSQuoted_root
                                           (case v_6 == '\'' of
                                                True -> ((afterAttValueQuoted v_2) v_5)
                                                False -> f_13))))
-attValueUnquoted = attValueUnquoted_root
-attValueUnquoted_root
-  = \ v_2 v_3 ->
+attValueUnquoted = \ v_2 v_3 ->
       (case v_3 of
            S v_5 v_6 v_7 v_8 v_9 -> (let def
                                            = ((ampChar v_6) ((attValueUnquoted v_2) v_5))
@@ -800,7 +791,7 @@ attValueUnquoted_root
                                                                              True -> (case v_2 of
                                                                                          True -> (neilXmlTagClose
                                                                                                     v_5)
-                                                                                         _ -> f_14)
+                                                                                         False -> f_14)
                                                                              False -> f_14))
                                                                in
                                                                (case v_6 == '>' of
@@ -817,12 +808,8 @@ attValueUnquoted_root
                                              (case (white v_6) of
                                                   True -> ((beforeAttName v_2) v_5)
                                                   False -> f_17)))))
-charRefAttValue = charRefAttValue_root
-charRefAttValue_root
-  = \ v_2 v_3 v_4 -> ((((charRef v_2) True) v_3) v_4)
-afterAttValueQuoted = afterAttValueQuoted_root
-afterAttValueQuoted_root
-  = \ v_2 v_3 ->
+charRefAttValue = \ v_2 v_3 v_4 -> ((((charRef v_2) True) v_3) v_4)
+afterAttValueQuoted = \ v_2 v_3 ->
       (case v_3 of
            S v_5 v_6 v_7 v_8 v_9 -> ((($) v_9)
                                        (let f_15
@@ -847,7 +834,7 @@ afterAttValueQuoted_root
                                                                           True -> (case v_2 of
                                                                                       True -> (neilXmlTagClose
                                                                                                  v_5)
-                                                                                      _ -> f_12)
+                                                                                      False -> f_12)
                                                                           False -> f_12))
                                                             in
                                                             (case v_6 == '>' of
@@ -861,9 +848,7 @@ afterAttValueQuoted_root
                                           (case (white v_6) of
                                                True -> ((beforeAttName v_2) v_5)
                                                False -> f_15))))
-selfClosingStartTag = selfClosingStartTag_root
-selfClosingStartTag_root
-  = \ v_2 v_3 ->
+selfClosingStartTag = \ v_2 v_3 ->
       (case v_3 of
            S v_5 v_6 v_7 v_8 v_9 -> ((($) v_9)
                                        (let f_13
@@ -885,14 +870,10 @@ selfClosingStartTag_root
                                                True -> ((ampOut (errSeen "/"))
                                                           ((beforeAttName v_2) v_3))
                                                False -> f_13))))
-bogusComment = bogusComment_root
-bogusComment_root
-  = \ v_2 ->
+bogusComment = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((ampOut Comment) (bogusComment1 v_2)))
-bogusComment1 = bogusComment1_root
-bogusComment1_root
-  = \ v_2 ->
+bogusComment1 = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((($) v_8)
                                        (let f_11
@@ -904,9 +885,7 @@ bogusComment1_root
                                           (case v_5 == '>' of
                                                True -> ((ampOut CommentEnd) (dat v_4))
                                                False -> f_11))))
-markupDeclOpen = markupDeclOpen_root
-markupDeclOpen_root
-  = \ v_2 ->
+markupDeclOpen = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((($) v_8)
                                        (let f_14
@@ -927,14 +906,12 @@ markupDeclOpen_root
                                                                          ((tagName False) v_4))))
                                                         False -> f_13))
                                           in
-                                          (let v_15 = (v_7 "--") in
+                                          (let v_15 = (v_7 (',':',':[])) in
                                              (case v_15 of
                                                   Just v_16 -> ((ampOut Comment)
                                                                   (commentStart v_16))
                                                   Nothing -> f_14)))))
-commentStart = commentStart_root
-commentStart_root
-  = \ v_2 ->
+commentStart = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((($) v_8)
                                        (let f_12
@@ -955,9 +932,7 @@ commentStart_root
                                           (case v_5 == '-' of
                                                True -> (commentStartDash v_4)
                                                False -> f_12))))
-commentStartDash = commentStartDash_root
-commentStartDash_root
-  = \ v_2 ->
+commentStartDash = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((($) v_8)
                                        (let f_12
@@ -980,9 +955,7 @@ commentStartDash_root
                                           (case v_5 == '-' of
                                                True -> (commentEnd v_4)
                                                False -> f_12))))
-comment = comment_root
-comment_root
-  = \ v_2 ->
+comment = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((($) v_8)
                                        (let f_11
@@ -995,9 +968,7 @@ comment_root
                                           (case v_5 == '-' of
                                                True -> (commentEndDash v_4)
                                                False -> f_11))))
-commentEndDash = commentEndDash_root
-commentEndDash_root
-  = \ v_2 ->
+commentEndDash = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((($) v_8)
                                        (let f_11
@@ -1013,9 +984,7 @@ commentEndDash_root
                                           (case v_5 == '-' of
                                                True -> (commentEnd v_4)
                                                False -> f_11))))
-commentEnd = commentEnd_root
-commentEnd_root
-  = \ v_2 ->
+commentEnd = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((($) v_8)
                                        (let f_14
@@ -1069,9 +1038,7 @@ commentEnd_root
                                           (case v_5 == '>' of
                                                True -> ((ampOut CommentEnd) (dat v_4))
                                                False -> f_14))))
-commentEndBang = commentEndBang_root
-commentEndBang_root
-  = \ v_2 ->
+commentEndBang = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((($) v_8)
                                        (let f_12
@@ -1099,9 +1066,7 @@ commentEndBang_root
                                           (case v_5 == '>' of
                                                True -> ((ampOut CommentEnd) (dat v_4))
                                                False -> f_12))))
-commentEndSpace = commentEndSpace_root
-commentEndSpace_root
-  = \ v_2 ->
+commentEndSpace = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((($) v_8)
                                        (let f_13
@@ -1132,9 +1097,7 @@ commentEndSpace_root
                                           (case v_5 == '>' of
                                                True -> ((ampOut CommentEnd) (dat v_4))
                                                False -> f_13))))
-cdataSection = cdataSection_root
-cdataSection_root
-  = \ v_2 ->
+cdataSection = \ v_2 ->
       (case v_2 of
            S v_4 v_5 v_6 v_7 v_8 -> ((($) v_8)
                                        (let f_11
@@ -1147,9 +1110,7 @@ cdataSection_root
                                              (case v_12 of
                                                   Just v_13 -> (dat v_13)
                                                   Nothing -> f_11)))))
-charRef = charRef_root
-charRef_root
-  = \ v_2 v_3 v_4 v_5 ->
+charRef = \ v_2 v_3 v_4 v_5 ->
       (case v_5 of
            S v_7 v_8 v_9 v_10 v_11 -> ((($) v_11)
                                          (let f_14
@@ -1165,18 +1126,14 @@ charRef_root
                                                of
                                                  True -> ((ampChar '&') (v_2 v_5))
                                                  False -> f_14))))
-charRefNum = charRefNum_root
-charRefNum_root
-  = \ v_2 v_3 v_4 ->
+charRefNum = \ v_2 v_3 v_4 ->
       (case v_4 of
            S v_6 v_7 v_8 v_9 v_10 -> ((($) v_10)
                                         (let f_12 = ((((charRefNum2 v_2) v_3) False) v_4) in
                                            (case ((elem v_7) "xX") of
                                                 True -> ((((charRefNum2 v_2) v_3) True) v_6)
                                                 False -> f_12))))
-charRefNum2 = charRefNum2_root
-charRefNum2_root
-  = \ v_2 v_3 v_4 v_5 ->
+charRefNum2 = \ v_2 v_3 v_4 v_5 ->
       (case v_5 of
            S v_7 v_8 v_9 v_10 v_11 -> ((($) v_11)
                                          (let f_13
@@ -1191,9 +1148,7 @@ charRefNum2_root
                                                             ((ampChar v_8)
                                                                (((charRefNum3 v_2) v_4) v_7)))
                                                  False -> f_13))))
-charRefNum3 = charRefNum3_root
-charRefNum3_root
-  = \ v_2 v_3 v_4 ->
+charRefNum3 = \ v_2 v_3 v_4 ->
       (case v_4 of
            S v_6 v_7 v_8 v_9 v_10 -> ((($) v_10)
                                         (let f_13
@@ -1209,9 +1164,7 @@ charRefNum3_root
                                                 True -> ((ampChar v_7)
                                                            (((charRefNum3 v_2) v_3) v_6))
                                                 False -> f_13))))
-charRefAlpha = charRefAlpha_root
-charRefAlpha_root
-  = \ v_2 v_3 v_4 ->
+charRefAlpha = \ v_2 v_3 v_4 ->
       (case v_4 of
            S v_6 v_7 v_8 v_9 v_10 -> ((($) v_10)
                                         (let f_12
@@ -1222,9 +1175,7 @@ charRefAlpha_root
                                                            ((ampChar v_7)
                                                               (((charRefAlpha2 v_2) v_3) v_6)))
                                                 False -> f_12))))
-charRefAlpha2 = charRefAlpha2_root
-charRefAlpha2_root
-  = \ v_2 v_3 v_4 ->
+charRefAlpha2 = \ v_2 v_3 v_4 ->
       (case v_4 of
            S v_6 v_7 v_8 v_9 v_10 -> ((($) v_10)
                                         (let f_14
@@ -1247,24 +1198,16 @@ charRefAlpha2_root
                                                 True -> ((ampChar v_7)
                                                            (((charRefAlpha2 v_2) v_3) v_6))
                                                 False -> f_14))))
-alphaChar = alphaChar_root
-alphaChar_root
-  = \ v_2 -> (((||) (isAlphaNum v_2)) ((elem v_2) ":-_"))
-errSeen = errSeen_root
-errSeen_root
-  = \ v_2 -> ((($) Warn) (((++) "Unexpected ") (show v_2)))
-errWant = errWant_root
-errWant_root
-  = \ v_2 -> ((($) Warn) (((++) "Expected ") (show v_2)))
-expand = expand_root
-expand_root
-  = \ v_2 v_3 ->
+alphaChar = \ v_2 -> (((||) (isAlphaNum v_2)) ((elem v_2) ":-_"))
+errSeen = \ v_2 -> ((($) Warn) (((&) "Unexpected ") (show v_2)))
+errWant = \ v_2 -> ((($) Warn) (((&) "Expected ") (show v_2)))
+expand = \ v_2 v_3 ->
       (let res
              = (((((S ((expand ((positionChar v_2) (head v_3))) (tail v_3)))
                      (let f_5 = (head v_3) in
                         (case (null v_3) of
                              True -> '\NUL'
-                             _ -> f_5)))
+                             False -> f_5)))
                     (null v_3))
                    ((((expand_next v_2) v_3) v_2) v_3))
                   ((:) (Pos v_2)))
@@ -1287,12 +1230,9 @@ expand_next
                                                           False -> f_12)
                                     [] -> f_12)
               [] -> f_12))
-ampChar = ampChar_root
-ampChar_root = \ v_2 v_3 -> (((:) (Char v_2)) v_3)
-ampOut = ampOut_root
-ampOut_root = \ v_2 v_3 -> (((:) v_2) v_3)
-state = state_root
-state_root = \ v_2 -> ((expand nullPosition) v_2)
+ampChar = \ v_2 v_3 -> (((:) (Char v_2)) v_3)
+ampOut = \ v_2 v_3 -> (((:) v_2) v_3)
+state = \ v_2 -> ((expand nullPosition) v_2)
 output = \ v_2 v_3 ->
       case v_2 of
            ParseOptions v_5 v_6 v_7 v_8 v_9 -> ((($)
@@ -2115,7 +2055,7 @@ output_pos
            (,) v_103 v_104 -> (case v_103 of
                                    (,) v_105 v_106 -> (case v_5 of
                                                            True -> (((:) (tagPosition v_105)) v_101)
-                                                           _ -> v_101)))
+                                                           False -> v_101)))
 output_warn
   = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_109 v_110 v_111 ->
       (case v_6 of
@@ -2131,9 +2071,7 @@ output_v_119
   = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_115 v_118 ->
       (((((((((output_pos v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_115)
          (((:) v_118) []))
-entityChr = entityChr_root
-entityChr_root
-  = \ v_2 v_3 ->
+entityChr = \ v_2 v_3 ->
       (let f_5
              = (case (isEntityHex v_2) of
                     True -> ((($) chr) ((($) fst) ((($) head) (readHex v_3))))
@@ -2142,17 +2080,13 @@ entityChr_root
          (case (isEntityNum v_2) of
               True -> ((($) chr) (read v_3))
               _ -> f_5))
-isEof = isEof_root
-isEof_root
-  = \ v_2 ->
+isEof = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
                                   [] -> True
                                   _ -> f_4)))
-isChar = isChar_root
-isChar_root
-  = \ v_2 ->
+isChar = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2160,9 +2094,7 @@ isChar_root
                                                       Char v_9 -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isTag = isTag_root
-isTag_root
-  = \ v_2 ->
+isTag = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2170,9 +2102,7 @@ isTag_root
                                                       Tag -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isTagShut = isTagShut_root
-isTagShut_root
-  = \ v_2 ->
+isTagShut = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2180,9 +2110,7 @@ isTagShut_root
                                                       TagShut -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isAttName = isAttName_root
-isAttName_root
-  = \ v_2 ->
+isAttName = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2190,9 +2118,7 @@ isAttName_root
                                                       AttName -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isAttVal = isAttVal_root
-isAttVal_root
-  = \ v_2 ->
+isAttVal = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2200,9 +2126,7 @@ isAttVal_root
                                                       AttVal -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isTagEnd = isTagEnd_root
-isTagEnd_root
-  = \ v_2 ->
+isTagEnd = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2210,9 +2134,7 @@ isTagEnd_root
                                                       TagEnd -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isTagEndClose = isTagEndClose_root
-isTagEndClose_root
-  = \ v_2 ->
+isTagEndClose = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2220,9 +2142,7 @@ isTagEndClose_root
                                                       TagEndClose -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isComment = isComment_root
-isComment_root
-  = \ v_2 ->
+isComment = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2230,9 +2150,7 @@ isComment_root
                                                       Comment -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isCommentEnd = isCommentEnd_root
-isCommentEnd_root
-  = \ v_2 ->
+isCommentEnd = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2240,9 +2158,7 @@ isCommentEnd_root
                                                       CommentEnd -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isEntity = isEntity_root
-isEntity_root
-  = \ v_2 ->
+isEntity = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2250,9 +2166,7 @@ isEntity_root
                                                       Entity -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isEntityChr = isEntityChr_root
-isEntityChr_root
-  = \ v_2 ->
+isEntityChr = \ v_2 ->
       (let f_9
              = (let f_4 = False in
                   (case v_2 of
@@ -2268,9 +2182,7 @@ isEntityChr_root
                                                           EntityNum -> True
                                                           _ -> f_9)
                                     _ -> f_9)))
-isEntityNum = isEntityNum_root
-isEntityNum_root
-  = \ v_2 ->
+isEntityNum = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2278,9 +2190,7 @@ isEntityNum_root
                                                       EntityNum -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isEntityHex = isEntityHex_root
-isEntityHex_root
-  = \ v_2 ->
+isEntityHex = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2288,9 +2198,7 @@ isEntityHex_root
                                                       EntityHex -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isEntityEnd = isEntityEnd_root
-isEntityEnd_root
-  = \ v_2 ->
+isEntityEnd = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2298,9 +2206,7 @@ isEntityEnd_root
                                                       EntityEnd -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isEntityEndAtt = isEntityEndAtt_root
-isEntityEndAtt_root
-  = \ v_2 ->
+isEntityEndAtt = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2308,9 +2214,7 @@ isEntityEndAtt_root
                                                       EntityEndAtt -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-isWarn = isWarn_root
-isWarn_root
-  = \ v_2 ->
+isWarn = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
@@ -2318,9 +2222,7 @@ isWarn_root
                                                       Warn v_9 -> True
                                                       _ -> f_4)
                                   _ -> f_4)))
-fromChr = fromChr_root
-fromChr_root
-  = \ v_2 ->
+fromChr = \ v_2 ->
       (let f_4 = Nothing in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of

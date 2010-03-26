@@ -55,8 +55,17 @@ arity x | '\'':xs <- dropWhile (/= '\'') x = Just $ read xs
 
 
 env :: [(Var,Exp)] -> Env
-env xs = \x -> Map.lookup x mp
-    where mp = Map.fromList xs
+env xs = f
+    where
+        mp = Map.fromList xs
+        f x = case Map.lookup x mp of
+                  Just x | Just y <- asVar x -> f y
+                  x -> x
+
+asVar (App _ x []) = Just x
+asVar (Let _ [] x) = Just x
+asVar _ = Nothing
+
 
 
 vars :: Exp -> [Var]

@@ -121,9 +121,10 @@ reduce (Let n xs v) = do
             | App _ v1 v2 <- e, Just e2@(App n v3 vs) <- lookup v1 done, Just a <- arity v3, a >= length (v2 ++ vs) =
                 f done ((v,App n v3 (vs++v2)):odo)
             | Case n v2 alts <- e, Just (Con _ c vs) <- lookup v2 done =
-                let g (Con _ c2 vs2, x) | c == c2 = [subst (zip vs2 vs) x]
-                    g _ = []
-                    r = head $ concatMap g alts ++ error
+                let pick (Con _ c2 vs2, x) | c == c2 = [subst (zip vs2 vs) x]
+                    pick (App _ vm [], x) | c `notElem` smallCtors = [subst [(vm,v2)] x]
+                    pick _ = []
+                    r = head $ concatMap pick alts ++ error
                             ("confused, no case match...\n" ++ show n ++ "\n" ++ pretty (Con noname c vs) ++ "\n" ++ pretty e)
                 in f done ((v,r):odo)
             | otherwise = f ((v,e):done) odo
@@ -133,6 +134,8 @@ reduce (Let n xs v) = do
 reduce x = return x
 
 
+
+smallCtors = ["Nothing","Just","True","False","(:)","[]",":"]
 
 
 

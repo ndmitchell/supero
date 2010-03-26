@@ -82,7 +82,7 @@
 \maketitle
 
 \begin{abstract}
-Supercompilation is a program optimisation technique, which can often eliminate the overhead of program abstractions. We present a new design for a supercompiler, rethinking many of the decisions that have become common in previous supercompilation work. The result is a supercompiler that we find simpler, and offers good performance both at compile time and runtime. We have implemented our supercompiler and benchmarked it on a small selection of programs from the nofib benchmark suite, which run faster than when compiled with GHC. We have put our supercompiler to practical use, optimising an HTML parsing library used in biological research, reducing the runtime by over an hour.
+Supercompilation is a program optimisation technique which is very effective at eliminating overheads introduced by program abstractions. We present a new design for a supercompiler, rethinking many of the decisions that have become standard in other supercompilation work. The result is a supercompiler that we find simpler, and that offers good performance both at compile-time and runtime. We have implemented our supercompiler and benchmarked it on a small selection of programs from the nofib benchmark suite, which run faster than when compiled with GHC. We have put our supercompiler to practical use, optimising an HTML parsing library used in biological research, reducing the runtime by over an hour.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -92,6 +92,18 @@ Languages
 
 \keywords
 Haskell, optimisation, supercompilation
+
+\section*{Hello}
+
+\todo{we must first eliminate all environment variables that point directly, otherwise they look equal under $\lhd$ and make the termination bork}
+
+Thoughts:
+
+An application is both an application, and a variable. Perhaps we need to track the first variable in an application too? Or make the rule that all environment variables are bound separately? Certainly something subtle going on, which is caused by the vector application. Perhaps we need all functions bound separately?
+
+Reintroduce Fun, for something that is not bound locally. 
+
+Hello Mike and Max. I appreciate you taking a look at my paper. The paper is not yet finished, I'm still working on some of the performance numbers -- I've only got them in preliminary form so far. I've done sections 2 (method), 3 (iterate example) and 6 (related work). They make up most of the paper. The intro is enough to read to get an introduction, but I might switch it round a fair bit. Any comments, particularly on those bits would be most appreciated. What do you think of the title? I'm never very good at titles. I'm aiming for this to be the paper that is simple and explicit enough that either of you feel you could implement it in a day, and that there are no hidden corners that contain magic. I know my previous paper didn't have that property (mainly because I tried to implement it a year later!). I'm hoping to have a version with all the performance numbers on Monday, then spend until Friday (April 2nd) polishing the text.
 
 \section{Introduction}
 
@@ -126,7 +138,7 @@ In addition, we make the following contributions:
 \section{Method}
 \label{sec:method}
 
-This section describes our supercompiler. We first present a Core language (\S\ref{sec:core}), along with simplification rules (\S\ref{sec:simplify}). We then present the overall algorithm (\S\ref{sec:manager}), which uses answers to the following questions:
+This section describes our supercompiler. We first present a Core language (\S\ref{sec:core}), along with simplification rules (\S\ref{sec:simplify}). We then present the overall algorithm (\S\ref{sec:manager}), which combines the answers to the following questions:
 
 \begin{itemize}
 \item How do you evaluate an open term? (\S\ref{sec:eval})
@@ -140,12 +152,11 @@ This section describes our supercompiler. We first present a Core language (\S\r
 \begin{code}
 root g f x = map g (map f x)
 
-map f x = case  x of
-                []    -> []
-                y:ys  -> f y : map f ys
+map f []      = []
+map f (x:xs)  = f y : map f ys
 \end{code}
 
-This example applies |map| twice -- the expression |map f x| produces a list that is immediately consumed by |map g|. A good supercompiler should remove the intermediate list. Our supercompiler always optimises from the function named |root|.
+Our supercompiler always optimises the function named |root|. The |root| function applies |map| twice -- the expression |map f x| produces a list that is immediately consumed by |map g|. A good supercompiler should remove the intermediate list.
 
 \subsection{Core Language}
 \label{sec:core}
@@ -155,11 +166,11 @@ This example applies |map| twice -- the expression |map f x| produces a list tha
 type Var   =   String -- variable/function names
 type Con   =   String -- constructor names
 
-data Exp   =   App Var [Var]
-           |   Con Con [Var]
-           |   Let [(Var,Exp)] Var
-           |   Case Var [(Pat, Exp)]
-           |   Lam Var Exp
+data Exp   =   App Var [Var]           -- function application
+           |   Con Con [Var]           -- constructor application
+           |   Let [(Var,Exp)] Var     -- let expression
+           |   Case Var [(Pat, Exp)]   -- case expression
+           |   Lam Var Exp             -- lambda expression
 
 type Pat   =   Exp -- restricted to |Con|
 \end{code}
@@ -167,18 +178,18 @@ type Pat   =   Exp -- restricted to |Con|
 \label{fig:core}
 \end{figure}
 
-Our Core language for expressions is given in Figure \ref{fig:core}, and has much in common with Administrative Normal Form \cite{flanagan:continuations}. There are a few points to note:
+Our Core language for expressions is given in Figure \ref{fig:core}, and has much in common with Administrative Normal Form \cite{flanagan:continuations}. We make the following observations:
 
 \begin{itemize}
-\item We require variables in many places that would normally permit expressions, including let bodies and application. A standard Core language (such as from \citet{ghc_core}) could be translated to ours by inserting let bindings.
-\item In many Core languages a distinction is made between standard let bindings and recursive let bindings. We allow expressions bound at a let to refer to variables bound at the same let, but disallow recursion. An alternative description is that we allow recursive let, but only if there is an equivalent nested non-recursive let that can represent the same expression. For example we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
-\item We don't have default patterns in case expressions, or literals. Both can be added, but are of little interest when describing a supercompiler.
-\item We assume that the Core language is well-typed, in particular that we never over-apply a constructor or perform case analysis on a function.
-\item We have vector application, rather than binary application, the reasons for which are described in \S\ref{sec:binaryapp}. We can use an application with no arguments to represent just a variable.
-\item We require all free variables (those from the environment) to occur in the first argument of |App|.
+\item We require variables in many places that would normally permit expressions, including let bodies and application. A standard Core language (such as from \citet{ghc_core}) can be translated to ours by inserting let expressions.
+\item In many Core languages a distinction is made between standard let bindings and recursive let bindings. We allow expressions bound at a let to refer to variables bound at the same let, but disallow recursion. An alternative description is that we allow recursive let, but only if there is an equivalent nested non-recursive let that can represent the same expression. For example, we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
+\item We don't have default patterns in case expressions. These can be added without great complexity, but are of little interest when describing a supercompiler.
+\item We assume programs in the Core language are well-typed, in particular that we never over-apply a constructor or perform case analysis on a function.
+\item Function application takes a list of arguments, rather than just a single argument -- the reasons are explained in \S\ref{sec:binaryapp}. We use an application with no arguments to represent just a variable.
+\item We require all variables not bound within that expression (those from the environment) to occur in the first argument of |App|.
 \end{itemize}
 
-We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place. For example a variable bound to a lambda would have an arity of the number of lambda variables it was bound to. For primitives, the arity is the number of arguments before the primitive is actually evaluated. For example, in our example |map| has arity 2 and |root| has arity 3. The arity of |f|, |g| and |x| are all 0, as we don't know their true arity.
+We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place. Bound variables have an arity based on the number of lambda arguments they have -- i.e. |v = \x y -> z| causes |v| to have arity 2. Variables without definitions are assumed to have arity 0, unless they are primitives of known arity (i.e. integer addition has arity 2). In our example |map| has arity 2 and |root| has arity 3. The arity of |f|, |g| and |x| are all 0 as they lack definitions.
 
 We write expressions using standard Haskell syntax (i.e. |let| for |Let|, |case| for |Case| etc.). Rewriting the |map|/|map| example in our Core language gives:
 
@@ -195,12 +206,12 @@ map = \f x -> case  x of
                                in   v_3
 \end{code}
 
-Our Core language can be rather verbose, so sometimes we write expressions using a standard Core language, assuming these are translated to our Core language when necessary. For example, we might write |map| as:
+Our Core language can be rather verbose, so we sometimes use a superset of our Core language, assuming these expressions are translated to our Core language when necessary. For example, we might write |map| as:
 
 \begin{code}
-map f x = case  x of
-                []    -> []
-                y:ys  -> f y : map f ys
+map = \f x -> case  x of
+                    []    -> []
+                    y:ys  -> f y : map f ys
 \end{code}
 
 \subsection{Simplified Core}
@@ -211,10 +222,10 @@ We now define a simplified form for our Core language. When working with Core ex
 \begin{itemize}
 \item |App v []|, where |v| is bound locally -- we can remove the binding by replacing the bound variable with |v| everywhere.
 \item |App v vs|, where |v| is bound to a |Con| -- the |App| can be replaced with a |Con| of higher arity.
-\item |App v vs|, where |v| is bound to |App w ws| and the arity of |w| is higher than the length of |ws| -- the |App| can be replaced with a |App| with more arguments.
+\item |App v vs|, where |v| is bound to |App w ws| and the arity of |w| is higher than the length of |ws| -- the |App| can be replaced with an |App| with more arguments.
 \item |App v vs|, where |v| is bound to a |Lam| -- the |App| can be replaced with the body of the lambda, with the variable substituted.
 \item |Case v w|, where |v| is bound to a |Con| -- the |Case| can be replaced with the appropriate alternative.
-\item |Let vs w| -- the nested bindings can be brought to the root |Let|, renaming variables if necessary.
+\item |Let vs w| -- the nested bindings can be lifted in to the root |Let|, renaming variables if necessary.
 \end{itemize}
 
 We also remove any bindings which are not used. If there is only one bound variable, and that variable is bound to a lambda, we remove the let. These simplifications may result in a root let expression with no bindings. As an example, we can apply these rules to the following expression:
@@ -277,7 +288,7 @@ flatten = nubBy (\x y -> pre x == pre y) . f []
 assign :: [Tree] -> [(Var,Exp)]
 assign ts = [(f t, gen t (map f (children t))) |  t <- ts]
     where  f t = fromJust $ lookup (pre t) names
-           names = zip (map pre ts) freshNames
+           names = zip (map pre ts) functionNames
 \end{code}
 \caption{The |supercompile| function.}
 \label{fig:manager}
@@ -298,25 +309,48 @@ stop :: History -> Exp -> ([Var] -> Exp, [Var]) -- \S\ref{sec:term_split}
 \label{fig:manager2}
 \end{figure}
 
-Our supercompiler is based around a manager, that integrates the answers to the questions of supercompilation. The manager itself has two main purposes: to ensure termination, and to tie back recursive functions. In our experience the act of tieing recursion is often one of the trickiest aspects when writing a supercompiler, so we deliberately choose to give plenty of detail. The code for our manager is given in Figure \ref{fig:manager}, making use of a some auxiliary functions whose types are given in \ref{fig:manager2}. We start by giving an intuition for how the manager works, then describe each part separately.
+Our supercompiler is based around a manager, that integrates the answers to the questions of supercompilation. The manager itself has two main purposes: to ensure termination, and to create recursive functions. In our experience the creation of recursive functions is often one of the most delicate parts of a supercompiler, so we deliberately include all the details. The code for our manager is given in Figure \ref{fig:manager}, making use of a some auxiliary functions whose types are given in Figure \ref{fig:manager2}. We first give an intuition for how the manager works, then describe each part separately.
 
-The supercompiler takes a source program, and generates a target program. Functions in these programs are distinct -- target expressions cannot refer to source functions. The source and target program are semantically identical, but it is hoped the target program runs faster. We use the type |Env| to represent a mapping from function names to expressions, allowing a result of |Nothing| to indicate a primitive function. We can think of a root lambda expression as a function, or as an \textit{open expression} whose free variables are given by the lambda.
+The supercompiler takes a source program, and generates a target program. Functions in these programs are distinct -- target expressions cannot refer to source functions. The source and target program are semantically identical, but it is hoped the target program runs faster. We use the type |Env| to represent a mapping from source function names to expressions, allowing a result of |Nothing| to indicate a primitive function.
 
-The manager first builds a tree tree, where each node in the tree is has a source expression (|pre|). The associated target expression may call other target functions, but these functions do not yet have names. Therefore, we store target expressions as a generator that when given the function names produces the target expression (|gen|), and a list of trees representing the target functions it needs to call (|children|). We then flatten this tree, ensuring identical functions are only represented once, and supply names to each node to generate the target program. If a target function is recursive then the initial tree will be infinite, but the flattened tree will always be finite due to the termination scheme defined in \S\ref{sec:term}.
+The manager first builds a tree (the type |Tree|), where each node in the tree has a source expression (|pre|). The associated target expression may call other target functions, but these functions do not yet have names. Therefore, we store target expressions as a generator that when given the function names produces the target expression (|gen|), and a list of trees representing the target functions it calls (|children|). We then flatten this tree, ensuring identical functions are only represented once, and assign names to each node to generate the target program. If a target function is recursive then the initial tree will be infinite, but the flattened tree will always be finite due to the termination scheme defined in \S\ref{sec:term}.
 
 \newcommand{\function}[1]{\paragraph{\textsf{#1:}}\hspace{-3mm}}
 
-\function{supercompile} This function puts all the parts together. Reading from right to left, we first generate a potentially infinite tree by optimising the function |root|, we then flatten the tree to a finite number of resultant functions, and finally assign names to each of the result functions.
+\function{supercompile} This function puts all the parts together. Reading from right to left, we first generate a potentially infinite tree by optimising the function |root|, we then flatten the tree to a finite number of functions, and finally assign names to each of the result functions.
 
 \function{optimise} This function constructs the tree of result functions. While the tree may be infinite, we demand that any infinite path from the root must encounter the same |pre| value more than once. We require that for any infinite sequence |ts| with no repeats, there must exist an |i| such that |terminate (<=||) (take i ts) (ts !! i+1)| returns |True|. If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |split ts| only produces subexpressions which pass the termination test. If the termination criteria do not force us to stop, then we call |reduce| to evaluate the expression.
 
-\function{reduce} This function optimises a function by repeatedly evaluating it by calling |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence |ts|, there must exist an |i| such that |terminate (<||) (take i ts) (ts !! i+1)| returns |True|.
+\function{reduce} This function optimises a function by repeatedly evaluating it with calls to |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence |ts|, there must exist an |i| such that |terminate (<||) (take i ts) (ts !! i+1)| returns |True|.
 
 \function{flatten} This function takes a tree and extracts a finite number of functions from it, assuming the termination restrictions given in |optimise|. Our |flatten| function will only keep one tree associated with each source expression. These trees may be different if one resulted from a call to |stop|, while another resulted from a call to |reduce| -- but all are semantically equivalent.
 
-\function{assign} This function assigns names to each target function, and constructs the target expressions by calling |gen|. We assume the function |freshNames| returns the infinite list of fresh function names.
+\function{assign} This function assigns names to each target function, and constructs the target expressions by calling |gen|. We assume the function |functionNames| returns an infinite list of function names.
 
-\subsubsection{The Example}
+\subsubsection{Notation}
+\label{sec:child_notation}
+
+To represent a value of type |([Var] -> Exp, [Exp])| we use |<? bullet ?>| notation to identify particular children of an expression. As an example:
+
+\begin{code}
+\g f -> map g (<? map f xs ?>)
+\end{code}
+
+\noindent This expression denotes a value whose first component is the function that when given ``|name|'' returns:
+
+\begin{code}
+\g f x -> map g (name f)
+\end{code}
+
+\noindent And the second component is the singleton list containing the expression:
+
+\begin{code}
+\f -> map f xs
+\end{code}
+
+To translate from the original expression using |<? bullet ?>| notation we pass as arguments all the variables bound in the outer expression and free in the child expression (after simplification). The first component of the result is a function that replaces each child with a name, and the second component is the list of children.
+
+\subsubsection{Example}
 \label{sec:manager_example}
 
 Revisiting our initial example, |supercompile| first calls |optimise| with:
@@ -329,55 +363,53 @@ The termination context is empty, so we call |reduce|, which calls |step| repeat
 
 \begin{code}
 \g f x ->  let  v = case  w of
-                          [] -> []
-                          y:ys -> g y : map g ys
+                          []    -> []
+                          y:ys  -> g y : map g ys
                 w = case  x of
-                          [] -> []
-                          z:zs -> f z : map f zs
+                          []    -> []
+                          z:zs  -> f z : map f zs
            in   v
 \end{code}
 
-The |step| function now returns |Nothing|, since the root cannot be reduced without the result of |x|. We therefore call |split| which results in:
+The |step| function now returns |Nothing|, since we cannot evaluate further without the result of |x|. We therefore call |split| which results in (using the notation from \S\ref{sec:child_notation}):
 
 \begin{code}
 \g f x -> case  x of
-                []    -> <? let v = ...; w = ...; x = [] in v ?>
-                z:zs  -> <? let v = ...; w = ...; x = z:zs in v ?>
+                []    -> <? let v = ...; w = ...; x = []    in v ?>
+                z:zs  -> <? let v = ...; w = ...; x = z:zs  in v ?>
 \end{code}
 
-To represent a value of type |([Var] -> Exp, [Exp])| we use the |<? bullet ?>| notation to identify particular children of an expression. The first component of the resulting pair takes a function name for each child and constructs the target expression. The second component is the list of children. For each child, all the free variables defined in the outer expression become arguments to the lambda, and are passed forward by the target expression.
-
-When optimising the first child expression, where |x = []|, the simplification rules from \S\ref{sec:simplify} immediately produce |[]| as the result. For the other child, we first get:
+Looking at the first child expression, where |x = []|, the simplification rules from \S\ref{sec:simplify} immediately produce |[]| as the result. The second child starts as:
 
 \begin{code}
 \g f z zs ->
-    let  v = case  w  of [] -> []; y  :ys  -> g  y  : map g  ys
-         w = case  x  of [] -> []; z  :zs  -> f  z  : map f  zs
-         x = z:zs
+    let  v  = case  w  of [] -> []; y  :ys  -> g  y  : map g  ys
+         w  = case  x  of [] -> []; z  :zs  -> f  z  : map f  zs
+         x  = z:zs
     in   v
 \end{code}
 
 Which simplifies to:
 
 \begin{code}
-\g f z zs ->  let  v = q : qs
-                   q = g y
-                   qs = map g ys
-                   y = f z
-                   ys = map f zs
+\g f z zs ->  let  v   = q : qs
+                   q   = g y
+                   qs  = map g ys
+                   y   = f z
+                   ys  = map f zs
               in   v
 \end{code}
 
-Calling |step| produces |Nothing|, as the root of this expression is a |(:)| that can't be evaluated. We therefore call |split| which results in:
+Calling |step| produces |Nothing|, as the root of this expression is a constructor |(:)| that can't be evaluated. We therefore call |split| which results in:
 
 \begin{code}
-\g f z zs ->  let  q = <? g (f z) ?>
-                   qs = <? map g (map f zs) ?>
-                   v = q : qs
+\g f z zs ->  let  q   = <? g (f z) ?>
+                   qs  = <? map g (map f zs) ?>
+                   v   = q : qs
               in   v
 \end{code}
 
-When optimising |g (f z)| we get no optimisation, as there is no available information. To optimise |map g (map f zs)| we do exactly the same steps as we have already done. However, the |flatten| function will spot that both nodes have the same |pre| expression (modulo free variables), and give them both the same name, creating a recursive function. We then assign names using |assign|. For the purposes of display (not optimisation), we apply a number of simplifications given in \S\ref{sec:postprocess}. The end result is:
+When optimising |g (f z)| we get no optimisation, as there is no available information. To optimise |map g (map f zs)| we repeat the exact same steps we have already done. However, the |flatten| function will spot that both nodes have the same |pre| expression, and reduce them to one node, creating a recursive function. We then assign names using |assign|. For the purposes of display (not optimisation), we apply a number of simplifications given in \S\ref{sec:postprocess}. The end result is:
 
 \begin{code}
 root g f x = case  x of
@@ -410,7 +442,7 @@ next (Let bind v) = last $ Nothing : f v
 
 Evaluation is based around the |step| function. Given an expression, |step| replaces a variable with the expression bound in the environment and returns |Just|, or if no suitable function is found returns |Nothing|. We always replace the variable that would be evaluated next during normal evaluation.
 
-To determine which variable would be evaluated next, we define the |force| and |next| functions in Figure \ref{fig:stack}. The |force| function determine which variable will be evaluated next given an expression -- simply a case scrutinee or an applied variable. The |next| function determines which let bound variable will be evaluated next, by following the forced variables from the bound expressions. Looking at the original example:
+To determine which variable would be evaluated next, we define the |force| and |next| functions in Figure \ref{fig:stack}. The |force| function determines which variable will be evaluated next given an expression -- either a case scrutinee or an applied variable. The |next| function determines which let bound variable will be evaluated next, by following the forced variables from the bound expressions. Looking at the original example:
 
 \begin{code}
 \g f x ->  let  v_1 =  map f x
@@ -418,7 +450,7 @@ To determine which variable would be evaluated next, we define the |force| and |
            in   v_2
 \end{code}
 
-The |next| function will return |Just v_2|. Calling |force| on |map g v_1| returns |map|, but since |map| is not bound at the let expression we go no further. Therefore, to evaluate this expression we will start by evaluating |v_2|, and thus |map|. We insert a fresh variable |v_3| for the body of |map|, and replace the |map| in |v_2| with |v_3|. This transformation results in:
+The |next| function will return |Just v_2|. Calling |force| on the expression |map g v_1| returns |map|, but since |map| is not bound at the let expression we go no further. Therefore, to evaluate this expression we will start by evaluating |v_2|, and thus |map|. To perform an evaluation step we insert a fresh variable |v_3| bound to the body of |map|, and replace the |map| variable in |v_2| with |v_3|. This transformation results in:
 
 \begin{code}
 \g f x ->  let  v_1 =  map f x
@@ -441,7 +473,7 @@ More generally, we match any expression with the following pattern:
 where Just e' = env f
 \end{code}
 
-Here we have used |s| to represent the next variable to be evaluated. We allow any other variables |v_1..v_n| bound to expressions |e_1..e_n| to be present. Given this configuration we can rewrite to:
+We use |s| to represent the next variable to be evaluated, as returned by |next|. We allow any other variables |v_1..v_n| to be present, bound to expressions |e_1..e_n|. Given this configuration we can rewrite to:
 
 \begin{code}
 \free ->  let  s'   = e'
@@ -456,18 +488,19 @@ As always, after generating a new expression we immediately apply the simplifica
 \subsection{Evaluation Splitting}
 \label{sec:eval_split}
 
-If evaluation cannot proceed we split to produce a target expression, and a list of child expressions for further optimisation, using the |<? bullet ?>| notation described in \S\ref{sec:manager_example}. When splitting an expression there are three concerns:
+If evaluation cannot proceed we split to produce a target expression, and a list of child expressions for further optimisation, using the |<? bullet ?>| notation described in \S\ref{sec:child_notation}. When splitting an expression there are three concerns:
 
 \paragraph{Permit further optimisation:} We aim to place any constructs blocking evaluation in the target expression, so that the children are suitable for further optimisation.
 
 \paragraph{No unbounded loss of sharing:} A complex variable may not be duplicated if that causes it to be evaluated multiple times at runtime. The target program cannot remove sharing present in the source program.
 
-\paragraph{Keep expressions together:} If we turn a bound variable in to a free variable we loose optimisation opportunities, as the right-hand side of the variable is no longer available for optimisation. We aim to keep as many expressions together as possible, but not at the cost of loosing sharing.
+\paragraph{Keep expressions together:} If we split variables bound at the same let expression in to separate child expressions we loose optimisation opportunities, as the right-hand side of the variable is no longer available for optimisation. We aim to keep as many expressions together as possible, but not if that looses sharing.
 
 \smallskip
 We split in one of three different ways, depending on the type of the next expression to be evaluated (as described in \S\ref{sec:eval}). We now describe each of the three ways to split, in each case we start with an example, then define the general rule.
 
 \subsubsection{Case Expression}
+\label{sec:eval_split_case}
 
 If the next expression is a case expression then we make the target a similar case expression, and under each alternative we create a child expression with the case scrutinee bound to the appropriate pattern. For example, given:
 
@@ -505,9 +538,7 @@ This expression immediately simplifies to:
           in   v
 \end{code}
 
-One important point is that for the first alternative we \textit{do not} pass in the variables |y| and |ys| -- these variables are not included in the lambda. In general we do not pass onwards any free variables which are obviously redundant after the simplification rules have been applied. By making this restriction we ensure that the number of free variables in a function cannot grow without bound -- as the expressions are bounded and therefore they can only use a finite number of free variables. We limit the free variables for all types of split operation.
-
-The general rule is that the target is the case on the top of the stack, and the alternatives are the entire expression but with the scrutinee variable bound to the associated patterns. More generally, if |s| is the next expression to evaluate:
+More generally, if |s| is the next expression to evaluate:
 
 \begin{code}
 \free ->  let  s    = case x of p_1 -> e_1' ; p_m -> e_m'
@@ -516,7 +547,7 @@ The general rule is that the target is the case on the top of the stack, and the
           in   v
 \end{code}
 
-\noindent becomes:
+\noindent After |split| it becomes:
 
 \begin{code}
 \free -> case x of
@@ -538,7 +569,7 @@ If the top of the stack is a lambda then we place a lambda in the target program
        in   s
 \end{code}
 
-Here the |add| function takes two arguments, but has only been given one so far. It is tempting to rewrite |\x -> ...| as |\x y -> ...|, but this potentially duplicates the expensive computation of |v_1|. Instead we place every variable binding, and the lambda, in to the target expression:
+The |add| function takes two arguments, but has only been given one. It is tempting to rewrite |\x -> ...| as |\x y -> ...|, but this potentially duplicates the expensive computation of |v_1|. Instead we use child expressions for every variable binding and for the body of the lambda:
 
 \begin{code}
 \x ->  let  s    = \y -> <? add v_1 y ?>
@@ -547,7 +578,7 @@ Here the |add| function takes two arguments, but has only been given one so far.
        in   s
 \end{code}
 
-However, we have now split the bindings for |v_1| and |v_2| apart, when there is no real need. We therefore move binding |v_2| under |v_1|, because it is only referred to by |v_1|, to give:
+Unfortunately, we have now split the bindings for |v_1| and |v_2| apart, when there is no real need. We therefore move binding |v_2| under |v_1|, because it is only referred to by |v_1|, to give:
 
 \begin{code}
 \x ->  let  s    = \y -> <? add v_1 y ?>
@@ -555,7 +586,7 @@ However, we have now split the bindings for |v_1| and |v_2| apart, when there is
        in   s
 \end{code}
 
-We now continue to optimise the body of |v_1| and the under the lambda of |s_1|, which will now be able to evaluate add. More generally, given:
+We now continue to optimise the body of |v_1|, and the body of lambda, which will now be able to evaluate add. More generally, given:
 
 \begin{code}
 \free ->  let  s    = \x -> e'
@@ -578,19 +609,19 @@ We then repeatedly move any binding |v_i| under |v_j| if either: 1) |v_i| is onl
 \subsubsection{Anything Else}
 \label{sec:eval_split_other}
 
-The final rule applies to any expression where the next expression is not a case expression or a lambda, including a constructor, a variable, and an application to an unknown variable. We do not deal with variables from the environment on the top of the stack, as those would be reduced by |step|, and not result in a call to |split|. Given the example:
+The final rule applies to any expression where the next expression is not a case expression or a lambda, including a constructor, a variable, and an application to an unknown variable. We do not deal with variables from the environment on the top of the stack, as those are handled by |step|. Given the example:
 
 \begin{code}
-\x y ->  let  v_1 = expensive
+\x y ->  let  v_1 = expensive x
               v_2 = v_1 x
               v_3 = Con v_2 y v_2
          in   v_3
 \end{code}
 
-We simply put all the variables other than the first on the stack inside |<? bullet ?>| brackets:
+We turn each binding into a child, apart from the next variable to be evaluated:
 
 \begin{code}
-\x y ->  let  v_1 = <? expensive ?>
+\x y ->  let  v_1 = <? expensive x ?>
               v_2 = <? v_1 x ?>
               v_3 = Con v_2 y v_2
          in   v_3
@@ -599,7 +630,7 @@ We simply put all the variables other than the first on the stack inside |<? bul
 We then perform the same sharing transformation as for lambda expressions, noting that |v_1| is only used within |v_2|, to give:
 
 \begin{code}
-\x y ->  let  v_2 = <? let v_1 = expensive ; v_2 = v_1 x in v_2 ?>
+\x y ->  let  v_2 = <? let v_1 = expensive x ; v_2 = v_1 x in v_2 ?>
               v_3 = Con v_2 x v_2
          in   v_3
 \end{code}
@@ -607,18 +638,18 @@ We then perform the same sharing transformation as for lambda expressions, notin
 More generally, given an expression:
 
 \begin{code}
-\free ->  let  s   = e'
-               v_1 = e_1
-               v_n = e_n
+\free ->  let  s    = e'
+               v_1  = e_1
+               v_n  = e_n
           in   v
 \end{code}
 
 We rewrite to:
 
 \begin{code}
-\free ->  let  s   = e'
-               v_1 = <? e_1 ?>
-               v_n = <? e_n ?>
+\free ->  let  s    = e'
+               v_1  = <? e_1 ?>
+               v_n  = <? e_n ?>
           in   v
 \end{code}
 
@@ -627,14 +658,14 @@ We then repeatedly move any binding |v_i| under |v_j| according to the criteria 
 \subsection{Termination}
 \label{sec:term}
 
-The termination rule is responsible for ensuring that whenever we proceed along a list of expressions we eventually stop. The intuition is that each expression contains a list of expressions at the root let, and each expression tracks where it came from in the source program. Each successive root let expression must contain either new subexpressions, or fewer subexpressions compared to previous versions.
+The termination rule is responsible for ensuring that whenever we proceed along a list of expressions we eventually stop. The intuition is that each expression contains a list of expressions at the root let, and each expression tracks where it came from in the source program. Each successive root let expression must contain either different subexpressions, or fewer subexpressions compared to previous versions.
 
 In this section we first describe the |terminate|, $\lhd$ and $\unlhd$ functions from a mathematical perspective, then how we apply these functions to expressions. Finally we show an example of how the termination rule catches non-termination.
 
 \subsubsection{Termination Rule}
 \label{sec:term_rule}
 
-Our termination orderings are defined over bags (also known as multisets) of values drawn from a finite alphabet $\Sigma$. A bag of values is unordered, but may contain elements more than once. We define our two orderings as:
+Our termination orderings are defined over bags (also known as multisets) of values drawn from a finite alphabet $\Sigma$. A bag of values is unordered, but may contain elements more than once. We define our orderings as:
 
 \[
 x \lhd y = \set(x) \not\equiv \set(y)  \veeskip \# x < \# y
@@ -649,7 +680,7 @@ The following sequences are well-formed under both $\unlhd$ and $\lhd$:
 
 \begin{code}
 [a,aaaaab,aaabb,b]
-[abc,ab,ac,a]
+[abc,ab,accc,a]
 [aaaaabbb,aaab,aab]
 \end{code}
 
@@ -667,14 +698,14 @@ The following sequences are not well-formed under $\unlhd$ or $\lhd$:
 [aa,aaa]
 \end{code}
 
-We define the |terminate| function from Figure \ref{fig:manager2} as:
+We define the |terminate| function referred to in Figure \ref{fig:manager2} as:
 
 \begin{code}
 terminate  :: (Exp -> Exp -> Bool) -> History -> Exp -> Bool
 terminate (<) hist x = not $ all (x <) hist
 \end{code}
 
-The |terminate| function checks that given a well-formed sequence (|hist|), adding the expression |x| will keep the sequence well-formed.
+The |terminate| function returns |False| if given a well-formed sequence (|hist|), adding the expression |x| will keep the sequence well-formed.
 
 \lemma{Any well-formed sequence under $\lhd$ is finite}
 
@@ -686,13 +717,13 @@ Given a finite alphabet $\Sigma$, any well-formed sequence under $\unlhd$ has a 
 
 \subsubsection{Tracking Names}
 
-Every expression in the source program is assigned a name. A name is a triple, \name{\mathit{f}}{\mathit{e}}{\mathit{a}} where $f$ is a function name, $e$ is an expression index and $a$ is an argument count. We label every expression in the source program with $f$ being the function it comes from, $e$ being a unique index within that function and $a$ being the number of arguments to a constructor or application, and $0$ otherwise.\footnote{It is possible to merge the function name and subexpression index, by making the subexpression index globally unique, but this change would make it harder to understand and debug.} When manipulating expressions, we need to track names:
+Every expression in the source program is assigned a name. A name is a triple, \name{\mathit{f}}{\mathit{e}}{\mathit{a}} where $f$ is a function name, $e$ is an expression index and $a$ is an argument count. We label every expression in the source program with $f$ being the function it comes from, $e$ being a unique index within that function and $a$ being the number of arguments to a constructor or application, or $0$ otherwise.\footnote{It is possible to merge the function name and subexpression index, by making the subexpression index globally unique, but this change would make it harder to understand and debug.} When manipulating expressions, we track names:
 
 \begin{itemize}
 \item If we rename bound variables, we do not update the expression names.
 \item If we extract a subexpression we use the name already assigned to that subexpression.
-\item If we insert a new constructor (when splitting on a case) we use the name assigned to the pattern in the associated case alternative.
-\item If we add variables to the end of a constructor or application, we change the argument count. For example, |let v = C x; w = v y in ...| being transformed to |let v = C x; w = C x y in ...| would have the name for |C x y| set to the name of |C x| but the constructor count incremented.
+\item If we insert a new constructor (when splitting on a case, \S\ref{sec:eval_split_case}) we use the name assigned to the pattern from the case alternative.
+\item If we add variables to an application or constructor, we use the name of the original application, but with the argument count increased. For example, |let v = C x; w = v y in w| being transformed to |let w = C x y in w| would have the name for |w| set to the name of |v|, but with an argument count of 2 instead of 1.
 \end{itemize}
 
 We map an expression to a bag of names by taking the names of all subexpressions bound at the root let. We never look at the name of a root let expression, and do not update it when making transformations.
@@ -707,7 +738,7 @@ Given a bag of names, there are only a finite number of expressions that could h
 
 \lemma{The termination properties required by \S\ref{sec:manager} are satisfied}
 
-These termination properties required by the manager are satisfied by the previous lemmas. We have shown that the alphabet of names, $\Sigma$, is finite. For |terminate (<=||)| we have shown that there can only be a finite number of distinct name bags, and that each name bag can only correspond to a finite number of original expressions. For |terminate (<||)| we have shown that there can only be a finite number of name bags.
+The termination properties in \S\ref{sec:manager} are satisfied by the lemmas in this section. We have shown that the alphabet of names, $\Sigma$, is finite. For |terminate (<=||)| we have shown that there can only be a finite number of distinct name bags, and that each name bag can only correspond to a finite number of expressions. For |terminate (<||)| we have shown that there can only be a finite number of name bags.
 
 \subsubsection{Termination Splitting}
 \label{sec:term_split}
@@ -730,9 +761,9 @@ We first split every variable bound at the let, to give:
           in   v
 \end{code}
 
-We now merge variable |v_i| under |v_j| using the same conditions as splitting after evaluation, as described in \S\ref{sec:eval_split_lambda}. In addition, do not merge |v_i| under |v_j| if the resulting expression bound to |v_j| violates the termination criteria |terminate (<=||) t|.
+We now merge variable |v_i| under |v_j| using the same conditions as |split|, described in \S\ref{sec:eval_split_lambda}. In addition, we do not merge |v_i| under |v_j| if the resulting expression bound to |v_j| violates the termination criteria |terminate (<=||) t|.
 
-As a heuristic, we merge variable |v| before |w| if the name associated with |v| occurs fewer times in the original let expression. By favouring names used fewer times we hope to encourage splitting off an expression that is growing in number, and will thus continue to grow in recursive calls. This heuristic has no effect on the correctness, but can sometimes result in better optimisation.
+As a heuristic, we merge variable |v| before |w| if the name associated with |v| occurs fewer times in the original let expression. By favouring names used fewer times we hope to encourage splitting off an expression that is growing in number, and will thus continue to grow in recursive calls. This heuristic has no effect on the correctness or termination, but can sometimes result in better optimisation.
 
 We can be sure that the resultant children do not violate the termination criteria, as we never combine expressions in a way that violates the criteria, and all the initial expressions will produce singleton name bags, which trivially satisfy $\unlhd$ for any expression.
 
@@ -748,7 +779,7 @@ rev acc xs = case  xs of
                    y:ys  -> rev (y:acc) ys
 \end{code}
 
-The |rev| function builds up an accumulator argument, which will be equal to the size of |xs|. If we tried to specialise the accumulator argument then we'd create an infinite number of distinct specialisations. To supercompile this program, the |optimise| function starts with an empty termination context and the expression |rev [] xs|, and calls |reduce|, resulting in:
+The |rev| function builds up an accumulator argument, which will be equal to the size of |xs|. To specialise on the accumulator argument would require an infinite number of specialisations. To supercompile this program, the |optimise| function starts with an empty termination context and the expression |rev [] xs|, and calls |reduce|, resulting in:
 
 \begin{code}
 \xs -> case  xs of
@@ -765,7 +796,7 @@ Focusing on the second alternative, we now add |rev [] xs| to the termination co
 ...
 \end{code}
 
-We can rewrite these expressions in our core language, with annotations for the names:
+We can rewrite these expressions in our core language, with annotations for names:
 
 \newlength{\lenmain}
 \newlength{\lenrev}
@@ -793,7 +824,7 @@ We can rewrite these expressions in our core language, with annotations for the 
     in   v_1
 \end{code}
 
-Applying our termination criteria, the first two expressions are a well-formed sequence, but comparing the second and third expressions we see that $e_2 \unlhd e_3$ is violated. The first item is permitted because the history is empty. The second is permitted as it contains new elements in the set (such as |{-"\name{rev}{1}{0}"-}|). The third item has the same set of names as the second, and has a higher cardinality. Therefore, when optimising, we call |stop| on the third expression. After calling |stop| we get:
+Under $\unlhd$ the first two expressions create a well-formed sequence, but the first three expressions do not. The first expression is permitted because the history is empty. The second expression is permitted because it has a different set of names from the first. The third item has the same set of names as the second, and has a higher cardinality. Therefore, when optimising, we call |stop| on the third expression. After calling |stop| we get:
 
 \begin{code}
 \x_1 x_2 x_3 ->
@@ -820,12 +851,12 @@ Part of the accumulator has been bound to |v_3|, and separated from the main exp
 ... -- repeat the last 2 lines
 \end{code}
 
-As required, we only have a finite number of unique expressions, and will end up with a recursive function in the target program.
+As required, we have only a finite number of unique expressions, and end up with a recursive function in the target program.
 
 \subsection{Post-processing}
 \label{sec:postprocess}
 
-Our |split| function is structured to produce only one simple expression per target function -- for example a function will never contain two constructors. While most opportunities to remove intermediate structure have been exploited, the target program will usually contain lots of small functions. We can eliminate many of these functions by inlining all functions which are called only once. For example, given the source program:
+Our |split| function is structured to produce only one simple expression per target function -- for example a target function will never contain two constructors. While most opportunities to remove intermediate structure have been exploited, the target program will usually contain lots of small functions. We can eliminate many of these functions by inlining all functions which are called only once. For example, given the source program:
 
 \begin{code}
 main x = x : x : []
@@ -855,10 +886,10 @@ In this section we describe some possible design alternatives for our supercompi
 \subsubsection{Binary Application}
 \label{sec:binaryapp}
 
-Our first version of this supercompiler had binary application, rather than vector application. The |App Var [Var]| construct was replaced by a combination of |Var Var| and |App Var Var|. The reason for originally choosing binary application is that it is closer to other Core languages, and the simplification does not need to track arity information. There were three main reasons for moving to vector application:
+Our first version of this supercompiler had binary application, rather than vector application. The |App Var [Var]| expression was replaced by a combination of |Var Var| and |App Var Var|. The reason for originally choosing binary application is that it is closer to other Core languages, and the simplification does not need to track arity information. There were three main reasons for moving to vector application:
 
 \begin{itemize}
-\item With binary application there was no way to indicate the number of arguments passed to primitives. In the absence of such information, the only safe alternative is to pass one argument at a time, which resulted in separate split functions.
+\item Vector application simplifies splitting with primitive functions, by providing the arity information directly.
 \item Vector application makes it easier to identify partial applications when increasing sharing (see \S\ref{sec:eval_split_lambda}).
 \item Vector application reduces the number of names in an expression, improving the time taken to compile.
 \end{itemize}
@@ -871,30 +902,31 @@ Our original termination ordering was:
 x \lhd y = x \setsup y \vee x \bagsub y
 \]
 
-Both this ordering and the one described in \S\ref{sec:term_rule} can be proved using the same argument. We choose to use our new ordering because it is simpler, more directly follows from the proof, and can be implemented very efficiently. Choosing a termination ordering is a tricky business -- no termination ordering can be best for every program, so there is always more room for experimentation.
+Both this ordering and the one described in \S\ref{sec:term_rule} can be proved using the same argument. We switched to use our new ordering because it is simpler, more directly follows from the proof, and can be implemented very efficiently. Choosing a termination ordering is a tricky business -- no termination ordering can be the best for every program, so there is always more room for experimentation.
 
 \subsubsection{Common Subexpression Elimination}
 
-Common Subexpression Elimination (CSE) involves spotting where a program would otherwise compute two identical expressions, and reducing them both to a single shared expression. The advantage of CSE is that performance can be increased (sometimes asymptotically), but it can also introduce space leaks \cite{chitil:cse}. Our Core language is well suited to CSE -- two variables can be merged if they have the same associated expression. In addition to the possibility of space leaks, merging two variables may stop the new variable from being placed below another expression when splitting. We have not investigated the performance impact of CSE on supercompilation, but think it is a worthwhile area for future research.
+Common Subexpression Elimination (CSE) involves detecting when a program will compute two identical expressions, and reducing them both to a single shared expression. Our Core language is well suited to CSE -- two variables can be merged if they have the same bound expression. The advantage of CSE is that performance can be increased, sometimes asymptotically. The disadvantages are that CSE can introduce space leaks \cite{chitil:cse}, and the additional sharing may stop variables from being moved when splitting. We have not investigated the performance impact of CSE on supercompilation, but think it is a worthwhile area for future research.
 
 \subsubsection{Inlining Simple Functions}
 
-The GHC compiler inlines many non-recursive functions during the simplification phase \cite{spj:inlining}. It is certainly possible that our simplification rules could be extended to inline some functions, such as |id|, provided no new names were introduced (and thus termination was unaffected). Another alternative would be to inline simple functions in the source program (such as |otherwise| and |(.)|), before supercompilation started. The primary motivation for inlining simple functions would be to reduce the complexity of the main supercompilation phase, and avoid inopportune termination splits. We have deliberately \textit{not} inlined any functions outside the |step| function, as there is a risk that doing so would hide weaknesses in the supercompiler. However, we think it would be worthwhile to pursue.
+The GHC compiler inlines many non-recursive functions during the simplification phase \cite{spj:inlining}. It is certainly possible that our simplification rules could be extended to inline some functions, such as |id|, provided no new names were introduced (and thus termination was unaffected). Another alternative would be to inline simple functions in the source program before supercompilation started (such as |otherwise| and |(.)|). The primary motivation for inlining simple functions would be to reduce the complexity of the main supercompilation phase, and avoid inopportune termination splits. We have deliberately \textit{not} inlined any functions outside the |step| function, as there is a risk that doing so would hide weaknesses in the supercompiler. However, we think simple inlining would be worthwhile to pursue.
 
-\todo{give sensible section name}
-\section{Running a Supercompiler}
+\section{Extended Example}
 \label{sec:examples}
+
+\todo{The section name is wrong, but I don't know what it should be...}
 
 Supercompilation naturally subsumes many other program transformations, including constructor specialisation \cite{spj:specconstr} and deforestation \cite{gill:shortcut_deforestation,wadler:deforestation}. Supercompilation (in the form presented here) does not remove the need for strictness analysis or say how to compile to native code. In order generate executable programs from a supercompiled program, we compile the resulting Core using GHC \cite{ghc6_12}.
 
-We now give an example where our supercompiler massively outperforms GHC, and discuss what optimisations are being done. Our example is:
+We now give an example where our supercompiler massively outperforms GHC, and discuss the optimisations being performed. Our example is:
 
 \begin{code}
 root n = map square (iterate (+1) 1) !! n
     where square x = x * x
 \end{code}
 
-Running this program with |n = 400000|, GHC takes 0.149 seconds, while our supercompiler combined with GHC takes 0.011 seconds. Running for larger values of |n| is not feasible as the GHC only variant overflows the stack. After optimising using our supercompiler, then using strictness analysis and unboxing from GHC \cite{spj:unboxing}, our resulting program is:
+Running this program with |n = 400000|, GHC takes 0.149 seconds, while our supercompiler combined with GHC takes 0.011 seconds. Running for larger values of |n| is not feasible as the GHC only variant overflows the stack. After optimising using our supercompiler, then compiling with GHC to make use of strictness analysis and unboxing \cite{spj:unboxing}, our resulting program is:
 
 \begin{code}
 go :: Int# -> Int# -> Int#
@@ -903,9 +935,9 @@ go x y = case x of
     _ -> go (x - 1) (y + 1)
 \end{code}
 
-All the intermediate lists have been removed and all the numbers have been unboxed (GHC uses |Int#| for unboxed integers, and all the arithmetic is performed on unboxed integers). This main loop runs without performing any memory allocation. The program compiled with GHC alone is much less efficient. GHC fuses the |map|/|iterate| function, and specialises the resulting combination on the |square| function, but not the increment -- |(+1)| is passed as a higher order function. Because lists and higher-order functions remain, GHC is not able determine strictness information or apply unboxing.
+All the intermediate lists have been removed and all the numbers have been unboxed (GHC uses |Int#| for unboxed integers, and all the arithmetic is performed on unboxed integers). This main loop runs without performing any memory allocation.
 
-GHC can specialise functions on data values using constructor specialisation, but cannot specialise on functions. To allow specialisation some functions are written in a particular style:
+The program compiled with GHC alone is much less efficient. GHC fuses the |map|/|iterate| combination, and specialises the result on the |square| function, but does not specialise the increment -- passing |(+1)| as a higher order function. Because lists and higher-order functions remain, GHC is not able determine strictness information or apply unboxing. GHC can specialise functions on data values using constructor specialisation, but cannot specialise on functions. To allow specialisation some functions are written in a particular style:
 
 \begin{code}
 foldr f z xs = go xs
@@ -913,9 +945,9 @@ foldr f z xs = go xs
            go (y:ys)  = f y (go ys)
 \end{code}
 
-Here, provided lambda-lifting has not been performed, the function |foldr| appears to be non-recursive. GHC can inline non-recursive functions, allowing the function |f| to be known. In contrast, our supercompiler has specialised all the functions to their higher-order parameters.
+Here, provided lambda-lifting has not been performed, the function |foldr| appears to be non-recursive. GHC can inline non-recursive functions, allowing the function |f| to be known. In contrast, our supercompiler has specialised all the functions to their higher-order parameters even when written in a natural style.
 
-GHC uses rewrite rules to perform eliminate unnecessary lists \cite{spj:rules}. A rewrite rule specifies a pattern to replace with another pattern at compile time. GHC contains a set of rules that replace |map| and |iterate| with alternative versions, and then further rules to fuse them together. GHC does not contain a rule that successfully merges the |(!!)| operator with the rest of the program. Our supercompiler does not rely on rules, which means that changing the data type or redefining |map| locally would have no effect, while in either case GHC would not be able to fuse the lists. Supercompilation can also apply the same techniques to fuse intermediate trees, tuples and any other form of data.
+GHC uses rewrite rules to eliminate unnecessary lists \cite{spj:rules}. A rewrite rule specifies a pattern to replace with another pattern at compile time. GHC contains a set of rules that replace |map| and |iterate| with alternative versions, and then further rules to fuse them together. GHC does not contain a rule that successfully merges the |(!!)| operator with the rest of the program. Our supercompiler does not rely on rules, which means that changing the data type or redefining |map| locally would have no effect -- while either change would cause GHC to fail to combine the functions. Supercompilation can also apply the same techniques to fuse intermediate trees, tuples and any other form of data.
 
 Some of GHC's optimisations, specifically strictness analysis and unboxing, work much better in the absence of lists and higher-order functions. The transformations performed by our supercompiler have allowed these phases to achieve their full potential.
 
@@ -1053,7 +1085,7 @@ This rule is not true, and our supercompiler spotted it. \footnote{Note that in 
 
 \section{Related Work}
 
-We first describe the related work in the area of supercompilation, particularly what makes our supercompiler unique. We then describe some work in related areas, particularly those from which we have used ideas.
+We first describe the related work in the area of supercompilation, particularly what makes our supercompiler unique. We then describe some work from other areas, particularly work from which we have used ideas.
 
 \subsection{Supercompilation}
 \label{sec:comparison}
@@ -1064,33 +1096,33 @@ Compared to an increasingly common foundation, our supercompiler is radically di
 
 \subsubsection{Let Expressions}
 
-The biggest difference from other Core languages is that we require let expressions, and use them extensively (some might say exclusively!). The issue of let expressions in supercompilation has not previously been a primary focus. If lets are included in the Core language, the usual strategy is to substitute all linear lets and residuate all others. Movement of lets can have a dramatic impact on performance: carefully designed let-shifting transformations give an average speedup of 15\% in GHC \cite{spj:letfloating}, suggesting let expressions are critical to the performance of real programs.
+The biggest difference from other Core languages is that we require let expressions, and use them extensively (some might say exclusively!). Previous supercompilation work has tended to ignore let expressions -- if let is mentioned the usual strategy is to substitute all linear lets and residuate all others. At the same time movement of lets can have a dramatic impact on performance: carefully designed let-shifting transformations give an average speedup of 15\% in GHC \cite{spj:letfloating}.
 
-Our previous work inlined all let bindings that it could show did not lead to a loss of sharing \cite{me:supero}. Unfortunately, where a let could not be removed, there was a substantial performance penalty. By going to the opposite extreme we are forced to deal with let bindings properly, which makes our new supercompiler both simpler and more robust.
+Our previous work inlined all let bindings that it could show did not lead to a loss of sharing \cite{me:supero}. Unfortunately, where a let could not be removed, there was a substantial performance penalty. By going to the opposite extreme we are forced to deal with let bindings properly, makeing our new supercompiler both simpler and more robust.
 
 \subsubsection{Termination Criteria}
 
-The standard termination criteria used by supercompilers is the homeomorphic embedding \cite{leuschel:homeomorphic}. The homeomorphic embedding is a well-quasi ordering, from Kruskal's Tree Theorem \cite{kruskal:tree}. The idea requires that for every infinite sequence $e_1,e_2 \ldots$ there exist indicies $i < j$ such that $e_i \ntriangleleft e_j$. The intuition is $x \ntriangleleft y$ holds if by removing nodes from $y$ you cannot reach $x$. Our termination ordering uses the idea idea of a well-quasi ordering, but with a very different ordering relation.
+The standard termination criteria used by supercompilers is the homeomorphic embedding \cite{leuschel:homeomorphic}. The homeomorphic embedding is a well-quasi ordering, from Kruskal's Tree Theorem \cite{kruskal:tree}. The idea requires that for every infinite sequence $e_1,e_2 \ldots$ there exist indicies $i < j$ such that $e_i \ntriangleleft e_j$. The intuition of homeomorphic embedding is that $x \ntriangleleft y$ holds if by removing nodes from $y$ you cannot obtain $x$. Our termination ordering uses the idea idea of a well-quasi ordering, but with a very different ordering relation.
 
-We are unaware of any other supercompilers that have assigned names to expressions, or that have used a bag based termination ordering (most use tree orderings, or sometimes cost models/budgets). Without our particular treatment of expressions as a set of let bindings, and our particular simplification rules, it would not have been possible to use our termination ordering. For example, if we ever inline let expressions then subexpressions would be changed internally, and a single name for each subexpression would no longer be sufficient.
+We are unaware of any other supercompilers that have assigned names to expressions, or that have used a bag based termination ordering (most use tree orderings, or sometimes cost models/budgets). Without our particular treatment of expressions as a set of let bindings, and our particular simplification rules, it is not possible to use our termination ordering. For example, if we ever inline let bindings then subexpressions would be changed internally, and a single name for each subexpression would no longer be sufficient.
 
 In some cases, our ordering is certainly less restrictive than the homeomorphic embedding. Our example in \S\ref{sec:term_example} would have stopped one step earlier with a homeomorphic embedding. Under a fairly standard interpretation of variable names and let expressions, we can show that our ordering is always less restrictive than the homeomorphic embedding -- although other differences in our treatment of expressions mean such a comparison is not necessarily meaningful. However, we did not choose our termination criteria to permit more expressions -- it was chosen for both simplicity and compile-time performance.
 
-We use two separate termination histories, one in |reduce| and another in |optimise| -- an idea suggested in \citet{ndm:thesis}, but not previously implemented. By separating the termination histories we gain better predictability, as |reduce| is not dependent on which functions have gone before. Additionally, the histories are kept substantially smaller, again improving compile-time performance. By splitting termination checks we also reduce the coupling between the separate aspects of supercompilation, allowing us to present a simpler manager than would otherwise be possible.
+We use two separate termination histories, one in |reduce| and another in |optimise| -- an idea suggested by \citet{me:thesis}, but not previously implemented. By separating the termination histories we gain better predictability, as |reduce| is not dependent on which functions have gone before. Additionally, the histories are kept substantially smaller, again improving compile-time performance. By splitting termination checks we also reduce the coupling between the separate aspects of supercompilation, allowing us to present a simpler manager than would otherwise be possible.
 
-As a result of the changes to termination, the operation for splitting after the termination check fails is different. In particular we can use almost identical operations when either evaluation fails to continue, or the termination check fails.
+As a result of the changes to termination and the Core language, the operation for splitting after the termination check fails is different. In particular we can use almost identical operations when either evaluation fails to continue, or the termination check fails.
 
 \subsection{Partial evaluation}
 
 There has been a lot of work on partial evaluation \cite{jones:partial_evaluation}, where a program is specialised with respect to some static data. Partial evaluation works by marking all variable bindings within a program as either static or dynamic, using binding time analysis, then specialises the program with respect to the static bindings. Partial evaluation is particularly appropriate for optimising an interpreter to the expression tree of a particular program, automatically generating a compiler, and removing \textit{interpretation overhead}. The translation of an interpreter into a compiler is known as the First Futamura Projection \cite{futanama:projections}, and can often give an order of magnitude speedup.
 
-Supercompilation and partial evaluation both remove abstraction overhead within a program. Partial evaluation is more suited to completely removing static data, such as an expression tree which is interpreted. Supercompilation is able to remove intermediate data structures, similar to deforestation, which partial evaluation cannot.
+Supercompilation and partial evaluation both remove abstraction overhead within a program. Partial evaluation is more suited to completely removing static data, such as an expression tree which is interpreted. Supercompilation is able to remove intermediate data structures, which partial evaluation cannot usually do.
 
 \subsection{Deforestation}
 
-The deforestation technique \cite{wadler:deforestation} removes intermediate lists in computations. This technique has been extended in many ways to encompass higher order deforestation \cite{marlow:higher_order_deforestation} and work on other data types \cite{coutts:string_fusion}. In many cases the gains from supercompilation are just particular forms of deforestation.
+Deforestation \cite{wadler:deforestation} removes intermediate lists from computations. This technique has been extended in many ways to encompass higher order deforestation \cite{marlow:higher_order_deforestation} and work on other data types \cite{coutts:string_fusion}. In many cases the gains from supercompilation are just particular forms of deforestation.
 
-Probably the most practically applied work on deforestation involves using GHC's rewrite rules to optimise programs \cite{spj:rules}. Shortcut deforestation rewrites many definitions in terms of |foldr| and |build|, then combines |foldr|/|build| pairs \cite{gill:shortcut_deforestation}. Stream fusion is similar to shortcut deforestation, but relies on |stream|/|unstream| rules \cite{coutts:stream_fusion}. In both cases the optimisation only applies to lists, and only to functions written in terms of the correct primitives. The advantage of supercompilation is that it applies to many types and functions, without any special effort from the program author.
+Probably the most practically applied work on deforestation uses GHC's rewrite rules to optimise programs \cite{spj:rules}. Shortcut deforestation rewrites many definitions in terms of |foldr| and |build|, then combines |foldr|/|build| pairs \cite{gill:shortcut_deforestation}. Stream fusion works similarly, but relies on |stream|/|unstream| rules \cite{coutts:stream_fusion}. In both cases the optimisation only applies to lists, and only to functions written in terms of the correct primitives. The advantage of supercompilation is that it applies to many types and functions, without any special effort from the program author.
 
 \subsection{Lower Level Optimisations}
 

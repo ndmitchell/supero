@@ -4,7 +4,7 @@
 module Main(main) where
 
 
-#ifdef MAIN
+#if MAIN
 main = print $ root 12
 addInt'2 = (+) :: Int -> Int -> Int
 subInt'2 = (-) :: Int -> Int -> Int

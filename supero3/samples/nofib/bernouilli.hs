@@ -6,10 +6,11 @@
 -- It's not a very good test, I suspect, because it manipulates big integers,
 -- and so probably spends most of its time in GMP.  
 
-import Prelude hiding ((!!),map,filter,odd,enumFromTo,error,zipWith,enumFrom,(++),iterate,($),tail,sum,not,head)
-import qualified Prelude
-import Ratio hiding ((%))
-import qualified Ratio
+-- import Prelude hiding ((!!),map,filter,odd,enumFromTo,error,zipWith,enumFrom,(++),iterate,($),tail,sum,not,head)
+--import qualified Prelude
+--import Ratio hiding ((%))
+--import qualified Ratio
+import Ratio
 
 -- powers = [[r^n | r<-[2..]] | n<-1..]
 -- type signature required for compilers lacking the monomorphism restriction
@@ -64,6 +65,8 @@ gtInt'2 = (>) :: Int -> Int -> Bool
 subInteger'2 = (-) :: Integer -> Integer -> Integer
 rational'2 = (Ratio.%)
 error'1 = Prelude.error
+sumRational = sum
+sumInteger = sum
 
 main = print $ root (500 :: Int)
 #endif

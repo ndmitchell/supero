@@ -1,6 +1,6 @@
 bernouilli
 GHC=0.530
-Supero=non-terminates at compile time
+Supero=compiles, not investigated enough yet
 
 digits-of-e1
 GHC=0.480
@@ -25,8 +25,8 @@ GHC=0.376
 Supero=0.221
 
 queens
-GHC=0.708
-Supero=non-terminates at compile time
+GHC=0.85
+Supero=0.80
 
 rfib
 

@@ -2,7 +2,8 @@
 
 {-
 TODO:
-should have a share cheap that does the pre-processing (ctors and paps) with arity
+cheaps are merged multiple times, should do sharing by list of variables, then only reify
+at the end so can merge two cheaps which are then merged.
 -}
 
 module Supercompile(supercompile) where
@@ -30,7 +31,7 @@ optimise :: Env -> Exp -> Tree
 optimise env = f newHistory
     where  f t x | terminate (<=|) t x = g x (stop t x) t
                  | otherwise = g x (reduce env x) (x += t)
-           g x (gen,cs) t = Tree x gen (map (f t) cs)
+           g x (gen,cs) t = trace (pretty $ gen (repeat "call")) $ Tree x gen (map (f t) cs)
 
 
 reduce :: Env -> Exp -> ([Var] -> Exp, [Exp])

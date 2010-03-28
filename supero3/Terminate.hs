@@ -1,40 +1,42 @@
 
-module Terminate(terminate, (<|), (<=|), newHistory, History, (+=)) where
+module Terminate(terminate, (<|), (<=|), newHistory, History, (+=), progress) where
 
 import Type
 import Debug.Trace
 import Data.List
 
 
-data History = History [Exp]
+data History = History Int [Exp] [Bag]
+type Bag = [Name]
 
-newHistory = History []
+newHistory = History 0 [] []
 
 
-terminate :: (Exp -> Exp -> Bool) -> History -> Exp -> Bool
-terminate (<) (History hist) x = if not $ all (x <) hist then info else False
+progress :: History -> String -> Bool
+progress (History n _ _) msg = trace (msg ++ " = " ++ show n) False
+
+
+terminate :: (Bag -> Bag -> Bool) -> History -> Exp -> Bool
+terminate (<) (History _ _ bs) x = if not $ all (getBag x <) bs then trace "terminate" True else False
     where
-        bad = head $ filter (not . (x <)) hist
-        info = error $ prettyNames bad ++
-               "\n WHEN TRYING TO ADD\n" ++ prettyNames x ++
-               "\n BECAUSE OF\n" ++ show (getBag x \\ getBag bad) ++ "\n" ++
-               show ("<",x<bad,"==",x==bad,"bageq",getBag x == getBag bad,"<|",x<|bad,"<=|",x<=|bad)
+        -- bad = head $ filter (not . (x <)) hist
+        --info = error $ prettyNames bad ++
+        --       "\n WHEN TRYING TO ADD\n" ++ prettyNames x ++
+        --       "\n BECAUSE OF\n" ++ show (getBag x \\ getBag bad) ++ "\n" ++
+        --       show ("<",x<bad,"==",x==bad,"bageq",getBag x == getBag bad,"<|",x<|bad,"<=|",x<=|bad)
     
 --    where
 --        info = error $ prettyNames (head hist) ++ "\n AGAINST \n" ++ prettyNames x ++ "\n" ++ show (getBag x ,getBag y)
 --        y = head hist
 
 
-(<|) :: Exp -> Exp -> Bool
-x <| y = nub x1 /= nub y1 || length x1 < length y1
-    where x1 = getBag x
-          y1 = getBag y
-(<=|) :: Exp -> Exp -> Bool
-x <=| y = x <| y || getBag x == getBag y
+(<|), (<=|) :: Bag -> Bag -> Bool
+x <| y = nub x /= nub y || length x < length y
+x <=| y = x <| y || x == y
 
 
 (+=) :: Exp -> History -> History
-(+=) x (History xs) = {- trace (prettyNames x) $ -} History $ x:xs
+(+=) x (History n xs bs) = {- trace (prettyNames x) $ -} History (n+1) (x:xs) (getBag x : bs)
 
 
 

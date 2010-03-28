@@ -1,6 +1,6 @@
 bernouilli
 GHC=0.530
-Supero=compiles, not investigated enough yet
+Supero=0.662
 
 digits-of-e1
 GHC=0.480
@@ -11,10 +11,12 @@ GHC=0.230
 Supero=0.091
 
 exp3_8
-GHC=1.89
-Supero=1.75
+GHC=1.53
+Supero=1.42
 
 gen_regexps
+GHC=0.012
+Supero=non-terminates at compile time
 
 integrate
 
@@ -25,12 +27,16 @@ GHC=0.376
 Supero=0.221
 
 queens
-GHC=0.85
-Supero=0.80
+GHC=0.70
+Supero=1.09
 
 rfib
+GHC=0.98
+Supero=0.75
 
 tak
+GHC=0.29
+Supero=0.23
 
 wheel-sieve1
 
@@ -38,7 +44,7 @@ wheel-sieve2
 
 x2n1
 GHC=0.310
-Supero=0.29
+Supero=0.26
 
 
 

@@ -16,7 +16,20 @@ import Debug.Trace
 
 
 simplifyProg :: [(Var,Exp)] -> [(Var,Exp)]
-simplifyProg = map (second $ transform simplify)
+simplifyProg = inlineVars . map (second $ transform simplify)
+
+
+
+inlineVars :: [(Var,Exp)] -> [(Var,Exp)]
+inlineVars xs = [(v, subst sub e) | (v,e) <- xs]
+    where sub = [(v,e) | (v,x) <- xs, Just e <- [f x]]
+          f (App _ x []) = g x
+          f (Let _ [] x) = g x
+          f _ = Nothing
+          g v = case lookup v xs of
+                    Just x -> f x `mplus` Just v
+                    Nothing -> Just v
+
 
 
 -- We run relabel 3 times:
@@ -25,7 +38,9 @@ simplifyProg = map (second $ transform simplify)
 -- second time round does GC
 -- third time round does variable normalisation
 simplify :: Exp -> Exp
-simplify x = f "v" $ f "_2" $ runFreshExp "_1" x $ skipLam reduce =<< relabel Map.empty x
+simplify = fixEq simplify1
+
+simplify1 x = f "v" $ f "_2" $ runFreshExp "_1" x $ skipLam reduce =<< relabel Map.empty x
     where f s x = runFreshExp s x $ relabel Map.empty x
 
 
@@ -110,7 +125,7 @@ reduce (Let n xs v) = do
         f done ((v,e):odo)
             | App n v2 [] <- e =
                 let g xs = [(a,subst [(v,v2)] b) | (a,b) <- xs]
-                in f ((v,e) : g done) (g odo)
+                in f ((v,e) : g done) (g odo) -- FIXME: This stage may not generate a fixed point!!!
             | Let n xs v2 <- e = f done (reverse xs ++ [(v,App n v2 [])] ++ odo)
             | App n v1 (v2:vs) <- e, Just e2@Lam{} <- lookup v1 done = do
                 Lam _ v3 e3 <- relabel Map.empty e2

@@ -55,17 +55,8 @@ arity x | '\'':xs <- dropWhile (/= '\'') x = Just $ read xs
 
 
 env :: [(Var,Exp)] -> Env
-env xs = f
-    where
-        mp = Map.fromList xs
-        f x = case Map.lookup x mp of
-                  Just x | Just y <- asVar x -> f y
-                  x -> x
-
-asVar (App _ x []) = Just x
-asVar (Let _ [] x) = Just x
-asVar _ = Nothing
-
+env xs = flip Map.lookup mp
+    where mp = Map.fromList xs
 
 
 vars :: Exp -> [Var]
@@ -295,7 +286,7 @@ toVar :: Var -> H.Exp
 toVar x = H.Var $ UnQual $ toName x
 
 toName :: String -> H.Name
-toName xs@(x:_) | isAlphaNum x || x `elem` "'_" = Ident xs
+toName xs@(x:_) | isAlphaNum x || x `elem` "'_(" = Ident xs
                 | otherwise = Symbol xs
 
 sl = SrcLoc "" 0 0

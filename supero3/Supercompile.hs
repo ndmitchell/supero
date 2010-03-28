@@ -29,14 +29,17 @@ supercompile env = resetTime $ assign $ flatten $ optimise env $ fromJustNote "c
 
 optimise :: Env -> Exp -> Tree
 optimise env = f newHistory
-    where  f t x | terminate (<=|) t x = g x (stop t x) t
+    where  f t x -- | trace (prettyNames x) False = undefined
+                 -- | progress t "optimse" = undefined
+                 | terminate (<=|) t x = g x (stop t x) t
                  | otherwise = g x (reduce env x) (x += t)
-           g x (gen,cs) t = trace (pretty $ gen (repeat "call")) $ Tree x gen (map (f t) cs)
+           g x (gen,cs) t = {- trace (pretty $ gen (repeat "call")) $ -} Tree x gen (map (f t) cs)
 
 
 reduce :: Env -> Exp -> ([Var] -> Exp, [Exp])
 reduce env = f newHistory
-    where f t x | terminate (<|) t x = stop t x
+    where f t x -- | progress t "reduce" = undefined
+                | terminate (<|) t x = stop t x
                 | Just x' <- step env x = f (x += t) x'
                 | otherwise = split x
 
@@ -118,7 +121,7 @@ deboxFree o = transform f o
 
         f (Box x) = appBox (simplify $ lams vs x2) vs
             where
-                vs = sort $ fx2 \\ fo
+                vs = {- sort $ -} fx2 \\ fo
                 x2 = simplify x
                 fx2 = free x2
         f x = x
@@ -150,13 +153,14 @@ share test x = fromFlat $ FlatExp vars bind2 root
         bind2 = norm ++ map (second Box) boxes2
 
 
-data Sharer = Sharer {rank :: Int, var :: Var, val :: Exp, fre :: [Var]}
+data Sharer = Sharer {rank :: Int, var :: Var, vals :: [Var], val :: Exp, fre :: [Var]}
 
 sharer :: (Exp -> Bool) -> [Var] -> [(Var, Exp)] -> [(Var, Exp)]
 sharer test keep xs = map (\x -> (var x, val x)) $ once $ cheap
-        [mk (length $ filter (== getName b) names) a b | (a,b) <- xs]
+        [mk (length $ filter (== getName b) names) a [a] | (a,b) <- xs]
     where
-        mk a b c = Sharer a b c (free c)
+        mk a b c = Sharer a b c d (free d)
+            where d = simplify $ Let noname [(c, fromJust $ lookup c xs) | c <- c] b
         names = map (getName . snd) xs
         order = sortBy (\x y -> compare (rank x) (rank y))
 
@@ -169,7 +173,7 @@ sharer test keep xs = map (\x -> (var x, val x)) $ once $ cheap
                 xs2 = map f xs
                 f x | var v `elem` fre x, test $ val x2 = x2
                     | otherwise = x
-                    where x2 = mk (max (rank v) (rank x)) (var x) (simplify $ Let noname [(var v,val v),("_root",val x)] "_root")
+                    where x2 = mk (max (rank v) (rank x)) (var x) (vals x `union` vals v)
 
         -- merge all the cheap ones
         cheap :: [Sharer] -> [Sharer]
@@ -240,8 +244,9 @@ step env x = Nothing
 split :: Exp -> ([Var] -> Exp, [Exp])
 split x
     | Nothing <- s = (const x, [])
-    | Just (_, Case n v xs) <- s = 
-        let alt (p,x) = (p, Box $ Let noname ((v,p):bind) root)
+    | Just (vc, Case n v xs) <- s = 
+        let alt (p@(App _ _ []),x) = (p, Box $ Let noname ((vc,x):delFst vc bind) root)
+            alt (p,x) = (p, Box $ Let noname ((v,p):bind) root)
         in debox $ lams free $ Case noname v $ map alt xs
     | Just (v, Lam{}) <- s =
         debox $ share (const True) $ fromFlat $ FlatExp free [(a, if a == v then boxlam b else Box b) | (a,b) <- bind] root

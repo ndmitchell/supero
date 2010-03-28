@@ -176,7 +176,8 @@ tagPosition :: Position -> Tag str
 tagPosition x = case x of
     Position r c -> TagPosition r c
 assert y x = x
-second f x = (fst x, f $ snd x)
+second f x = case x of
+    (a,b) -> (a, f b) {- FIXME, too strict -}
 
 root
   = \ x ->
@@ -227,11 +228,11 @@ dat = \ v_2 ->
                                                                  True -> []
                                                                  False -> f_10))
                                                    in
-                                                   (case v_5 == '<' of
+                                                   (case False {- FIXME v_5 == '<' -} of
                                                         True -> (tagOpen v_4)
                                                         False -> f_11))
                                           in
-                                          (case v_5 == '&' of
+                                          (case False {- FIXME v_5 == '&' -} of
                                                True -> (charReference v_4)
                                                False -> f_12))))
 charReference = \ v_2 -> ((((charRef dat) False) Nothing) v_2)
@@ -666,7 +667,7 @@ beforeAttValue = \ v_2 v_3 ->
                                                                                                          of
                                                                                                            True -> (neilXmlTagClose
                                                                                                                       v_5)
-                                                                                                           _ -> f_14)
+                                                                                                           False -> f_14)
                                                                                                False -> f_14))
                                                                                  in
                                                                                  (case v_6 == '>' of
@@ -894,7 +895,7 @@ markupDeclOpen = \ v_2 ->
                                                                 = ((ampOut (errWant "tag name"))
                                                                      (bogusComment v_2))
                                                             in
-                                                            (let v_11 = (v_7 "[CDATA[") in
+                                                            (let v_11 = (v_7 ('[':'C':'D':'A':'T':'A':'[':[])) in
                                                                (case v_11 of
                                                                     Just v_12 -> (cdataSection v_12)
                                                                     Nothing -> f_10)))
@@ -1106,7 +1107,7 @@ cdataSection = \ v_2 ->
                                                         True -> (dat v_2)
                                                         False -> f_10))
                                           in
-                                          (let v_12 = (v_7 "]]>") in
+                                          (let v_12 = (v_7 (']':']':'>':[])) in
                                              (case v_12 of
                                                   Just v_13 -> (dat v_13)
                                                   Nothing -> f_11)))))
@@ -1188,7 +1189,7 @@ charRefAlpha2 = \ v_2 v_3 v_4 ->
                                                              (case v_3 of
                                                                   True -> ((ampOut EntityEndAtt)
                                                                              (v_2 v_4))
-                                                                  _ -> f_12))
+                                                                  False -> f_12))
                                                     in
                                                     (case v_7 == ';' of
                                                          True -> ((ampOut EntityEnd) (v_2 v_6))
@@ -1201,17 +1202,14 @@ charRefAlpha2 = \ v_2 v_3 v_4 ->
 alphaChar = \ v_2 -> (((||) (isAlphaNum v_2)) ((elem v_2) ":-_"))
 errSeen = \ v_2 -> ((($) Warn) (((&) "Unexpected ") (show v_2)))
 errWant = \ v_2 -> ((($) Warn) (((&) "Expected ") (show v_2)))
+
 expand = \ v_2 v_3 ->
-      (let res
-             = (((((S ((expand ((positionChar v_2) (head v_3))) (tail v_3)))
-                     (let f_5 = (head v_3) in
-                        (case (null v_3) of
-                             True -> '\NUL'
-                             False -> f_5)))
-                    (null v_3))
-                   ((((expand_next v_2) v_3) v_2) v_3))
-                  ((:) (Pos v_2)))
-         in res)
+    S
+        ((expand v_2) (tail v_3))
+        (case v_3 of [] -> '\NUL' ; x:xs -> x)
+        (case v_3 of [] -> True; x:xs -> False)
+        ((((expand_next v_2) v_3) v_2) v_3)
+        ((:) (Pos v_2))
 expand_next
   = \ v_2 v_3 v_7 v_8 v_9 ->
       (let f_12
@@ -1239,11 +1237,11 @@ output = \ v_2 v_3 ->
                                                    (case v_9 of
                                                         True -> tagTextMerge
                                                         False -> id))
-                                                  ((((((((output_go v_2) v_3) v_5) v_6) v_7) v_8)
+                                                  ((((((output_go v_5) v_6) v_7) v_8)
                                                       v_9)
                                                      (((,) (((,) nullPosition) [])) v_3)))
 output_go
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_11 ->
+  = \ v_5 v_6 v_7 v_8 v_9 v_11 ->
       (let f_41
              = (let f_35
                       = (let f_27
@@ -1270,17 +1268,13 @@ output_go
                                                                                                 of
                                                                                                   Just
                                                                                                     v_15 -> (let f_16
-                                                                                                                   = ((((((((output_go
-                                                                                                                               v_2)
-                                                                                                                              v_3)
+                                                                                                                   = ((((((output_go
                                                                                                                              v_5)
                                                                                                                             v_6)
                                                                                                                            v_7)
                                                                                                                           v_8)
                                                                                                                          v_9)
-                                                                                                                        ((((((((output_next
-                                                                                                                                  v_2)
-                                                                                                                                 v_3)
+                                                                                                                        ((((((output_next
                                                                                                                                 v_5)
                                                                                                                                v_6)
                                                                                                                               v_7)
@@ -1292,9 +1286,7 @@ output_go
                                                                                                                   v_6
                                                                                                                   of
                                                                                                                     True -> ((($)
-                                                                                                                                ((((((((output_pos
-                                                                                                                                          v_2)
-                                                                                                                                         v_3)
+                                                                                                                                ((((((output_pos
                                                                                                                                         v_5)
                                                                                                                                        v_6)
                                                                                                                                       v_7)
@@ -1305,17 +1297,13 @@ output_go
                                                                                                                                    (TagWarning
                                                                                                                                       (fromString
                                                                                                                                          v_15)))
-                                                                                                                                  ((((((((output_go
-                                                                                                                                            v_2)
-                                                                                                                                           v_3)
+                                                                                                                                  ((((((output_go
                                                                                                                                           v_5)
                                                                                                                                          v_6)
                                                                                                                                         v_7)
                                                                                                                                        v_8)
                                                                                                                                       v_9)
-                                                                                                                                     ((((((((output_next
-                                                                                                                                               v_2)
-                                                                                                                                              v_3)
+                                                                                                                                     ((((((output_next
                                                                                                                                              v_5)
                                                                                                                                             v_6)
                                                                                                                                            v_7)
@@ -1327,17 +1315,13 @@ output_go
                                                                                  in
                                                                                  (let y_a
                                                                                         = ((($)
-                                                                                              (((((((output_chars
-                                                                                                       v_2)
-                                                                                                      v_3)
+                                                                                              (((((output_chars
                                                                                                      v_5)
                                                                                                     v_6)
                                                                                                    v_7)
                                                                                                   v_8)
                                                                                                  v_9))
-                                                                                             ((((((((output_next
-                                                                                                       v_2)
-                                                                                                      v_3)
+                                                                                             ((((((output_next
                                                                                                      v_5)
                                                                                                     v_6)
                                                                                                    v_7)
@@ -1357,9 +1341,7 @@ output_go
                                                                                              v_11)
                                                                                           of
                                                                                             True -> ((($)
-                                                                                                        ((((((((output_pos
-                                                                                                                  v_2)
-                                                                                                                 v_3)
+                                                                                                        ((((((output_pos
                                                                                                                 v_5)
                                                                                                                v_6)
                                                                                                               v_7)
@@ -1373,17 +1355,13 @@ output_go
                                                                                                                  ((entityChr
                                                                                                                      v_11)
                                                                                                                     a))))
-                                                                                                          ((((((((output_go
-                                                                                                                    v_2)
-                                                                                                                   v_3)
+                                                                                                          ((((((output_go
                                                                                                                   v_5)
                                                                                                                  v_6)
                                                                                                                 v_7)
                                                                                                                v_8)
                                                                                                               v_9)
-                                                                                                             (((((((((output_skip
-                                                                                                                        v_2)
-                                                                                                                       v_3)
+                                                                                                             (((((((output_skip
                                                                                                                       v_5)
                                                                                                                      v_6)
                                                                                                                     v_7)
@@ -1395,17 +1373,13 @@ output_go
                                                                         in
                                                                         (let y_a
                                                                                = ((($)
-                                                                                     (((((((output_charsStr
-                                                                                              v_2)
-                                                                                             v_3)
+                                                                                     (((((output_charsStr
                                                                                             v_5)
                                                                                            v_6)
                                                                                           v_7)
                                                                                          v_8)
                                                                                         v_9))
-                                                                                    ((((((((output_next
-                                                                                              v_2)
-                                                                                             v_3)
+                                                                                    ((((((output_next
                                                                                             v_5)
                                                                                            v_6)
                                                                                           v_7)
@@ -1419,9 +1393,7 @@ output_go
                                                                               (case (isEntity v_11)
                                                                                  of
                                                                                    True -> (((++)
-                                                                                               (((((((((output_poss
-                                                                                                          v_2)
-                                                                                                         v_3)
+                                                                                               (((((((output_poss
                                                                                                         v_5)
                                                                                                        v_6)
                                                                                                       v_7)
@@ -1442,17 +1414,13 @@ output_go
                                                                                                               False -> f_19)))
                                                                                                      (v_7
                                                                                                         a))))
-                                                                                              ((((((((output_go
-                                                                                                        v_2)
-                                                                                                       v_3)
+                                                                                              ((((((output_go
                                                                                                       v_5)
                                                                                                      v_6)
                                                                                                     v_7)
                                                                                                    v_8)
                                                                                                   v_9)
-                                                                                                 (((((((((output_skip
-                                                                                                            v_2)
-                                                                                                           v_3)
+                                                                                                 (((((((output_skip
                                                                                                           v_5)
                                                                                                          v_6)
                                                                                                         v_7)
@@ -1464,16 +1432,13 @@ output_go
                                                                in
                                                                (let y_a
                                                                       = ((($)
-                                                                            (((((((output_charsStr
-                                                                                     v_2)
-                                                                                    v_3)
+                                                                            (((((output_charsStr
                                                                                    v_5)
                                                                                   v_6)
                                                                                  v_7)
                                                                                 v_8)
                                                                                v_9))
-                                                                           ((((((((output_next v_2)
-                                                                                    v_3)
+                                                                           ((((((output_next 
                                                                                    v_5)
                                                                                   v_6)
                                                                                  v_7)
@@ -1486,9 +1451,7 @@ output_go
                                                                      in
                                                                      (case (isComment v_11) of
                                                                           True -> ((($)
-                                                                                      ((((((((output_pos
-                                                                                                v_2)
-                                                                                               v_3)
+                                                                                      ((((((output_pos
                                                                                               v_5)
                                                                                              v_6)
                                                                                             v_7)
@@ -1498,17 +1461,13 @@ output_go
                                                                                      (((:)
                                                                                          (TagComment
                                                                                             a))
-                                                                                        ((((((((output_go
-                                                                                                  v_2)
-                                                                                                 v_3)
+                                                                                        ((((((output_go
                                                                                                 v_5)
                                                                                                v_6)
                                                                                               v_7)
                                                                                              v_8)
                                                                                             v_9)
-                                                                                           (((((((((output_skip
-                                                                                                      v_2)
-                                                                                                     v_3)
+                                                                                           (((((((output_skip
                                                                                                     v_5)
                                                                                                    v_6)
                                                                                                   v_7)
@@ -1520,13 +1479,13 @@ output_go
                                                       in
                                                       (let y_a
                                                              = ((($)
-                                                                   (((((((output_charsStr v_2) v_3)
+                                                                   (((((output_charsStr 
                                                                           v_5)
                                                                          v_6)
                                                                         v_7)
                                                                        v_8)
                                                                       v_9))
-                                                                  ((((((((output_next v_2) v_3) v_5)
+                                                                  ((((((output_next v_5)
                                                                          v_6)
                                                                         v_7)
                                                                        v_8)
@@ -1537,7 +1496,7 @@ output_go
                                                               a = (snd y_a)
                                                             in
                                                             (let z_b
-                                                                   = ((((((((output_atts v_2) v_3)
+                                                                   = ((((((output_atts
                                                                              v_5)
                                                                             v_6)
                                                                            v_7)
@@ -1550,9 +1509,7 @@ output_go
                                                                   in
                                                                   (case (isTagShut v_11) of
                                                                        True -> ((($)
-                                                                                   ((((((((output_pos
-                                                                                             v_2)
-                                                                                            v_3)
+                                                                                   ((((((output_pos
                                                                                            v_5)
                                                                                           v_6)
                                                                                          v_7)
@@ -1569,9 +1526,7 @@ output_go
                                                                                                (null
                                                                                                   b))
                                                                                             of
-                                                                                              True -> (((((((((output_warn
-                                                                                                                 v_2)
-                                                                                                                v_3)
+                                                                                              True -> (((((((output_warn
                                                                                                                v_5)
                                                                                                               v_6)
                                                                                                              v_7)
@@ -1579,19 +1534,15 @@ output_go
                                                                                                            v_9)
                                                                                                           v_11)
                                                                                                          "Unexpected attributes in close tag")
-                                                                                              _ -> id))
+                                                                                              False -> id))
                                                                                         (let f_23
-                                                                                               = ((((((((output_go
-                                                                                                           v_2)
-                                                                                                          v_3)
+                                                                                               = ((((((output_go
                                                                                                          v_5)
                                                                                                         v_6)
                                                                                                        v_7)
                                                                                                       v_8)
                                                                                                      v_9)
-                                                                                                    (((((((((output_skip
-                                                                                                               v_2)
-                                                                                                              v_3)
+                                                                                                    (((((((output_skip
                                                                                                              v_5)
                                                                                                             v_6)
                                                                                                            v_7)
@@ -1605,9 +1556,7 @@ output_go
                                                                                                  z)
                                                                                               of
                                                                                                 True -> ((($)
-                                                                                                            (((((((((output_warn
-                                                                                                                       v_2)
-                                                                                                                      v_3)
+                                                                                                            (((((((output_warn
                                                                                                                      v_5)
                                                                                                                     v_6)
                                                                                                                    v_7)
@@ -1615,17 +1564,13 @@ output_go
                                                                                                                  v_9)
                                                                                                                 v_11)
                                                                                                                "Unexpected self-closing in close tag"))
-                                                                                                           ((((((((output_go
-                                                                                                                     v_2)
-                                                                                                                    v_3)
+                                                                                                           ((((((output_go
                                                                                                                    v_5)
                                                                                                                   v_6)
                                                                                                                  v_7)
                                                                                                                 v_8)
                                                                                                                v_9)
-                                                                                                              ((((((((output_next
-                                                                                                                        v_2)
-                                                                                                                       v_3)
+                                                                                                              ((((((output_next
                                                                                                                       v_5)
                                                                                                                      v_6)
                                                                                                                     v_7)
@@ -1637,11 +1582,11 @@ output_go
                                              in
                                              (let y_a
                                                     = ((($)
-                                                          (((((((output_charsStr v_2) v_3) v_5) v_6)
+                                                          (((((output_charsStr v_5) v_6)
                                                                v_7)
                                                               v_8)
                                                              v_9))
-                                                         ((((((((output_next v_2) v_3) v_5) v_6)
+                                                         ((((((output_next v_5) v_6)
                                                                v_7)
                                                               v_8)
                                                              v_9)
@@ -1651,7 +1596,7 @@ output_go
                                                      a = (snd y_a)
                                                    in
                                                    (let z_b
-                                                          = ((((((((output_atts v_2) v_3) v_5) v_6)
+                                                          = ((((((output_atts v_5) v_6)
                                                                   v_7)
                                                                  v_8)
                                                                 v_9)
@@ -1662,8 +1607,7 @@ output_go
                                                          in
                                                          (case (isTag v_11) of
                                                               True -> ((($)
-                                                                          ((((((((output_pos v_2)
-                                                                                   v_3)
+                                                                          ((((((output_pos 
                                                                                   v_5)
                                                                                  v_6)
                                                                                 v_7)
@@ -1672,17 +1616,13 @@ output_go
                                                                              v_11))
                                                                          (((:) ((TagOpen a) b))
                                                                             (let f_25
-                                                                                   = ((((((((output_go
-                                                                                               v_2)
-                                                                                              v_3)
+                                                                                   = ((((((output_go
                                                                                              v_5)
                                                                                             v_6)
                                                                                            v_7)
                                                                                           v_8)
                                                                                          v_9)
-                                                                                        (((((((((output_skip
-                                                                                                   v_2)
-                                                                                                  v_3)
+                                                                                        (((((((output_skip
                                                                                                  v_5)
                                                                                                 v_6)
                                                                                                v_7)
@@ -1695,9 +1635,7 @@ output_go
                                                                                   (isTagEndClose z)
                                                                                   of
                                                                                     True -> ((($)
-                                                                                                ((((((((output_pos
-                                                                                                          v_2)
-                                                                                                         v_3)
+                                                                                                ((((((output_pos
                                                                                                         v_5)
                                                                                                        v_6)
                                                                                                       v_7)
@@ -1707,17 +1645,13 @@ output_go
                                                                                                (((:)
                                                                                                    (TagClose
                                                                                                       a))
-                                                                                                  ((((((((output_go
-                                                                                                            v_2)
-                                                                                                           v_3)
+                                                                                                  ((((((output_go
                                                                                                           v_5)
                                                                                                          v_6)
                                                                                                         v_7)
                                                                                                        v_8)
                                                                                                       v_9)
-                                                                                                     ((((((((output_next
-                                                                                                               v_2)
-                                                                                                              v_3)
+                                                                                                     ((((((output_next
                                                                                                              v_5)
                                                                                                             v_6)
                                                                                                            v_7)
@@ -1728,7 +1662,7 @@ output_go
                                                               False -> f_24))))))
                                     in
                                     (let y_a
-                                           = ((((((((output_charsStr v_2) v_3) v_5) v_6) v_7) v_8)
+                                           = ((((((output_charsStr v_5) v_6) v_7) v_8)
                                                  v_9)
                                                 v_11)
                                        in
@@ -1737,13 +1671,13 @@ output_go
                                           in
                                           (case (isChar v_11) of
                                                True -> ((($)
-                                                           ((((((((output_pos v_2) v_3) v_5) v_6)
+                                                           ((((((output_pos v_5) v_6)
                                                                  v_7)
                                                                 v_8)
                                                                v_9)
                                                               v_11))
                                                           (((:) (TagText a))
-                                                             ((((((((output_go v_2) v_3) v_5) v_6)
+                                                             ((((((output_go v_5) v_6)
                                                                    v_7)
                                                                   v_8)
                                                                  v_9)
@@ -1757,9 +1691,7 @@ output_go
                                                                                                 v_32
                                                                                                 of
                                                                                                   Pos
-                                                                                                    v_34 -> ((((((((output_go
-                                                                                                                      v_2)
-                                                                                                                     v_3)
+                                                                                                    v_34 -> ((((((output_go
                                                                                                                     v_5)
                                                                                                                    v_6)
                                                                                                                   v_7)
@@ -1781,9 +1713,8 @@ output_go
                                                                                     True -> ((++)
                                                                                                (reverse
                                                                                                   v_39))
-                                                                                    _ -> id))
-                                                                              ((((((((output_go v_2)
-                                                                                       v_3)
+                                                                                    False -> id))
+                                                                              ((((((output_go 
                                                                                       v_5)
                                                                                      v_6)
                                                                                     v_7)
@@ -1801,24 +1732,24 @@ output_go
                                                           True -> []
                                                           False -> f_41))))
 output_atts
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_47 ->
+  = \ v_5 v_6 v_7 v_8 v_9 v_47 -> error "atts" {-
       (let f_50
              = (let f_49 = (((,) v_47) []) in
                   (let y_a
-                         = ((((((((output_charsEntsStr v_2) v_3) v_5) v_6) v_7) v_8) v_9)
-                              ((((((((output_next v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_47))
+                         = ((((((output_charsEntsStr v_5) v_6) v_7) v_8) v_9)
+                              ((((((output_next v_5) v_6) v_7) v_8) v_9) v_47))
                      in
                      (let y = (fst y_a)
                           a = (snd y_a)
                         in
                         (case (isAttVal v_47) of
                              True -> ((($) (second ((:) (((,) empty) a))))
-                                        ((((((((output_atts v_2) v_3) v_5) v_6) v_7) v_8) v_9) y))
-                             _ -> f_49))))
+                                        ((((((output_atts v_5) v_6) v_7) v_8) v_9) y))
+                             False -> f_49))))
          in
          (let y_a
-                = ((((((((output_charsStr v_2) v_3) v_5) v_6) v_7) v_8) v_9)
-                     ((((((((output_next v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_47))
+                = ((((((output_charsStr v_5) v_6) v_7) v_8) v_9)
+                     ((((((output_next v_5) v_6) v_7) v_8) v_9) v_47))
             in
             (let y = (fst y_a)
                  a = (snd y_a)
@@ -1826,34 +1757,34 @@ output_atts
                (let z_b
                       = (let f_51 = (((,) y) empty) in
                            (case (isAttVal y) of
-                                True -> ((((((((output_charsEntsStr v_2) v_3) v_5) v_6) v_7) v_8)
+                                True -> ((((((output_charsEntsStr v_5) v_6) v_7) v_8)
                                             v_9)
-                                           ((((((((output_next v_2) v_3) v_5) v_6) v_7) v_8) v_9)
+                                           ((((((output_next v_5) v_6) v_7) v_8) v_9)
                                               y))
-                                _ -> f_51))
+                                False -> f_51))
                   in
                   (let z = (fst z_b)
                        b = (snd z_b)
                      in
                      (case (isAttName v_47) of
                           True -> ((($) (second ((:) (((,) a) b))))
-                                     ((((((((output_atts v_2) v_3) v_5) v_6) v_7) v_8) v_9) z))
-                          _ -> f_50))))))
+                                     ((((((output_atts v_5) v_6) v_7) v_8) v_9) z))
+                          False -> f_50)))))) -}
 output_chars
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_53 ->
-      (((((((((output_charss v_2) v_3) v_5) v_6) v_7) v_8) v_9) False)
+  = \ v_5 v_6 v_7 v_8 v_9 v_53 ->
+      (((((((output_charss v_5) v_6) v_7) v_8) v_9) False)
          v_53)
 output_charsStr
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_56 ->
+  = \ v_5 v_6 v_7 v_8 v_9 v_56 ->
       ((($) ((opStarStarStar id) fromString))
-         ((((((((output_chars v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_56))
+         ((((((output_chars v_5) v_6) v_7) v_8) v_9) v_56))
 output_charsEntsStr
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_59 ->
+  = \ v_5 v_6 v_7 v_8 v_9 v_59 ->
       ((($) ((opStarStarStar id) fromString))
-         (((((((((output_charss v_2) v_3) v_5) v_6) v_7) v_8) v_9) True)
+         (((((((output_charss v_5) v_6) v_7) v_8) v_9) True)
             v_59))
 output_charss
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_62 v_63 ->
+  = \ v_5 v_6 v_7 v_8 v_9 v_62 v_63 ->
       (let f_81
              = (let f_79
                       = (let f_77
@@ -1862,8 +1793,7 @@ output_charss
                                              (let v_66 = (fromWarn v_63) in
                                                 (case v_66 of
                                                      Just v_67 -> ((($)
-                                                                      ((((((((output_charss v_2)
-                                                                               v_3)
+                                                                      ((((((output_charss 
                                                                               v_5)
                                                                              v_6)
                                                                             v_7)
@@ -1872,9 +1802,7 @@ output_charss
                                                                          v_62))
                                                                      ((($)
                                                                          (case v_6 of
-                                                                              True -> ((((((((output_addWarns
-                                                                                                v_2)
-                                                                                               v_3)
+                                                                              True -> ((((((output_addWarns
                                                                                               v_5)
                                                                                              v_6)
                                                                                             v_7)
@@ -1886,9 +1814,8 @@ output_charss
                                                                                                 (fromString
                                                                                                    v_67)))
                                                                                             []))
-                                                                              _ -> id))
-                                                                        ((((((((output_next v_2)
-                                                                                 v_3)
+                                                                              False -> id))
+                                                                        ((((((output_next 
                                                                                 v_5)
                                                                                v_6)
                                                                               v_7)
@@ -1905,9 +1832,7 @@ output_charss
                                                                                                   v_74
                                                                                                   of
                                                                                                     Pos
-                                                                                                      v_76 -> (((((((((output_charss
-                                                                                                                         v_2)
-                                                                                                                        v_3)
+                                                                                                      v_76 -> (((((((output_charss
                                                                                                                        v_5)
                                                                                                                       v_6)
                                                                                                                      v_7)
@@ -1923,8 +1848,8 @@ output_charss
                                                                                      [] -> f_69))))
                            in
                            (let y_a
-                                  = ((($) (((((((output_chars v_2) v_3) v_5) v_6) v_7) v_8) v_9))
-                                       ((((((((output_next v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_63))
+                                  = ((($) (((((output_chars v_5) v_6) v_7) v_8) v_9))
+                                       ((((((output_next v_5) v_6) v_7) v_8) v_9) v_63))
                               in
                               (let y = (fst y_a)
                                    a = (snd y_a)
@@ -1932,11 +1857,11 @@ output_charss
                                  (let z
                                         = ((($) fst)
                                              ((($)
-                                                 ((((((((output_charss v_2) v_3) v_5) v_6) v_7) v_8)
+                                                 ((((((output_charss v_5) v_6) v_7) v_8)
                                                      v_9)
                                                     v_62))
                                                 (let f_78
-                                                       = (((((((((output_skip v_2) v_3) v_5) v_6)
+                                                       = (((((((output_skip v_5) v_6)
                                                                 v_7)
                                                                v_8)
                                                               v_9)
@@ -1944,20 +1869,20 @@ output_charss
                                                             y)
                                                    in
                                                    (case (isEntityEnd y) of
-                                                        True -> ((((((((output_next v_2) v_3) v_5)
+                                                        True -> ((((((output_next v_5)
                                                                        v_6)
                                                                       v_7)
                                                                      v_8)
                                                                     v_9)
                                                                    y)
-                                                        _ -> f_78))))
+                                                        False -> f_78))))
                                     in
                                     (case v_62 of
                                          True -> (case (isEntityChr v_63) of
                                                       True -> ((($)
                                                                   (second
                                                                      ((:) ((entityChr v_63) a))))
-                                                                 (((((((((output_charss v_2) v_3)
+                                                                 (((((((output_charss 
                                                                           v_5)
                                                                          v_6)
                                                                         v_7)
@@ -1966,11 +1891,11 @@ output_charss
                                                                      v_62)
                                                                     z))
                                                       _ -> f_77)
-                                         _ -> f_77)))))
+                                         False -> f_77)))))
                   in
                   (let y_a
-                         = ((($) (((((((output_charsStr v_2) v_3) v_5) v_6) v_7) v_8) v_9))
-                              ((((((((output_next v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_63))
+                         = ((($) (((((output_charsStr v_5) v_6) v_7) v_8) v_9))
+                              ((((((output_next v_5) v_6) v_7) v_8) v_9) v_63))
                      in
                      (let y = (fst y_a)
                           a = (snd y_a)
@@ -1978,16 +1903,16 @@ output_charss
                         (let b = ((($) not) (isEntityEndAtt y)) in
                            (let z
                                   = (let f_80
-                                           = ((((((((output_next v_2) v_3) v_5) v_6) v_7) v_8) v_9)
+                                           = ((((((output_next v_5) v_6) v_7) v_8) v_9)
                                                 y)
                                        in
                                        (case b of
-                                            True -> (((((((((output_skip v_2) v_3) v_5) v_6) v_7)
+                                            True -> (((((((output_skip v_5) v_6) v_7)
                                                           v_8)
                                                          v_9)
                                                         isEntityEnd)
                                                        y)
-                                            _ -> f_80))
+                                            False -> f_80))
                                 n_m = (v_8 (((,) a) b))
                               in
                               (let n = (fst n_m)
@@ -1997,14 +1922,14 @@ output_charss
                                       True -> (case (isEntity v_63) of
                                                    True -> ((($) (second ((++) (toString n))))
                                                               ((($)
-                                                                  ((((((((output_charss v_2) v_3)
+                                                                  ((((((output_charss 
                                                                           v_5)
                                                                          v_6)
                                                                         v_7)
                                                                        v_8)
                                                                       v_9)
                                                                      v_62))
-                                                                 (((((((((output_addWarns v_2) v_3)
+                                                                 (((((((output_addWarns 
                                                                           v_5)
                                                                          v_6)
                                                                         v_7)
@@ -2012,12 +1937,12 @@ output_charss
                                                                       v_9)
                                                                      m)
                                                                     z)))
-                                                   _ -> f_79)
-                                      _ -> f_79)))))))
+                                                   False -> f_79)
+                                      False -> f_79)))))))
          in
          (let y_b
-                = (((((((((output_charss v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_62)
-                     ((((((((output_next v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_63))
+                = (((((((output_charss v_5) v_6) v_7) v_8) v_9) v_62)
+                     ((((((output_next v_5) v_6) v_7) v_8) v_9) v_63))
             in
             (let y = (fst y_b)
                  b = (snd y_b)
@@ -2025,22 +1950,22 @@ output_charss
                (let v_82 = (fromChr v_63) in
                   (case v_82 of
                        Just v_83 -> (((,) y) (((:) v_83) b))
-                       _ -> f_81)))))
+                       Nothing -> f_81)))))
 output_next
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_85 -> ((second (drop 1)) v_85)
+  = \ v_5 v_6 v_7 v_8 v_9 v_85 -> ((second (drop 1)) v_85)
 output_skip
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_88 v_89 ->
+  = \ v_5 v_6 v_7 v_8 v_9 v_88 v_89 ->
       ((assert (((||) (isEof v_89)) (v_88 v_89)))
-         ((((((((output_next v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_89))
+         ((((((output_next v_5) v_6) v_7) v_8) v_9) v_89))
 output_addWarns
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_92 v_93 ->
+  = \ v_5 v_6 v_7 v_8 v_9 v_92 v_93 ->
       (case v_93 of
            (,) v_95 v_96 -> (case v_95 of
                                  (,) v_97 v_98 -> (((,)
                                                       (((,) v_97)
                                                          (((++)
                                                              (reverse
-                                                                (((((((((output_poss v_2) v_3) v_5)
+                                                                (((((((output_poss v_5)
                                                                         v_6)
                                                                        v_7)
                                                                       v_8)
@@ -2050,42 +1975,42 @@ output_addWarns
                                                             v_98)))
                                                      v_96)))
 output_pos
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_100 v_101 ->
+  = \ v_5 v_6 v_7 v_8 v_9 v_100 v_101 ->
       (case v_100 of
            (,) v_103 v_104 -> (case v_103 of
                                    (,) v_105 v_106 -> (case v_5 of
                                                            True -> (((:) (tagPosition v_105)) v_101)
                                                            False -> v_101)))
 output_warn
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_109 v_110 v_111 ->
+  = \ v_5 v_6 v_7 v_8 v_9 v_109 v_110 v_111 ->
       (case v_6 of
            True -> ((($)
-                       ((((((((output_pos v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_109))
+                       ((((((output_pos v_5) v_6) v_7) v_8) v_9) v_109))
                       (((:) (TagWarning (fromString v_110))) v_111))
-           _ -> v_111)
+           False -> v_111)
 output_poss
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_115 ->
+  = \ v_5 v_6 v_7 v_8 v_9 v_115 ->
       (concatMap
-         ((((((((output_v_119 v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_115))
+         ((((((output_v_119 v_5) v_6) v_7) v_8) v_9) v_115))
 output_v_119
-  = \ v_2 v_3 v_5 v_6 v_7 v_8 v_9 v_115 v_118 ->
-      (((((((((output_pos v_2) v_3) v_5) v_6) v_7) v_8) v_9) v_115)
+  = \ v_5 v_6 v_7 v_8 v_9 v_115 v_118 ->
+      (((((((output_pos v_5) v_6) v_7) v_8) v_9) v_115)
          (((:) v_118) []))
 entityChr = \ v_2 v_3 ->
       (let f_5
              = (case (isEntityHex v_2) of
                     True -> ((($) chr) ((($) fst) ((($) head) (readHex v_3))))
-                    _ -> patternMatchFail)
+                    False -> patternMatchFail)
          in
          (case (isEntityNum v_2) of
               True -> ((($) chr) (read v_3))
-              _ -> f_5))
+              False -> f_5))
 isEof = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
               (,) v_5 v_6 -> (case v_6 of
                                   [] -> True
-                                  _ -> f_4)))
+                                  x:xs -> f_4)))
 isChar = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2093,7 +2018,7 @@ isChar = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       Char v_9 -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isTag = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2101,7 +2026,7 @@ isTag = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       Tag -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isTagShut = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2109,7 +2034,7 @@ isTagShut = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       TagShut -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isAttName = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2117,7 +2042,7 @@ isAttName = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       AttName -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isAttVal = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2125,7 +2050,7 @@ isAttVal = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       AttVal -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isTagEnd = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2133,7 +2058,7 @@ isTagEnd = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       TagEnd -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isTagEndClose = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2141,7 +2066,7 @@ isTagEndClose = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       TagEndClose -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isComment = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2149,7 +2074,7 @@ isComment = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       Comment -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isCommentEnd = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2157,7 +2082,7 @@ isCommentEnd = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       CommentEnd -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isEntity = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2165,7 +2090,7 @@ isEntity = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       Entity -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isEntityChr = \ v_2 ->
       (let f_9
              = (let f_4 = False in
@@ -2174,14 +2099,14 @@ isEntityChr = \ v_2 ->
                                            (:) v_7 v_8 -> (case v_7 of
                                                                EntityHex -> True
                                                                _ -> f_4)
-                                           _ -> f_4)))
+                                           [] -> f_4)))
          in
          (case v_2 of
               (,) v_10 v_11 -> (case v_11 of
                                     (:) v_12 v_13 -> (case v_12 of
                                                           EntityNum -> True
                                                           _ -> f_9)
-                                    _ -> f_9)))
+                                    [] -> f_9)))
 isEntityNum = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2189,7 +2114,7 @@ isEntityNum = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       EntityNum -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isEntityHex = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2197,7 +2122,7 @@ isEntityHex = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       EntityHex -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isEntityEnd = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2205,7 +2130,7 @@ isEntityEnd = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       EntityEnd -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isEntityEndAtt = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2213,7 +2138,7 @@ isEntityEndAtt = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       EntityEndAtt -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 isWarn = \ v_2 ->
       (let f_4 = False in
          (case v_2 of
@@ -2221,7 +2146,7 @@ isWarn = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       Warn v_9 -> True
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 fromChr = \ v_2 ->
       (let f_4 = Nothing in
          (case v_2 of
@@ -2229,7 +2154,7 @@ fromChr = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       Char v_9 -> (Just v_9)
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 fromWarn = \ v_2 ->
       (let f_4 = Nothing in
          (case v_2 of
@@ -2237,17 +2162,17 @@ fromWarn = \ v_2 ->
                                   (:) v_7 v_8 -> (case v_7 of
                                                       Warn v_9 -> (Just v_9)
                                                       _ -> f_4)
-                                  _ -> f_4)))
+                                  [] -> f_4)))
 tagTextMerge = \ v_2 ->
       (let f_7
              = (let f_4
                       = (case v_2 of
                              [] -> []
-                             _ -> patternMatchFail)
+                             x:xs -> patternMatchFail)
                   in
                   (case v_2 of
                        (:) v_5 v_6 -> (((:) v_5) (tagTextMerge v_6))
-                       _ -> f_4))
+                       [] -> f_4))
          in
          (case v_2 of
               (:) v_8 v_9 -> (case v_8 of
@@ -2262,7 +2187,7 @@ tagTextMerge = \ v_2 ->
                                                         (((:) (TagText (strConcat (((:) v_10) a))))
                                                            (tagTextMerge b))))
                                   _ -> f_7)
-              _ -> f_7))
+              [] -> f_7))
 tagTextMerge_f
   = \ v_2 f_7 v_8 v_9 v_10 v_12 ->
       (let f_22
@@ -2287,9 +2212,9 @@ tagTextMerge_f
                                                                                                                   v_19)
                                                                                                                  v_20))
                                                                                                  _ -> f_14)
-                                                                           _ -> f_14)
+                                                                           [] -> f_14)
                                              _ -> f_14)
-                       _ -> f_14))
+                       [] -> f_14))
          in
          (case v_12 of
               (:) v_23 v_24 -> (case v_23 of
@@ -2303,7 +2228,7 @@ tagTextMerge_f
                                                             b = (snd a_b)
                                                           in (((,) (((:) v_25) a)) b)))
                                     _ -> f_22)
-              _ -> f_22))
+              [] -> f_22))
 tagTextMerge_g
   = \ v_2 f_7 v_8 v_9 v_10 v_27 v_28 v_29 ->
       (let f_47
@@ -2322,7 +2247,7 @@ tagTextMerge_g
                                                                                   (((:) v_32)
                                                                                      (v_28 v_33)))
                                                                _ -> f_31)
-                                         _ -> f_31))
+                                         [] -> f_31))
                            in
                            (case v_29 of
                                 (:) v_36 v_37 -> (case v_36 of
@@ -2346,9 +2271,9 @@ tagTextMerge_g
                                                                                                                       (v_28
                                                                                                                          v_41))))
                                                                                                    _ -> f_35)
-                                                                                    _ -> f_35)
+                                                                                    [] -> f_35)
                                                       _ -> f_35)
-                                _ -> f_35))
+                                [] -> f_35))
                   in
                   (case v_29 of
                        (:) v_44 v_45 -> (case v_44 of
@@ -2360,7 +2285,7 @@ tagTextMerge_g
                                                                     (((.) v_28) ((:) v_44)))
                                                                    v_45)
                                              _ -> f_43)
-                       _ -> f_43))
+                       [] -> f_43))
          in
          (case v_29 of
               (:) v_48 v_49 -> (case v_48 of
@@ -2383,6 +2308,6 @@ tagTextMerge_g
                                                                                                                v_52))))
                                                                                                      v_53)
                                                                                         _ -> f_47)
-                                                                  _ -> f_47)
+                                                                  [] -> f_47)
                                     _ -> f_47)
-              _ -> f_47))
+              [] -> f_47))

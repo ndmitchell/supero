@@ -8,6 +8,7 @@ import Control.Monad.State
 import Data.IORef
 import Debug.Trace
 import System.IO.Unsafe
+import Data.Time.Clock.POSIX(getPOSIXTime)
 
 
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
@@ -15,6 +16,21 @@ sortOn f = sortBy (compare `on` f)
 
 
 subset x y = null $ x \\ y
+
+fixEq f x = if x == x2 then x else fixEq f x2
+    where x2 = f x
+
+
+getTime :: IO Double
+getTime = (fromRational . toRational) `fmap` getPOSIXTime
+
+timer :: IO () -> IO ()
+timer act = do
+    start <- getTime
+    act
+    end <- getTime
+    print (end - start)
+
 
 
 delFst :: Eq a => a -> [(a,b)] -> [(a,b)]

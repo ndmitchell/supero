@@ -5,6 +5,8 @@ import Desugar
 import Supercompile
 import Type
 import Simplify
+import Simpler
+import Util
 
 import Control.Monad
 import Language.Haskell.Exts
@@ -28,12 +30,11 @@ main = do
         let res = fleshOut src $ prettyPrint $ toHSE $ supercompile $ env $ simplifyProg $ fromHSE $ desugar $
                         fromParseResult $ parseFileContents $ cpphs ["SUPERO"] src
         when ("--only" `notElem` opts) $ do
-            writeFile y res
+            timer $ writeFile y res
         when ("--compile" `elem` opts) $ do
             withDirectory (takeDirectory x) $ do
-                system_ $ "ghc --make -O2 " ++ takeFileName x ++ " -ddump-simpl -cpp -DMAIN -DMAIN_GHC > " ++ takeFileName x ++ ".log"
-                system_ $ "ghc --make -O2 " ++ takeFileName y ++ " -ddump-simpl > " ++ takeFileName y ++ ".log"
-
+                -- system_ $ "ghc --make -O2 " ++ takeFileName x ++ " -ddump-simpl -cpp -DMAIN -DMAIN_GHC > " ++ takeFileName x ++ ".log"
+                timer $ system_ $ "ghc --make -O2 " ++ takeFileName y ++ " -ddump-simpl > " ++ takeFileName y ++ ".log"
 
 -- not unsafe since no include files
 cpphs :: [String] -> String -> String

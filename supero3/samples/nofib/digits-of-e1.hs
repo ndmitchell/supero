@@ -13,8 +13,7 @@ ratTrans :: (Integer,Integer,Integer,Integer) -> ContFrac -> ContFrac
 ratTrans abcd xs = case abcd of
     (a,b,c,d) ->
         let q = b `div` d
-        in case ((signum c == signum d) || (abs c < abs d)) && -- No pole in range
-                 (c+d)*q <= a+b && (c+d)*q + (c+d) > a+b of       -- Next digit is determined
+        in case op'5 a b c d q of       -- Next digit is determined
                 True -> q:ratTrans (c,d,a-q*c,b-q*d) xs
                 False -> case xs of
                     x:xs -> ratTrans (b,a+x*b,d,c+x*d) xs
@@ -30,6 +29,9 @@ root n = take n e
 
 #if MAIN
 main = print $ root 1000
+
+op'5 a b c d q = ((signum c == signum d) || (abs c < abs d)) && -- No pole in range
+                 (c+d)*q <= a+b && (c+d)*q + (c+d) > a+b
 #endif
 
 #if SUPERO

@@ -24,7 +24,9 @@ neg_powers =
   map (zipWith (\n x -> if n then x else negateInteger'1 x) (iterate not True)) powers
 
 pascal:: [[Integer]]
-pascal = (integer1'0:integer2'0:integer1'0:[]) : map (\line -> zipWith (addInteger'2) (line++[integer0'0]) (integer0'0:line)) pascal
+pascal = iterate op (integer1'0:integer2'0:integer1'0:[])
+op line = zipWith (addInteger'2) (line++[integer0'0]) (integer0'0:line)
+
 
 bernoulli :: Int -> Rational
 bernoulli n = case eqInt'2 n int0'0 of

@@ -942,6 +942,7 @@ Some of GHC's optimisations, specifically strictness analysis and unboxing, work
 \begin{tabular}{@@{}lrrrr}
 \textbf{Program} & \textbf{Speed} & \textbf{Space} & \textbf{Size} & \textbf{Compile} \\
 append \\
+bernouilli & 1.04 & 1.02 & 1.02 & 2.4 + 1.3 \\
 charcount \\
 digits-of-e2 & 0.40 & 0.55 & 0.99 & 2.0 + 0.8 \\
 exp3\_8 & 0.93 & 1.00 & 1.08 & 0.5 + 0.8 \\
@@ -958,42 +959,41 @@ wordcount \\
 x2n1 & 0.90 & 1.00 & 1.00 & 0.1 + 0.8 \\
 \end{tabular}
 \\ \\
-\textbf{Program} is the name of the program as given in \S\ref{sec:benchmarks}. The next three columns are relative to \texttt{ghc -O2} compilation being 1.00: \textbf{Speed} is the runtime taken; \textbf{Space} is the maximum resident heap size; \textbf{Size} is the size of the compiled binary on disk. \textbf{Compile-time} is the number of seconds to compile the program, including both compilation with our supercompiler and the subsequent compilation with GHC.
+\textbf{Program} is the name of the program as given in \S\ref{sec:benchmarks}. The next three columns are relative to \texttt{ghc -O2} compilation being 1.00: \textbf{Speed} is the runtime taken; \textbf{Space} is the maximum resident heap size; \textbf{Size} is the size of the compiled binary on disk. \textbf{Compile} $a+b$ is the number of seconds to compile the program, including both compilation with our supercompiler ($a$) and the subsequent compilation with GHC ($b$).
 \caption{Benchmark results.}
 \label{tab:results}
 \end{table}
 
-In this section we benchmark our supercompiler on a range of benchmarks drawn from other papers. The results are given in Table \ref{tab:results}. The benchmarks are:
+In this section we benchmark our supercompiler on a range of benchmarks drawn from other papers. The results are given in Table \ref{tab:results}. The benchmarks we use are:
 
 \begin{itemize}
-\item charcount, linecount and wordcount are taken from our previous supercompiler work \cite{me:iflpost}, with the wordcount being used in \S\ref{sec:introduction}.
-\item digits-of-e2, exp3\_8, primes, rfib, tak and x2n1 are all taken from the Imaginary section of the nofib benchmark suite \cite{nofib}.
-\item sumsquare is the introductory example used in the paper on stream fusion \cite{dcoutts:stream_fusion}.
-\item append, factorial, treeflip, sumtree and raytracer have been used to benchmark previous supercompilers \cite{pejo:popl}, and originate from papers on deforestation \cite{wadler:deforestation,kort:raytracer}.
+\item charcount, linecount and wordcount are taken from our previous supercompiler work \cite{me:supero}, and wordcount is used as an example in \S\ref{sec:introduction}.
+\item bernouilli, digits-of-e2, exp3\_8, primes, rfib, tak and x2n1 are all taken from the Imaginary section of the nofib benchmark suite \cite{nofib}.
+\item sumsquare is the introductory example used in the stream fusion paper \cite{coutts:stream_fusion}.
+\item append, factorial, treeflip, sumtree and raytracer have been used to benchmark other supercompilers \cite{jonsson:supercompilation}, and originate from papers on deforestation \cite{wadler:deforestation,kort:raytracer}.
 \end{itemize}
 
-We have translated these examples from their source language to our Core language by hand. We have taken care to ensure that we have not simplified the programs in translation -- in particular we have inserted explicit dictionaries for all examples that require type classes \cite{wadler:typeclasses}, and have translated list-comprehensions to |concatMap| as described by the Haskell report \cite{haskell}.
+We have translated all the examples from their source language to our Core language manually. We have taken care to ensure that we have not simplified the programs in translation -- in particular we have inserted explicit dictionaries for all examples that require type classes \cite{wadler:typeclasses}, and have translated list-comprehensions to |concatMap| as described by the Haskell report \cite{haskell}.
 
-For all benchmarks we compiled using GHC 6.12.1 \cite{ghc_6_12_1}, on Windows on a 32bit processor with 4Gb of RAM. We normalised the benchmarks so GHC took time 1, and used memory usage 1. We measured the wallclock time, the maximum heap residency and the resulting binary size. All GHC programs were compiled with \texttt{-O2}.
+For comparison purposes, we compiled all the benchmarks with GHC 6.12.1 \cite{ghc_6_12_1}, using the \texttt{-O2} optimisation setting. For our supercompiled results we first ran our supercompiler, then compiled the result using GHC. We ran all benchmarks on Windows 32bit with 4Gb of RAM.
 
+\subsection{Comparison to GHC}
 
-\subsection{Execution Speed}
+The attributes for runtime speed, runtime memory usage and size of the resulting binary are all in comparison to GHC, with GHC having the value 1. In all cases a lower number is better, and less than 1 is an improvement over GHC. Overall our results are good -- the benchmarks are nearly all faster than GHC, with some programs running almost three times faster than GHC alone. The improvement is speed is usually accompanied by either a similar memory usage, or a substantial reduction. The resulting executables are all very close in size to compilation with GHC alone, partly because the runtime system takes up a lot of space regardless, and partly because it just doesn't code bloat much.
 
-See how great we do, yay.
+Some of the benchmarks are primarily numeric computation -- for example factorial, x2n1 and tak. In these cases we suspect that we have inlined some of the functions even though they are recursive, which has been equivalent to a small amount of loop unrolling, which has thus improved execution speed.
 
-For the benchmarks that are primarily numeric computation, such as rfib, x2n1, factorial and tak we suspect the main advantage is we've inlined a little more, perhaps equivalent to loop unrolling.
+For the charcount, linecount and workcount benchmarks we achieve exactly the same result as our previous supercompiler \cite{me:supero}. In many of the benchmarks, such as append, sumtree and raytracer, we eliminate all the intermediate values. These benchmarks can almost be seen as tests of supercompilation -- benchmarks where a sufficiently powerful supercompiler will eliminate all the overhead. These benchmarks give us confidence that even though we have departed significantly from previous supercompilers, we can still perform the same kinds of optimisation.
 
-For wordcount, linecount and charcount we do exactly the same as our previous supercompiler -- which is nice to see, as we haven't screwed it up.
+Some of the other benchmarks have a combination of data structures and numeric computation -- for example primes, digits-of-e2 and exp3\_8. In these cases we get a combination of list fusion and specialisation, eliminating some of the overhead, but the benchmarks mean that not all lists can be eliminated. Looking at exp3\_8 most of our speed gains result from fusing computations over the data type |data Nat = Z || S Nat|. Looking at digits-of-e2 we are able to fuse long pipelines of list functions.
 
-For append, treeflip, sumtree, raytracer and sumsquare we eliminate all intermediate values. These can perhaps be seen as examples of supercompilation classically.
-
-For the other benchmarks, we quite nicely get some list fusion and specialisation in most cases. Primes we do particularly well -- looking at the underlying core we've acheived fusion and specialisation. Looking at exp3\_8 we gain a little by fusing the data type |data Nat = Z || S Nat|.
+The benchmark on which we do worst is bernouilli. The bernouilli program seems reasonably similar in terms of list operations to other benchmarks such as primes, but our supercompiler is unable to outperform GHC -- we have been unable to figure out exactly why. Interesting our previous supercompiler also failed to outperform GHC on this benchmark, as does the stream fusion work. So perhaps the reason is in fact that GHC does a particularly good job on this benchmark.
 
 \subsection{Compilation Speed}
 
-Our compiler is quite quick, we've broken in down in to the time to compile and the result. The tricks we use to speed up compilation are variable normalising, using a map for let expressions, and we could also reduce the termination keys in to |Int|, but we haven't bothered yet.
+Our compiler gives perfectly acceptable compile times -- under four seconds for all benchmarks. We have given all compilation times as two figures -- the time required to run the supercompiler, followed by the time required to compile the result with GHC. In all cases, the resulting GHC compilation time is dominated by the linker. Compared to our previous supercompiler, where compile times ranged from a few seconds to five minutes, our new supercompiler is incredibly fast.
 
-Currently the biggest bottle neck is the simplification method as listed in \S\ref{sec:simplify}. To acheive this result we currently follow the produced:
+While we have designed our compiler for speed, we haven't actually spent much effort optimising the compiler. Profiling shows that the biggest bottle neck is the simplification method as described in \S\ref{sec:simplify}, taking about 80\% of the time. Our simplifier is currently implemented as:
 
 \begin{itemize}
 \item Normalise all variables, starting with |v_1| and onwards.
@@ -1002,13 +1002,11 @@ Currently the biggest bottle neck is the simplification method as listed in \S\r
 \item Normalise again starting at |v_1|.
 \end{itemize}
 
-This nearly always reaches a fixed point, but sometimes the reductions don't quite -- which we consider to be a bug. To fix that, we then take the fixed point. Most compilation time is taken there.
+This nearly always reaches a fixed point, but sometimes the reductions don't quite -- which we consider to be a bug. To fix that, we then take the fixed point. We always normalise all variables right down inside expressions, which is totally unnecessary. We suspect there is a one-pass simplification algorithm that can achieve the same results in a much more efficient manner.
 
-We also spend about a second per program linking. In reality the actual supercompilation time of something like primes is under 0.01 seconds.
+In addition to optimising the simplifier, we have left all of the other stages implemented in the most literal way possible. For example, we have currently implemented the termination check exactly as per \S\ref{sec:term_rule}, traversing and comparing the entire history at each step. It would be simple to optimise this to a mapping from a name bag to a rank (being the highest permitted rank). We could also optimise names to be integers corresponding to both the subexpression name and the function name, although have not yet done so. We could also implement our let expressions as a finite map rather than an association list.
 
-Compared to \cite{me:ifl2007post}, we are much faster. The simplification is easier since we don't descend in to variables. The separate termination histories make it much faster, as they are much smaller. We can write a linear time termination check.
-
-Our compiler is whole program, although we could split it up by defining interface points which are not violated. We haven't bothered to do so yet.
+We think our supercompiler is fast at compile time, but we believe we have barely scratched the surface of speed. By moving away from homeomorphic embedding we get it much faster.
 
 %if 0
 \section{Dead}
@@ -1179,23 +1177,11 @@ The GRIN approach \cite{grin} uses whole program compilation for Haskell. It is 
 
 Need more benchmarks, integrate into a production quality compiler (GHC). Our supercompiler has been designed to run faster, but does it really do so?
 
+Our compiler is whole program, although we could split it up by defining interface points which are not violated. We haven't bothered to do so yet.
+
 \subsection{More Benchmarks}
 
-We really need to translate to a Core language directly. We previously used Yhc Core, but unfortunately that project is now defunct. 
-
-\subsection{Compile Time Performance}
-
-We can implement this construct much more efficiently, in particular significantly more efficiently than a homeomorphic embedding. We can reify this sequence as |Map Name Int|.
-
-We can change names to be a function name and subexpression index combined. We can also free up the last 6 bits to store the constructor count, allowing over 60 million subexpressions even with 32 bit integers. We now have very efficient names.
-
-We can pre-resolve in to a decision table or finite state machine very easily. However, it's not really necessary - the basic test is dead fast, if you use ordered lists.
-
-We currently keep a list of history built using |(:)|, but that's very inefficient. If instead we have a termination context that can manipulate expressions and store more structure it can go faster.
-
-One intruiging possibility is that our supercompiler as described may actually be a great target for partial evaluation. The program being supercompiled is static, and in our supercompiler is not perturbed to the extent of other supercompilers.
-
-It never rewrites expressions, allowing for the tantilising opportunity to partially evaluate the supercompiler.
+We really need to translate to a Core language directly. We previously used Yhc Core, but unfortunately that project is now defunct.
 
 
 \subsection{Run Time Performance}

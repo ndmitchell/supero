@@ -81,8 +81,13 @@
 
 \maketitle
 
+% Grammar:
+% Which is giving additional information, that is giving essential information
+% Run-time library, run-time performance, at runtime.
+% Compile-time library, compile-time performance, at compile time.
+
 \begin{abstract}
-Supercompilation is a program optimisation technique which is very effective at eliminating overheads introduced by program abstractions. We present a new design for a supercompiler, rethinking many of the decisions that have become standard in other supercompilation work. The result is a supercompiler that we find simpler, and that offers good performance both at compile-time and runtime. We have implemented our supercompiler and benchmarked it on a small selection of programs, which run faster than when compiled with GHC.
+Supercompilation is a program optimisation technique which is particularly effective at eliminating unnecessary overheads. We present a new design for a supercompiler, making many novel choices, including different termination criteria and handling of let bindings. The result is a supercompiler that focuses on simplicity, compiles programs quickly and optimises programs well. We have benchmarked our supercompiler, with some programs running twice as fast when compared to GHC compiled versions.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -96,7 +101,7 @@ Haskell, optimisation, supercompilation
 \section{Introduction}
 \label{sec:introduction}
 
-Supercompilation is a technique for program optimisation, that is particularly suited to removing the overhead introduced by abstractions. Consider a program that counts the number of words read from the standard input -- in Haskell \cite{haskell} this can be compactly written as:
+Consider a program that counts the number of words read from the standard input -- in Haskell \cite{haskell} this can be compactly written as:
 
 \begin{code}
 main = print . length . words =<< getContents
@@ -104,22 +109,21 @@ main = print . length . words =<< getContents
 
 Reading the program right to left, we first read the standard input as a string (|getContents|), then split it in to words (|words|), count the number of words (|length|), and print the result (|print|). An equivalent C program is unlikely to use such a high degree of abstraction, and is more likely to get characters and operate on them in a loop using some state which is updated.
 
-Sadly the C program is three times faster, even using the advanced optimising compiler GHC \cite{GHC}. The abstractions that make the program concise have a significant runtime cost. In a previous paper on supercompilation \cite{me:supero} we showed how supercompilation can remove these abstractions, to the stage where the Haskell is even faster than the C version (by about 6\%). In the Haskell program after optimisation all the intermediate lists have been removed, and the |length . words| part of the pipeline is translated into a state machine.
+Sadly the C program is three times faster, even using the advanced optimising compiler GHC \cite{ghc6_12}. The abstractions that make the program concise have a significant runtime cost. In a previous paper \cite{me:supero} we showed how supercompilation can remove these abstractions, to the stage where the Haskell version is faster than the C version (by about 6\%). In the Haskell program after optimisation all the intermediate lists have been removed, and the |length . words| part of the pipeline is translated into a state machine.
 
-One informal description of supercompilation is that you simply ``run the program at compile time''. This description leads to two questions -- what happens if you are blocked on information only available at runtime, and how do you ensure termination? Answering these questions provides the design for a supercompiler. This paper strives to provide simple answers, but which do not reduce the optimisation power. In doing so, we make a large number of departures from the current consensus of supercompiler design.
-
-Our supercompiler is better because we've tried to keep it simple. Our document describes all the little details, in full colour. We have left nothing out. In doing so, we've ended up with a supercompiler that is also fast at compile time, and performs well at runtime. We hope that from the descriptions given in this paper a user is able to write their own supercompiler. Indeed, we have written a supercompiler following this design which is available online at \verb"http://community.haskell.org/~ndm". Much of the code (for example Figure \ref{fig:manager}) has been copied verbatim in to our compiler.
+One informal description of supercompilation is that you simply ``run the program at compile time''. This description leads to two questions -- what happens if you are blocked on information only available at runtime, and how do you ensure termination? Answering these questions provides the design for a supercompiler.
 
 \subsection{Contributions}
 
-Our primary contribution is the design of a new supercompiler (\S\ref{sec:method}). Our supercompiler has many differences from previous supercompilers (\S\ref{sec:comparison}), including a new core language, a substantially different treatment of let expressions, a transformation that never manipulates inside expressions and an entirely new termination criteria. The result is simpler than previous supercompilers, yet still powerful.
+Our primary contribution is the design of a new supercompiler (\S\ref{sec:method}). Our supercompiler has many differences from previous supercompilers (\S\ref{sec:comparison}), including a new core language, a substantially different treatment of let expressions and an entirely new termination criteria. The result is a supercompiler with a number of desirable properties:
 
-In addition, we make the following contributions:
+\begin{description}
+\item[Simple] Our supercompiler is designed to be simple. From the descriptions given in this paper a reader should be able to write their own supercompiler. We have written a supercompiler following our design which is available online\footnote{\verb"http://community.haskell.org/~ndm/supero"}. Much of the code (for example Figure \ref{fig:manager}) has been copied verbatim in to our implementation. The supercompiler can be implemented in under 300 lines of code.
+\item[Fast compilation] Previous supercompilers have reported compilation times of up to five minutes for small examples \cite{me:supero}. Our compilation times are under 3 seconds, and there are many further compile time improvements that could be made (\S\ref{sec:benchmarks_compile}).
+\item[Fast runtime] We have benchmarked our supercompiler on a range of small examples (\S\ref{sec:benchmarks}). Some programs optimised with our supercompiler and then compiled with GHC are more than twice as fast than when compiled with GHC alone.
+\end{description}
 
-\begin{itemize}
-\item We give examples of how our supercompiler performs (\S\ref{sec:manager_example}, \S\ref{sec:term_example}, \S\ref{sec:examples}), including how it subsumes list fusion and specialisation, and what happens when the termination criteria are needed.
-\item We benchmark the supercompiler on a small range of examples (\S\ref{sec:benchmarks}) -- our supercompiler achieves an improvement of up to 60\% when used in combination with GHC, as opposed to GHC alone.
-\end{itemize}
+We give several examples of how our supercompiler performs (\S\ref{sec:manager_example}), including how it subsumes list fusion and specialisation (\S\ref{sec:examples}), and what happens when the termination criteria are needed (\S\ref{sec:term_example}).
 
 \section{Method}
 \label{sec:method}
@@ -935,78 +939,70 @@ GHC uses rewrite rules to eliminate unnecessary lists \cite{spj:rules}. A rewrit
 
 Some of GHC's optimisations, specifically strictness analysis and unboxing, work much better in the absence of lists and higher-order functions. The transformations performed by our supercompiler have allowed these phases to achieve their full potential.
 
+\todo{Note that GHC can't remove lists or apply any fusion because the names have changed, another weakness in it's approach.}
+
 \section{Benchmarks}
 \label{sec:benchmarks}
 
 \begin{table}
 \begin{tabular}{@@{}lrrrr}
-\textbf{Program} & \textbf{Speed} & \textbf{Space} & \textbf{Size} & \textbf{Compile} \\
+\textbf{Program} & \textbf{Compile time} & \textbf{Runtime} & \textbf{Memory} & \textbf{Size} \\
 append \\
-bernouilli & 1.04 & 1.02 & 1.02 & 2.4 + 1.3 \\
+bernouilli & 2.4 + 1.3 & 1.04 & 1.02 & 1.02 \\
 charcount \\
-digits-of-e2 & 0.40 & 0.55 & 0.99 & 2.0 + 0.8 \\
-exp3\_8 & 0.93 & 1.00 & 1.08 & 0.5 + 0.8 \\
+digits-of-e2 & 2.0 + 0.8 & 0.40 & 0.55 & 0.99 \\
+exp3\_8 & 0.5 + 0.8 & 0.93 & 1.00 & 1.08 \\
 factorial \\
 linecount \\
-primes & 0.58 & 0.41 & 0.99 & 0.1 + 0.6 \\
+primes & 0.1 + 0.6 & 0.58 & 0.41 & 0.99 \\
 raytracer \\
-rfib & 0.77 & 1.01 & 0.98 & 0.1 + 0.7 \\
+rfib & 0.1 + 0.7 & 0.77 & 1.01 & 0.98 \\
 sumsquare \\
 sumtree \\
-tak & 0.79 & 1.01 & 0.98 & 0.1 + 0.6 \\
+tak & 0.1 + 0.6 & 0.79 & 1.01 & 0.98 \\
 treeflip \\
 wordcount \\
-x2n1 & 0.90 & 1.00 & 1.00 & 0.1 + 0.8 \\
+x2n1 & 0.1 + 0.8 & 0.90 & 1.00 & 1.00 \\
 \end{tabular}
 \\ \\
-\textbf{Program} is the name of the program as given in \S\ref{sec:benchmarks}. The next three columns are relative to \texttt{ghc -O2} compilation being 1.00: \textbf{Speed} is the runtime taken; \textbf{Space} is the maximum resident heap size; \textbf{Size} is the size of the compiled binary on disk. \textbf{Compile} $a+b$ is the number of seconds to compile the program, including both compilation with our supercompiler ($a$) and the subsequent compilation with GHC ($b$).
+\textbf{Program} is the name of the program as given in \S\ref{sec:benchmarks}. \textbf{Compile time} is the number of seconds to compile the program ($a+b$), including both compilation with our supercompiler ($a$) and the subsequent compilation with GHC ($b$). The final three columns are relative to \texttt{ghc -O2} being 1.00, with a lower number being better. \textbf{Runtime} is how long the optimised program takes to run. \textbf{Memory} is the maximum resident heap size of the optimised program. \textbf{Size} is the size of the optimised program on disk.
 \caption{Benchmark results.}
 \label{tab:results}
 \end{table}
 
-In this section we benchmark our supercompiler on a range of benchmarks drawn from other papers. The results are given in Table \ref{tab:results}. The benchmarks we use are:
+In this section we run our supercompiler over a range of benchmarks drawn from other papers. The results are given in Table \ref{tab:results}. The benchmarks we use are:
 
 \begin{itemize}
-\item charcount, linecount and wordcount are taken from our previous supercompiler work \cite{me:supero}, and wordcount is used as an example in \S\ref{sec:introduction}.
-\item bernouilli, digits-of-e2, exp3\_8, primes, rfib, tak and x2n1 are all taken from the Imaginary section of the nofib benchmark suite \cite{nofib}.
 \item sumsquare is the introductory example used in the stream fusion paper \cite{coutts:stream_fusion}.
+\item charcount, linecount and wordcount are taken from our previous supercompiler work \cite{me:supero}, and wordcount is used as the example in \S\ref{sec:introduction}.
 \item append, factorial, treeflip, sumtree and raytracer have been used to benchmark other supercompilers \cite{jonsson:supercompilation}, and originate from papers on deforestation \cite{wadler:deforestation,kort:raytracer}.
+\item bernouilli, digits-of-e2, exp3\_8, primes, rfib, tak and x2n1 are all taken from the Imaginary section of the nofib benchmark suite \cite{nofib}.
 \end{itemize}
 
-We have translated all the examples from their source language to our Core language manually. We have taken care to ensure that we have not simplified the programs in translation -- in particular we have inserted explicit dictionaries for all examples that require type classes \cite{wadler:typeclasses}, and have translated list-comprehensions to |concatMap| as described by the Haskell report \cite{haskell}.
+We have manually translated all the examples from their source language to our Core language. We have taken care to ensure that we have not simplified the programs in translation -- in particular we have inserted explicit dictionaries for all examples that require type classes \cite{wadler:type_classes}, and have translated list-comprehensions to |concatMap| as described by the Haskell report \cite{haskell}.
 
-For comparison purposes, we compiled all the benchmarks with GHC 6.12.1 \cite{ghc_6_12_1}, using the \texttt{-O2} optimisation setting. For our supercompiled results we first ran our supercompiler, then compiled the result using GHC. We ran all benchmarks on Windows 32bit with 4Gb of RAM.
+For comparison purposes we compiled all the benchmarks with GHC 6.12.1 \cite{ghc6_12}, using the \texttt{-O2} optimisation setting. For the supercompiled results we first ran our supercompiler, then compiled the result using GHC. To run the benchmarks we used a 32bit Windows machine with 4Gb of RAM.
 
 \subsection{Comparison to GHC}
 
-The attributes for runtime speed, runtime memory usage and size of the resulting binary are all in comparison to GHC, with GHC having the value 1. In all cases a lower number is better, and less than 1 is an improvement over GHC. Overall our results are good -- the benchmarks are nearly all faster than GHC, with some programs running almost three times faster than GHC alone. The improvement is speed is usually accompanied by either a similar memory usage, or a substantial reduction. The resulting executables are all very close in size to compilation with GHC alone, partly because the runtime system takes up a lot of space regardless, and partly because it just doesn't code bloat much.
+The benchmarks are nearly all faster than GHC, with some programs running almost three times faster than GHC alone. The improvement in speed is usually accompanied by either a similar memory usage, or a substantial reduction. The resulting executables are all very close in size to compilation with GHC alone -- partly because the run-time system accounts for a substantial proportion of the executable size.
 
-Some of the benchmarks are primarily numeric computation -- for example factorial, x2n1 and tak. In these cases we suspect that we have inlined some of the functions even though they are recursive, which has been equivalent to a small amount of loop unrolling, which has thus improved execution speed.
+\paragraph{Numeric Computation} Some of the benchmarks mainly test numerical performance -- for example factorial, x2n1 and tak. In these benchmarks we have been able to inline some of the functions even though they are recursive, which has been equivalent to a small amount of loop unrolling, and has improved execution speed.
 
-For the charcount, linecount and workcount benchmarks we achieve exactly the same result as our previous supercompiler \cite{me:supero}. In many of the benchmarks, such as append, sumtree and raytracer, we eliminate all the intermediate values. These benchmarks can almost be seen as tests of supercompilation -- benchmarks where a sufficiently powerful supercompiler will eliminate all the overhead. These benchmarks give us confidence that even though we have departed significantly from previous supercompilers, we can still perform the same kinds of optimisation.
+\paragraph{Complete Elimination} Some of the benchmarks allow us to completely eliminate most intermediate values -- for example charcount, sumtree and raytracer. In these cases the execution time and memory both reduce substantially. Most of these benchmarks have previously been used to test supercompilers, and our supercompiler performs the same optimisations.
 
-Some of the other benchmarks have a combination of data structures and numeric computation -- for example primes, digits-of-e2 and exp3\_8. In these cases we get a combination of list fusion and specialisation, eliminating some of the overhead, but the benchmarks mean that not all lists can be eliminated. Looking at exp3\_8 most of our speed gains result from fusing computations over the data type |data Nat = Z || S Nat|. Looking at digits-of-e2 we are able to fuse long pipelines of list functions.
+\paragraph{Partial Elimination} Some of the benchmarks have a combination of data structures and numeric computation -- for example primes, digits-of-e2 and exp3\_8. In these benchmarks we perform specialisation, and remove some intermediate structures, but due to the nature of the benchmarks not all intermediate values can be eliminated. In digits-of-e2 we are able to fuse long pipelines of list fusions. In exp3\_8 most of our performance increase comes from eliminating intermediate values of the data type |data Nat = Z || S Nat|.
 
-The benchmark on which we do worst is bernouilli. The bernouilli program seems reasonably similar in terms of list operations to other benchmarks such as primes, but our supercompiler is unable to outperform GHC -- we have been unable to figure out exactly why. Interesting our previous supercompiler also failed to outperform GHC on this benchmark, as does the stream fusion work. So perhaps the reason is in fact that GHC does a particularly good job on this benchmark.
+\paragraph{Bernouilli} The benchmark on which we do worst is bernouilli. The bernouilli program seems reasonably similar in terms of list operations to other benchmarks such as primes, but our supercompiler is unable to outperform GHC -- the exact reasons are still unclear. Interestingly both our previous supercompiler and the stream fusion work also failed to outperform GHC on this benchmark, so the reason may be that GHC does a particularly good job on this benchmark.
 
 \subsection{Compilation Speed}
+\label{sec:benchmarks_compile}
 
-Our compiler gives perfectly acceptable compile times -- under four seconds for all benchmarks. We have given all compilation times as two figures -- the time required to run the supercompiler, followed by the time required to compile the result with GHC. In all cases, the resulting GHC compilation time is dominated by the linker. Compared to our previous supercompiler, where compile times ranged from a few seconds to five minutes, our new supercompiler is incredibly fast.
+In the benchmarks presented, our supercompiler always takes under four seconds to compile. We have given the compilation times as two figures -- the time taken to run the supercompiler, followed by the time taken to compile the result with GHC. In all cases, the resulting GHC compilation time is dominated by the linker. Compared to our previous supercompiler, where compile times ranged from a few seconds to five minutes, our new supercompiler is substantially faster.
 
-While we have designed our compiler for speed, we haven't actually spent much effort optimising the compiler. Profiling shows that the biggest bottle neck is the simplification method as described in \S\ref{sec:simplify}, taking about 80\% of the time. Our simplifier is currently implemented as:
+While we have designed our supercompiler with compilation speed in mind, we haven't focused on optimising the compiler -- all functions are implemented as simply as possible. Profiling shows that 80\% of the compilation time is spent in the simplifications described in \S\ref{sec:simplify}. Our simplification method is currently written as a transformation that is applied until a fixed point is reached -- we believe the simplification can be implemented in one pass, leading to a substantial compile time reduction.
 
-\begin{itemize}
-\item Normalise all variables, starting with |v_1| and onwards.
-\item Apply all the reductions, looping round.
-\item Normalise all the variables, starts with |w_1| and onwards.
-\item Normalise again starting at |v_1|.
-\end{itemize}
-
-This nearly always reaches a fixed point, but sometimes the reductions don't quite -- which we consider to be a bug. To fix that, we then take the fixed point. We always normalise all variables right down inside expressions, which is totally unnecessary. We suspect there is a one-pass simplification algorithm that can achieve the same results in a much more efficient manner.
-
-In addition to optimising the simplifier, we have left all of the other stages implemented in the most literal way possible. For example, we have currently implemented the termination check exactly as per \S\ref{sec:term_rule}, traversing and comparing the entire history at each step. It would be simple to optimise this to a mapping from a name bag to a rank (being the highest permitted rank). We could also optimise names to be integers corresponding to both the subexpression name and the function name, although have not yet done so. We could also implement our let expressions as a finite map rather than an association list.
-
-We think our supercompiler is fast at compile time, but we believe we have barely scratched the surface of speed. By moving away from homeomorphic embedding we get it much faster.
+We have implemented the termination check exactly as described in \S\ref{sec:term_rule}, traversing and comparing the entire history at each step. For our termination check it is simple to change the history to a mapping from a name bag to a rank (being the highest permitted rank) -- reducing algorithmic the complexity. We could also optimise the representation of names, using a single integer for both the function name and subexpression index.
 
 %if 0
 \section{Dead}
@@ -1173,31 +1169,32 @@ The GRIN approach \cite{grin} uses whole program compilation for Haskell. It is 
 
 \section{Conclusions and Future Work}
 
-\todo{this section is not finished}
-
-Need more benchmarks, integrate into a production quality compiler (GHC). Our supercompiler has been designed to run faster, but does it really do so?
-
-Our compiler is whole program, although we could split it up by defining interface points which are not violated. We haven't bothered to do so yet.
+We see two main avenues for future work: increasing the range of benchmarks, and improving the runtime performance.
 
 \subsection{More Benchmarks}
 
-We really need to translate to a Core language directly. We previously used Yhc Core, but unfortunately that project is now defunct.
+We really need to translate to a Core language directly. We previously used Yhc Core \cite{yhc_core}, but unfortunately that project is now defunct. Need more benchmarks, integrate into a production quality compiler (GHC). We need lots of benchmarks, including real world stuff.
 
+Our compiler is whole program, although we could split it up by defining interface points which are not violated. We haven't bothered to do so yet. Our supercompiler is sufficiently fast at compile-time, but we believe it could be made much faster. We think our supercompiler is fast at compile time, but we believe we have barely scratched the surface of speed. By moving away from homeomorphic embedding we get it much faster.
 
-\subsection{Run Time Performance}
+There are some things we don't yet cover, such a value recursive let bindings. Perhaps we need to add them.
 
-What about merging a rules engine.
+\subsection{Runtime Performance}
 
-What about strictness analysis.
+What about merging a rules engine. Much of what we do can be removed, but some can't.
+
+What about strictness analysis. A big benefit, and if it was more tightly integrated it might do better.
+
+It's nice to know that some particular list/structure has been eliminated entirely, perhaps have an annotation for that.
 
 \subsection{Conclusions}
 
-We have presented a supercompiler which is simple, and has found practical use. What a great result. By striving for simplicity we think we've got something better than previously.
+We have presented a new design for a supercompiler, that is designed to be simple, is fast at compile time and achieves good performance results. Supercompilation generalises many existing optimisations, requires no special knowledge to achieve fusion and has no phases. Supercompilation has the potential to drastically simplify an optimising compiler while still acheiving greater performance. We believe our supercompiler would be an excellent basis to start from.
 
 
 \subsection*{Acknowledgements}
 
-I would like to thank lots of people for helpful ideas and discussions. Particularly I'd like to thank Max Bolingbroke, Jason Reich, Simon Peyton Jones and Peter Jonsson. Thanks to Ketil Malde for providing further inspiration to continue researching supercompilation. Thanks to Mike Dodds and Emily Mitchell for proof helpful suggestions.
+I would like to thank Max Bolingbroke, Jason Reich, Simon Peyton Jones and Peter Jonsson for helpful discussion. Thanks to Ketil Malde for providing further inspiration to continue researching supercompilation. Thanks to Mike Dodds and Emily Mitchell for comments on earlier drafts.
 
 \bibliographystyle{plainnat}
 \bibliography

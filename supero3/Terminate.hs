@@ -17,13 +17,13 @@ progress (History n _ _) msg = trace (msg ++ " = " ++ show n) False
 
 
 terminate :: (Bag -> Bag -> Bool) -> History -> Exp -> Bool
-terminate (<) (History _ _ bs) x = if not $ all (getBag x <) bs then trace "terminate" True else False
+terminate (<) (History _ hs bs) x = if not $ all (getBag x <) bs then trace "terminate" True else False
     where
-        -- bad = head $ filter (not . (x <)) hist
-        --info = error $ prettyNames bad ++
-        --       "\n WHEN TRYING TO ADD\n" ++ prettyNames x ++
-        --       "\n BECAUSE OF\n" ++ show (getBag x \\ getBag bad) ++ "\n" ++
-        --       show ("<",x<bad,"==",x==bad,"bageq",getBag x == getBag bad,"<|",x<|bad,"<=|",x<=|bad)
+        bad = head $ filter (not . (getBag x <) . getBag) hs
+        info = error $ prettyNames bad ++
+               "\n WHEN TRYING TO ADD\n" ++ prettyNames x ++
+               "\n BECAUSE OF\n" ++ show (getBag x \\ getBag bad) ++ "\n" ++
+               show ("<",getBag x < getBag bad,"==",x==bad,"bageq",getBag x == getBag bad,"<|",getBag x <| getBag bad,"<=|",getBag x <=| getBag bad)
     
 --    where
 --        info = error $ prettyNames (head hist) ++ "\n AGAINST \n" ++ prettyNames x ++ "\n" ++ show (getBag x ,getBag y)

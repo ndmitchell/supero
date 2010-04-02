@@ -1,11 +1,9 @@
 
 module Main where
 
-import Desugar
 import Supercompile
 import Type
 import Simplify
-import Simpler
 import Util
 
 import Control.Monad
@@ -27,7 +25,7 @@ main = do
     forM_ files $ \x -> do
         let y = dropExtension x <.> "opt.hs"
         src <- readFile x
-        let res = fleshOut src $ prettyPrint $ toHSE $ supercompile $ env $ simplifyProg $ fromHSE $ desugar $
+        let res = fleshOut src $ prettyPrint $ toHSE $ supercompile $ env $ simplifyProg $ fromHSE $
                         fromParseResult $ parseFileContents $ cpphs ["SUPERO"] src
         when ("--only" `notElem` opts) $ do
             timer $ writeFile y res

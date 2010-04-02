@@ -33,8 +33,8 @@ main = do
             timer $ writeFile y res
         when ("--compile" `elem` opts) $ do
             withDirectory (takeDirectory x) $ do
-                -- system_ $ "ghc --make -O2 " ++ takeFileName x ++ " -ddump-simpl -cpp -DMAIN -DMAIN_GHC > " ++ takeFileName x ++ ".log"
                 timer $ system_ $ "ghc --make -O2 " ++ takeFileName y ++ " -ddump-simpl > " ++ takeFileName y ++ ".log"
+                system_ $ "ghc --make -O2 " ++ takeFileName x ++ " -ddump-simpl -cpp -DMAIN -DMAIN_GHC > " ++ takeFileName x ++ ".log"
 
 -- not unsafe since no include files
 cpphs :: [String] -> String -> String

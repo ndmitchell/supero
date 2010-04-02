@@ -33,7 +33,7 @@ optimise env = f newHistory
                  -- | progress t "optimse" = undefined
                  | terminate (<=|) t x = g x (stop t x) t
                  | otherwise = g x (reduce env x) (x += t)
-           g x (gen,cs) t = {- trace (pretty $ gen (repeat "call")) $ -} Tree x gen (map (f t) cs)
+           g x ~(gen,cs) t = {- trace (pretty $ gen (repeat "call")) $ -} Tree x gen (map (f t) cs)
 
 
 reduce :: Env -> Exp -> ([Var] -> Exp, [Exp])

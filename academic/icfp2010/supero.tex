@@ -70,7 +70,7 @@
 % \CopyrightYear{2009}
 % \copyrightdata{978-1-60558-508-6/09/09}
 
-\titlebanner{\today{} - \currenttime{}}        % These are ignored unless
+% \titlebanner{\today{} - \currenttime{}}        % These are ignored unless
 \preprintfooter{}   % 'preprint' option specified.
 
 \title{Rethinking Supercompilation}
@@ -87,7 +87,7 @@
 % Compile-time library, compile-time performance, at compile time.
 
 \begin{abstract}
-Supercompilation is a program optimisation technique which is particularly effective at eliminating unnecessary overheads. We present a new design for a supercompiler, making many novel choices, including different termination criteria and handling of let bindings. The result is a supercompiler that focuses on simplicity, compiles programs quickly and optimises programs well. We have benchmarked our supercompiler, with some programs running twice as fast when compared to GHC compiled versions.
+Supercompilation is a program optimisation technique that is particularly effective at eliminating unnecessary overheads. We have designed a new supercompiler, making many novel choices, including different termination criteria and handling of let bindings. The result is a supercompiler that focuses on simplicity, compiles programs quickly and optimises programs well. We have benchmarked our supercompiler, with some programs running more than twice as fast than when compiled with GHC.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -107,7 +107,7 @@ Consider a program that counts the number of words read from the standard input 
 main = print . length . words =<< getContents
 \end{code}
 
-Reading the program right to left, we first read the standard input as a string (|getContents|), then split it in to words (|words|), count the number of words (|length|), and print the result (|print|). An equivalent C program is unlikely to use such a high degree of abstraction, and is more likely to get characters and operate on them in a loop using some state which is updated.
+Reading the program right to left, we first read the standard input as a string (|getContents|), then split it in to words (|words|), count the number of words (|length|), and print the result (|print|). An equivalent C program is unlikely to use such a high degree of abstraction, and is more likely to get characters and operate on them in a loop while updating some state.
 
 Sadly, such a C program is three times faster, even using the advanced optimising compiler GHC \cite{ghc6_12}. The abstractions that make the program concise have a significant runtime cost. In a previous paper \cite{me:supero} we showed how supercompilation can remove these abstractions, to the stage where the Haskell version is \textit{faster} than the C version (by about 6\%). In the Haskell program after optimisation, all the intermediate lists have been removed, and the |length . words| part of the pipeline is translated into a state machine.
 
@@ -179,7 +179,7 @@ Our Core language for expressions is given in Figure \ref{fig:core}, and has muc
 \item Variables may be either local (bound in an expression), or global (bound in the environment). We require that all global variables occur as the first argument of |App|.
 \end{itemize}
 
-We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place. Bound variables have an arity based on the number of lambda arguments they have -- i.e. |v = \x y -> z| causes |v| to have arity 2. Variables without definitions are assumed to have arity 0, unless they are primitives of known arity (i.e. integer addition has arity 2). In our example |map| has arity 2 and |root| has arity 3. The arity of |f|, |g| and |x| are all 0 as they lack definitions.
+We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place. Bound variables have an arity based on the number of lambda arguments they have -- i.e. |v = \x y -> z| causes |v| to have arity 2. Variables without definitions are assumed to have arity 0, unless they are primitives of known arity (e.g. integer addition has arity 2). In our example |map| has arity 2 and |root| has arity 3. The arity of |f|, |g| and |x| are all 0 as they lack definitions.
 
 We write expressions using standard Haskell syntax (e.g. |let| for |Let|, |case| for |Case| etc.). Rewriting the |map|/|map| example in our Core language gives:
 
@@ -187,6 +187,7 @@ We write expressions using standard Haskell syntax (e.g. |let| for |Let|, |case|
 root = \g f x ->  let  v_1 =  map f x
                        v_2 =  map g v_1
                   in   v_2
+\end{code}\begin{code}
 map = \f x -> case  x of
                     []    ->   let  v_1 = []
                                in   v_1
@@ -196,7 +197,7 @@ map = \f x -> case  x of
                                in   v_3
 \end{code}
 
-Our Core language can be rather verbose, so we sometimes use a superset of our Core language, assuming these expressions are translated to our Core language when necessary. For example, we might write |map| as:
+Our Core language can be rather verbose, so we sometimes use a superset of our Core language, assuming the expressions are translated to our Core language when necessary. For example, we might write |map| as:
 
 \begin{code}
 map = \f x -> case  x of
@@ -207,7 +208,7 @@ map = \f x -> case  x of
 \subsection{Simplified Core}
 \label{sec:simplify}
 
-We now define a simplified form of our Core language. When working with Core expressions we assume they are always simplified, and after constructing new expressions we always simplify them. Our simplified form requires that the root of a function be a sequence of lambda expressions, followed by a let expression -- which we call the \textit{root let}. The expressions bound at the root let must \textit{not} have the following form:
+We now define a simplified form of our Core language. When working with Core expressions we assume they are always simplified, and after constructing new expressions we always simplify them. Our simplified form requires that the root of a function be a sequence of lambda expressions, followed by a let expression -- which we call the \textit{root let}. The expressions bound at the root let must not have the following form:
 
 \begin{itemize}
 \item |App v []|, where |v| is bound at the root let -- we can remove the binding by inlining it.
@@ -215,7 +216,7 @@ We now define a simplified form of our Core language. When working with Core exp
 \item |App v vs|, where |v| is bound to |App w ws| and the arity of |w| is higher than the length of |ws| -- the |App| can be replaced with an |App| with more arguments.
 \item |App v vs|, where |v| is bound to a |Lam| -- the |App| can be replaced with the body of the lambda, with the variable substituted.
 \item |Case v w|, where |v| is bound to a |Con| -- the |Case| can be replaced with the appropriate alternative.
-\item |Let vs w| -- the nested bindings can be lifted in to the root let, renaming variables if necessary.
+\item |Let bs v| -- the bindings can be lifted into the root let, renaming variables if necessary.
 \end{itemize}
 
 We also remove any bindings which are not used, and ensure all bound variables are unique. As an example, we can simplify the following expression:
@@ -277,7 +278,7 @@ flatten = nubBy (\t_1 t_2 -> pre t_1 == pre t_2) . f []
 
 assign :: [Tree] -> [(Var,Exp)]
 assign ts = [(f t, gen t (map f (children t))) |  t <- ts]
-    where  f t = fromJust $ lookup (pre t) names
+    where  f t = fromJust (lookup (pre t) names)
            names = zip (map pre ts) functionNames
 \end{code}
 \caption{The |supercompile| function.}
@@ -303,7 +304,7 @@ Our supercompiler is based around a manager, that integrates the answers to the 
 
 Our supercompiler takes a source program, and generates a target program. Functions in these programs are distinct -- target expressions cannot refer to source functions. The source and target program are equivalent, but hopefully the target program runs faster. We use the type |Env| to represent a mapping from source function names to expressions, allowing a result of |Nothing| to indicate a primitive function.
 
-The manager first builds a tree (the type |Tree|), where each node has a source expression (|pre|) and an equivalent target expression. The target expression may call target functions, but these functions do not yet have names. Therefore, we store target expressions as a generator that when given the function names produces the target expression (|gen|), and a list of trees for the functions it calls (|children|). We then flatten this tree, ensuring identical functions are only included once, and assign names to each node to generate the target program. If a target function is recursive then the initial tree will be infinite, but the flattened tree will always be finite due to the termination scheme defined in \S\ref{sec:term}.
+The manager first builds a tree (the type |Tree|), where each node has a source expression (|pre|) and an equivalent target expression. The target expression may call target functions, but these functions do not yet have names. Therefore, we store target expressions as a generator that when given the function names produces the target expression (|gen|), and a list of trees for the functions it calls (|children|). We then flatten this tree, ensuring identical functions are only included once, and assign names to each node before generating the target program. If a target function is recursive then the initial tree will be infinite, but the flattened tree will always be finite due to the termination scheme defined in \S\ref{sec:term}.
 
 \newcommand{\function}[1]{\paragraph{\textsf{#1:}}\hspace{-3mm}}
 
@@ -311,7 +312,7 @@ The manager first builds a tree (the type |Tree|), where each node has a source 
 
 \function{optimise} This function constructs the tree of result functions. While the tree may be infinite, we demand that any infinite path from the root must encounter the same |pre| value more than once. We require that for any infinite sequence of distinct expressions |h|, there must exist an |i| such that |terminate (<=||) (take i h) (h !! i+1)| returns |True|. If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |stop h| only produces subexpressions which pass the termination test. If the termination criteria do not force us to stop, then we call |reduce| to evaluate the expression.
 
-\function{reduce} This function optimises a function by repeatedly evaluating it with calls to |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence of expressions |h|, there must exist an |i| such that |terminate (<||) (take i h) (h !! i+1)| returns |True|.
+\function{reduce} This function optimises an expression by repeatedly evaluating it with calls to |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence of expressions |h|, there must exist an |i| such that |terminate (<||) (take i h) (h !! i+1)| returns |True|.
 
 \function{flatten} This function takes a tree and extracts a finite number of functions from it, assuming the termination restrictions given in |optimise|. Our |flatten| function will only keep one tree associated with each source expression. These trees may have different target expressions if one resulted from a call to |stop|, while another resulted from a call to |reduce| -- but all are semantically equivalent.
 
@@ -361,7 +362,7 @@ The termination history is empty, so we call |reduce|, which calls |step| repeat
            in   v
 \end{code}
 
-The |step| function now returns |Nothing|, since we cannot evaluate further without the result of |x|. We therefore call |split| which results in (using the notation from \S\ref{sec:child_notation}):
+The |step| function now returns |Nothing|, since we cannot evaluate further without the result of |x|. We therefore call |split|, which results in (using the notation from \S\ref{sec:child_notation}):
 
 \begin{code}
 \g f x -> case  x of
@@ -379,7 +380,7 @@ Looking at the first child expression, where |x = []|, the simplification rules 
     in   v
 \end{code}
 
-Which simplifies to:
+\noindent Which simplifies to:
 
 \begin{code}
 \g f z zs ->  let  v   = q : qs
@@ -478,13 +479,13 @@ As always, after generating a new expression we immediately apply the simplifica
 \subsection{Evaluation Splitting}
 \label{sec:eval_split}
 
-If evaluation cannot proceed we split to produce a target expression, and a list of child expressions for further optimisation, using the |<? bullet ?>| notation described in \S\ref{sec:child_notation}. When splitting an expression there are three concerns:
+If evaluation cannot proceed, we split to produce a target expression, and a list of child expressions for further optimisation, using the |<? bullet ?>| notation described in \S\ref{sec:child_notation}. When splitting an expression there are three concerns:
 
 \paragraph{Permit further optimisation:} We aim to place any constructs blocking evaluation in the target expression, so that the children are suitable for further optimisation.
 
 \paragraph{No unbounded loss of sharing:} A complex variable cannot be duplicated if that causes it to be evaluated multiple times at runtime. The target program cannot remove sharing present in the source program.
 
-\paragraph{Keep expressions together:} If we split variables bound at the same let expression in to separate child expressions we loose optimisation opportunities, as the right-hand side of the variable is no longer available for optimisation. We aim to keep as many expressions together as possible, but not if that looses sharing.
+\paragraph{Keep expressions together:} If we split variables bound at the same let expression in to separate child expressions we lose optimisation opportunities, as the right-hand side of the variable is no longer available for optimisation. We aim to keep as many expressions together as possible, but not if that loses sharing.
 
 \smallskip
 We split in one of three different ways, depending on the type of the next expression to be evaluated (as described in \S\ref{sec:eval}). We now describe each of the three ways to split, in each case we start with an example, then define the general rule.
@@ -501,19 +502,19 @@ If the next expression is a case expression then we make the target a similar ca
        in    v
 \end{code}
 
-\noindent We produce the residual expression:
+\noindent We split to produce:
 
 \begin{code}
 \x ->  case x of
        []    -> <?  let  v =  case x of [] -> []; y:ys -> add y ys
                          x =  []
-                    in   x ?>
+                    in   v ?>
        y:ys  -> <?  let  v =  case x of [] -> []; y:ys -> add y ys
                          x =  y:ys
-                    in   x ?>
+                    in   v ?>
 \end{code}
 
-Looking more closely at the second alternative, we start with the expression:
+Looking more closely at the second child, we start with the expression:
 
 \begin{code}
 \y ys ->  let  v  = case x of [] -> []; y:ys -> add y ys
@@ -537,15 +538,15 @@ More generally, if |s| is the next expression to evaluate:
           in   v
 \end{code}
 
-\noindent After |split| becomes:
+\noindent After |split| it becomes:
 
-\begin{code}
+\begin{onepage}\begin{code}
 \free -> case x of
     p_1  -> <? let  s    = case x of p_1 -> e_1'; p_m -> e_m'
                     v_1  = e_1; v_n = e_n; x = p_1 in v ?>
     p_m  -> <? let  s    = case x of p_1 -> e_1'; p_m -> e_m'
                     v_1  = e_1; v_n = e_n; x = p_m in v ?>
-\end{code}
+\end{code}\end{onepage}
 
 \subsubsection{Lambda}
 \label{sec:eval_split_lambda}
@@ -559,7 +560,7 @@ If the top of the stack is a lambda, then we place a lambda in the target progra
        in   s
 \end{code}
 
-The |add| function takes two arguments, but only has one so far. It is tempting to rewrite |\x -> ...| as |\x y -> ...|, but this potentially duplicates the expensive computation of |v_1|. Instead, we create child expressions for every variable binding and for the body of the lambda:
+The |add| function takes two arguments, but only has one so far. It is tempting to rewrite |\x -> ...| as |\x y -> ...|, but this potentially duplicates the expensive computation of |v_1|. Instead, we create child expressions for every variable binding, and for the body of the lambda:
 
 \begin{code}
 \x ->  let  s    = \y -> <? add v_1 y ?>
@@ -576,7 +577,7 @@ Unfortunately, we have now split the bindings for |v_1| and |v_2| apart, when th
        in   s
 \end{code}
 
-We now continue to optimise the body of |v_1|, and the body of lambda, which will now be able to evaluate add. More generally, given:
+We will now optimise the body of |v_1|, and the body of the lambda, which will be able to evaluate |add|. More generally, given:
 
 \begin{code}
 \free ->  let  s    = \x -> e'
@@ -585,7 +586,7 @@ We now continue to optimise the body of |v_1|, and the body of lambda, which wil
           in   v
 \end{code}
 
-We rewrite:
+\noindent We rewrite:
 
 \begin{code}
 \free ->  let  s    = \x -> <? e' ?>
@@ -594,19 +595,19 @@ We rewrite:
           in   v
 \end{code}
 
-We then repeatedly move any binding |v_i| under |v_j| if either: 1) |v_i| is only used within the body of |v_j|; or 2) the expression bound to |v_i| is cheap. We define an expression to be cheap if it is a constructor, or an application to a variable |v| with fewer arguments than the arity of |v| (a partial application). The intention of moving bindings is to increase sharing, which can be done provided we don't duplicate work (condition 1) or the work duplicated is bounded (condition 2).
+We then repeatedly move any binding |v_i| under |v_j| if either: 1) |v_i| is only used within the body of |v_j|; or 2) the expression bound to |v_i| is cheap. We define an expression to be cheap if it is a constructor, or an application to a variable |v| with fewer arguments than the arity of |v| (a partial application). The intention of moving bindings is to increase sharing, which can be done provided we don't duplicate work (condition 1), or if the work duplicated is bounded (condition 2).
 
 \subsubsection{Anything Else}
 \label{sec:eval_split_other}
 
 The final rule applies if the next expression is not a case expression or a lambda, including a constructor, a variable, and an application of a variable not bound in the environment. We do not deal with variables bound in the environment, as these are handled by |step|. Given the example:
 
-\begin{code}
+\begin{onepage}\begin{code}
 \x y ->  let  v_1 = expensive x
               v_2 = v_1 x
               v_3 = Con v_2 y v_2
          in   v_3
-\end{code}
+\end{code}\end{onepage}
 
 \noindent We turn each binding into a child, apart from the next binding to be evaluated:
 
@@ -701,7 +702,7 @@ The |terminate| function returns |False| if given a well-formed sequence (|h|), 
 
 \lemma{Any well-formed sequence under $\lhd$ is finite}
 
-Given a finite alphabet $\Sigma$, any well-formed sequence under $\lhd$ is finite. Consider a well-formed sequence $x_1\ldots$. We can partition this sequence into at most $2^\Sigma$ subsequences using set equality. Consider any subsequence $y_1\ldots$. For any two elements in the subsequence, $\set(y_i) \not\equiv \set(y_j)$ will be false, due to the partitioning. Therefore, for the sequence to be well-formed, $i < j \Rightarrow \# y_j < \# y_i$. Therefore there can be at most $\#y_1+1$ elements in any particular subsequence. Combined with a finite number of subsequences, we conclude that any well-formed sequence is finite.
+Given a finite alphabet $\Sigma$, any well-formed sequence under $\lhd$ is finite. Consider a well-formed sequence $x_1\ldots$. We can partition this sequence into at most $2^\Sigma$ subsequences using set equality. Consider any subsequence $y_1\ldots$. For any two elements in this subsequence, $\set(y_i) \not\equiv \set(y_j)$ will be false, due to the partitioning. Therefore, for the sequence to be well-formed, $i < j \Rightarrow \# y_j < \# y_i$. Therefore there can be at most $\#y_1+1$ elements in any particular subsequence. Combined with a finite number of subsequences, we conclude that any well-formed sequence is finite.
 
 \lemma{Any well-formed sequence under $\unlhd$ has a finite number of distinct elements.}
 
@@ -735,7 +736,7 @@ The termination properties in \S\ref{sec:manager} are satisfied by the lemmas in
 \subsubsection{Termination Splitting}
 \label{sec:term_split}
 
-If we are forced to terminate we call |stop|, which splits the expression into several subexpressions, much like |split| (see \S\ref{sec:eval_split}). We require that |split h e| only produces subexpressions which are not forced to terminate by |terminate (<=||) h|. We trivially satisfy this requirement by using the termination criteria when writing |split|.
+If we are forced to terminate we call |stop|, which splits the expression into several subexpressions, much like |split| (see \S\ref{sec:eval_split}). We require that |split h e| only produces subexpressions which are not forced to terminate by |terminate (<=||) h|. We trivially satisfy this requirement by using the termination criteria when defining |split|.
 
 Given an expression:
 
@@ -814,7 +815,7 @@ We can rewrite these expressions in our core language, with annotations for name
     in   v_1
 \end{code}
 
-Under $\unlhd$ the first two expressions create a well-formed sequence, but the first three expressions do not. The first expression is permitted because the history is empty. The second expression is permitted because it has a different set of names from the first. The third item has the same set of names as the second, and has a higher cardinality. Therefore, when optimising, we call |stop| on the third expression. After calling |stop| we get:
+Under $\unlhd$ the first two expressions create a well-formed sequence, but the first three expressions do not. The first expression is permitted because the history is empty. The second expression is permitted because it has a different set of names from the first. The third expression has the same set of names as the second, and has a higher cardinality. Therefore, when optimising, we call |stop| on the third expression. After calling |stop| we get:
 
 \begin{code}
 \x_1 x_2 x_3 ->
@@ -833,8 +834,6 @@ Part of the accumulator has been bound to |v_3|, and separated from the main exp
 \x_1 -> rev [] x_1                          -- |reduce|
 \x_1 x_2 -> rev (x_1:[]) x_2                -- |reduce|
 \x_1 x_2 x_3 -> rev (x_1:x_2:[]) x_3        -- |stop|
-\x_1 x_2 x_3 -> rev (x_1:x_2) x_3           -- |reduce|
-\x_1 x_2 x_3 x_4 -> rev (x_1:x_2:x_3) x_4   -- |stop|
 \x_1 x_2 x_3 -> rev (x_1:x_2) x_3           -- |reduce|
 \x_1 x_2 x_3 x_4 -> rev (x_1:x_2:x_3) x_4   -- |stop|
 \x_1 x_2 x_3 -> rev (x_1:x_2) x_3           -- |reduce|
@@ -876,7 +875,7 @@ In this section we describe some possible design alternatives for our supercompi
 \subsubsection{Binary Application}
 \label{sec:binaryapp}
 
-Our first version of this supercompiler had binary application, rather than vector application. The |App Var [Var]| constructor was replaced by a combination of |Var Var| and |App Var Var|. The reason for originally choosing binary application is that it is closer to other Core languages, and the simplification does not need to track arity information. There were three main reasons for moving to vector application:
+The first version of this supercompiler had binary application, rather than vector application. The |App Var [Var]| constructor was replaced by a combination of |Var Var| and |App Var Var|. The reason for originally choosing binary application is that it is closer to other Core languages, and the simplification does not need to track arity information. There were three main reasons for moving to vector application:
 
 \begin{itemize}
 \item Vector application simplifies splitting with primitive functions, by providing the arity information directly.
@@ -978,7 +977,7 @@ In this section we run our supercompiler over a range of benchmarks drawn from o
 
 \begin{itemize}
 \item sumsquare is the introductory example used in the stream fusion paper \cite{coutts:stream_fusion}.
-\item charcount, linecount and wordcount are taken from our previous supercompiler work \cite{me:supero}, and wordcount is used as the example in \S\ref{sec:introduction}.
+\item charcount, linecount and wordcount are taken from our previous supercompiler work \cite{me:supero}, and wordcount is used as the example in \S\ref{sec:introduction}. For these benchmarks we have removed the actual IO operations, leaving the cost of the actual computation.
 \item append, factorial, treeflip, sumtree and raytracer have been used to benchmark other supercompilers \cite{jonsson:supercompilation}, and originate from papers on deforestation \cite{wadler:deforestation,kort:raytracer}.
 \item bernouilli, digits-of-e2, exp3\_8, primes, rfib, tak and x2n1 are all taken from the Imaginary section of the nofib benchmark suite \cite{nofib}.
 \end{itemize}
@@ -989,13 +988,13 @@ For comparison purposes we compiled all the benchmarks with GHC 6.12.1 \cite{ghc
 
 \subsection{Comparison to GHC}
 
-The benchmarks are nearly all faster than GHC, with some programs running almost three times faster than GHC alone. The improvement in speed is usually accompanied by either a similar memory usage, or a substantial reduction. The resulting executables are all very close in size to compilation with GHC alone -- partly because the run-time system accounts for a substantial proportion of the executable size.
+The benchmarks are nearly all faster than GHC, with some programs running substantially faster than GHC alone. The improvement in speed is usually accompanied by either a similar memory usage, or a substantial reduction. The resulting executables are all very close in size to compilation with GHC alone -- partly because the run-time system accounts for a substantial proportion of the executable size.
 
-\paragraph{Numeric Computation} Some of the benchmarks mainly test numerical performance -- for example factorial, x2n1 and tak. In these benchmarks we have been able to inline some of the functions even though they are recursive, which has been equivalent to a small amount of loop unrolling, and has improved execution speed.
+\paragraph{Numerical Computation} Some of the benchmarks mainly test numerical performance -- for example factorial, x2n1 and tak. In these benchmarks we have been able to inline some of the functions even though they are recursive, which has been equivalent to a small amount of loop unrolling, and has sometimes improved execution speed.
 
 \paragraph{Complete Elimination} Some of the benchmarks allow us to completely eliminate most intermediate values -- for example charcount, sumtree and raytracer. In these cases the execution time and memory are both substantially reduced. Most of these benchmarks have previously been used to test supercompilers, and our supercompiler performs the same optimisations.
 
-\paragraph{Partial Elimination} Some of the benchmarks have a combination of data structures and numeric computation -- for example primes, digits-of-e2 and exp3\_8. In these benchmarks we perform specialisation, and remove some intermediate values, but due to the nature of the benchmarks not all intermediate values can be eliminated. In digits-of-e2 we are able to fuse long pipelines of list fusions. In exp3\_8 most of our performance increase comes from eliminating intermediate values of the data type |data Nat = Z || S Nat|.
+\paragraph{Partial Elimination} Some of the benchmarks have a combination of data structures and numerical computation -- for example primes, digits-of-e2 and exp3\_8. In these benchmarks we perform specialisation, and remove some intermediate values, but due to the nature of the benchmarks not all intermediate values can be eliminated. In digits-of-e2 we are able to fuse long pipelines of list fusions. In exp3\_8 most of our performance increase comes from eliminating intermediate values of the data type |data Nat = Z || S Nat|.
 
 \paragraph{Bernouilli} The benchmark on which we do worst is bernouilli. The bernouilli program seems reasonably similar in terms of list operations to other benchmarks such as primes, but our supercompiler is unable to outperform GHC -- the exact reasons are still unclear. Interestingly, both our previous supercompiler and the stream fusion work also failed to outperform GHC on this benchmark, so the reason may be that GHC does a particularly good job on this benchmark.
 
@@ -1006,7 +1005,7 @@ In the benchmarks presented, our supercompiler always takes under four seconds t
 
 While we have designed our supercompiler with compilation speed in mind, we haven't focused on optimising the compiler -- all functions are implemented as simply as possible. Profiling shows that 80\% of the compilation time is spent simplifying expressions, as described in \S\ref{sec:simplify}. Our simplification method is currently written as a transformation that is applied until a fixed point is reached -- we believe the simplification can be implemented in one pass, leading to a substantial reduction in compile time.
 
-We have implemented the termination check exactly as described in \S\ref{sec:term_rule}, traversing and comparing the entire history at each step. For our termination check it is simple to change the history to a mapping from a name bag to a rank (being the highest permitted rank) -- reducing the algorithmic complexity. We could also optimise the representation of names, using a single integer for both the function name and subexpression index.
+We have implemented the termination check exactly as described in \S\ref{sec:term_rule}, traversing and comparing the entire history at each step. For our termination check it is simple to change the history to a mapping from a name bag to an integer (being the highest permitted cardinality) -- reducing the algorithmic complexity. We could also optimise the representation of names, using a single integer for both the function name and subexpression index.
 
 %if 0
 \section{Dead}
@@ -1191,7 +1190,7 @@ Supercompilation is a powerful technique which generalises many of the transform
 
 \subsection*{Acknowledgements}
 
-I would like to thank Max Bolingbroke, Jason Reich, Simon Peyton Jones and Peter Jonsson for helpful discussions. Thanks to Ketil Malde for providing further inspiration to continue researching supercompilation. Thanks to Mike Dodds and Emily Mitchell for comments on earlier drafts.
+I would like to thank Max Bolingbroke, Jason Reich, Simon Peyton Jones and Peter Jonsson for helpful discussions. Thanks to Ketil Malde for providing further inspiration to continue researching supercompilation.
 
 \bibliographystyle{plainnat}
 \balance

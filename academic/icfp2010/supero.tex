@@ -1140,7 +1140,7 @@ Our previous work inlined all let bindings that it could show did not lead to a 
 
 \subsubsection{Termination Criteria}
 
-The standard termination criteria used by supercompilers is the homeomorphic embedding \cite{leuschel:homeomorphic}. The homeomorphic embedding is a well-quasi ordering, from Kruskal's Tree Theorem \cite{kruskal:tree}. The criteria requires that for every infinite sequence $e_1,e_2 \ldots$ there exist indicies $i < j$ such that $e_i \ntriangleleft e_j$. The intuition of homeomorphic embedding is that $x \ntriangleleft y$ holds if by removing nodes from $y$ you cannot obtain $x$. Our termination ordering uses the idea of a well-quasi ordering, but with a very different ordering relation.
+The standard termination criteria used by supercompilers is the homeomorphic embedding \cite{leuschel:homeomorphic}. The homeomorphic embedding is a well-quasi ordering, from Kruskal's Tree Theorem \cite{kruskal:tree}. The criteria requires that for every infinite sequence $e_1,e_2 \ldots$ there exist indicies $i < j$ such that $e_j \ntriangleleft e_i$. The intuition of homeomorphic embedding is that $x \ntriangleleft y$ holds if by removing nodes from $y$ you cannot obtain $x$. Our termination ordering uses the idea of a well-quasi ordering, but with a very different ordering relation.
 
 We are unaware of any other supercompilers that have assigned names to expressions, or that have used a bag based termination ordering (most use tree orderings, or sometimes cost models/budgets). Without our particular treatment of expressions as a set of let bindings, and our particular simplification rules, it is not possible to use our termination ordering. For example, if we ever inline let bindings then subexpressions would be changed internally, and a single name for each subexpression would no longer be sufficient.
 
@@ -1164,7 +1164,7 @@ Probably the most practically applied work on deforestation uses GHC's rewrite r
 
 \subsection{Lower Level Optimisations}
 
-Our optimisation works at the Core level, but even once efficient Core has been generated there is still some work before efficient machine code can be produced. Key optimisations include strictness analysis and unboxing \cite{spj:unboxing}. In GHC both of these optimisations are done at the core level, using a core language extended with unboxed types. After this lower level core has been generated, it is then compiled to STG machine instructions \cite{spj:stg}, from which assembly code is generated. There is still work being done to modify the lowest levels to take advantage of the current generation of microprocessors \cite{marlow:pointer_tagging}. We rely on GHC to perform all these optimisations after our supercompiler generates a residual program.
+Our optimisation works at the Core level, but even once efficient Core has been generated there is still some work before efficient machine code can be produced. Key optimisations include strictness analysis and unboxing \cite{spj:unboxing}. In GHC both of these optimisations are done at the core level, using a core language extended with unboxed types. After this lower level core has been generated, it is then compiled to STG machine instructions \cite{spj:stg}, from which assembly code is generated. There is still work being done to modify the lowest levels to take advantage of the current generation of microprocessors \cite{marlow:pointer_tagging}. We rely on GHC to perform all these optimisations after our supercompiler generates a target program.
 
 The GRIN approach \cite{grin} uses whole program compilation for Haskell. It is currently being implemented in the jhc compiler \cite{jhc}, with promising initial results. GRIN works by first removing all functional values, turning them into case expressions, allowing subsequent optimisation. The intermediate language for jhc is at a much lower level than our Core language, so jhc is able to perform detailed optimisations that we are unable to express.
 
@@ -1190,7 +1190,7 @@ Supercompilation is a powerful technique which generalises many of the transform
 
 \subsection*{Acknowledgements}
 
-I would like to thank Max Bolingbroke, Jason Reich, Simon Peyton Jones and Peter Jonsson for helpful discussions. Thanks to Ketil Malde for providing further inspiration to continue researching supercompilation.
+I would like to thank Max Bolingbroke, Jason Reich, Simon Peyton Jones and Peter Jonsson for helpful discussions. Thanks to Ketil Malde for providing further inspiration to continue researching supercompilation. Thanks to Max Bolingbroke and Mike Dodds for comments on earlier drafts.
 
 \bibliographystyle{plainnat}
 \balance

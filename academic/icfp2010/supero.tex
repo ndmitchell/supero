@@ -66,6 +66,21 @@
 
 \begin{document}
 
+\todo{The non-termination issue was also spotted (after the submission of my paper) by Ilya Klyuchnikov, who has written a paper "Supercompiler HOSC 1.1: proof of termination". His paper discusses the non-termination problem, and I will include a citation. The non-termination is a corner case (unlikely to occur in real programs), but should be possible to fix with a small change to the simplifier. Thank you for finding this example.}
+
+\todo{The typing for Core programs is considered to be Hindley-Milner.}
+
+\todo{The references to termination orderings are somewhat light, I will rectify this.}
+
+\todo{The statement about inlining was intended to express that GHC uses inlining to move expressions together which allows them to reduce. My use of inlining in the post-processing phase is purely to reduce function call overhead. The main supercompilation phase subsumes inlining, so the techniques are not really comparable.}
+
+\todo{Thanks for the useful feedback on the areas that are less clear. I agree that a formal AST would help, and will include one - which I think will also make the arity definition clearer.}
+
+\todo{Thanks for the feedback on related work, I will revise the citations.}
+
+\todo{By manager I do mean the supercompile function - manager is certainly a better name.}
+
+
 \conferenceinfo{ICFP 2010}{}
 % \CopyrightYear{2009}
 % \copyrightdata{978-1-60558-508-6/09/09}
@@ -118,7 +133,7 @@ One informal description of supercompilation is that you simply ``run the progra
 Our primary contribution is the design of a new supercompiler (\S\ref{sec:method}). Our supercompiler has many differences from previous supercompilers (\S\ref{sec:comparison}), including a new core language, a substantially different treatment of let expressions and an entirely new termination criteria. The result is a supercompiler with a number of desirable properties:
 
 \begin{description}
-\item[Simple] Our supercompiler is designed to be simple. From the descriptions given in this paper a reader should be able to write their own supercompiler. We have written a supercompiler following our design which is available online\footnote{\verb"http://community.haskell.org/~ndm/supero"}. Much of the code (for example Figure \ref{fig:manager}) has been copied verbatim in to our implementation. The supercompiler can be implemented in under 300 lines of Haskell.
+\item[Simple] Our supercompiler is designed to be simple. From the descriptions given in this paper a reader should be able to write their own supercompiler. We have written a supercompiler following our design which is available online\footnote{\verb"http://hackage.haskell.org/package/supero"}. Much of the code (for example Figure \ref{fig:manager}) has been copied verbatim in to our implementation. The supercompiler can be implemented in under 300 lines of Haskell.
 \item[Fast compilation] Previous supercompilers have reported compilation times of up to five minutes for small examples \cite{me:supero}. Our compilation times are under four seconds, and there are many further compile time improvements that could be made (\S\ref{sec:benchmarks_compile}).
 \item[Fast runtime] We have benchmarked our supercompiler on a range of small examples (\S\ref{sec:benchmarks}). Some programs optimised with our supercompiler, and then compiled with GHC, are more than twice as fast than when compiled with GHC alone.
 \end{description}

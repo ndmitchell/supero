@@ -171,11 +171,11 @@ Our Core language for expressions is given in Figure \ref{fig:core}, and has muc
 
 \begin{itemize}
 \item We require variables in many places that would normally permit expressions, including let bodies and application. A standard Core language (such as from \citet{ghc_core}) can be translated to ours by inserting let expressions.
-\item In many Core languages a distinction is made between standard let bindings and recursive let bindings. We allow expressions bound at a let to refer to variables bound at the same let, but disallow recursion. An alternative description is that we allow recursive let, but only if there is an equivalent nested non-recursive let that can represent the same expression. For example, we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
+\item Our let expression is non-recursive. Bindings within a let expression are bound in order, and an expression on the right-hand side may not refer to variables defined later. For example, we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
 \item We don't have default patterns in case expressions. These can be added without great complexity, but are of little interest when describing a supercompiler.
 \item We assume programs in our Core language are well-typed, in particular that we never over-apply a constructor or perform case analysis on a function.
 \item Function application takes a list of arguments, rather than just a single argument -- the reasons are explained in \S\ref{sec:binaryapp}. We use an application with no arguments to represent just a variable.
-\item Variables may be either local (bound in an expression), or global (bound in the environment). We require that all global variables occur as the first argument of |App|.
+\item Variables may be either local (bound in an expression), or global (bound in a top-level environment). We require that all global variables occur as the first argument of |App|.
 \end{itemize}
 
 We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place. Bound variables have an arity based on the number of lambda arguments they have -- i.e. |v = \x y -> z| causes |v| to have arity 2. Variables without definitions are assumed to have arity 0, unless they are primitives of known arity (e.g. integer addition has arity 2). In our example |map| has arity 2 and |root| has arity 3. The arity of |f|, |g| and |x| are all 0 as they lack definitions.
@@ -207,18 +207,20 @@ map = \f x -> case  x of
 \subsection{Simplified Core}
 \label{sec:simplify}
 
-We now define a simplified form of our Core language. When working with Core expressions we assume they are always simplified, and after constructing new expressions we always simplify them. Our simplified form requires that the root of a function be a sequence of lambda expressions, followed by a let expression -- which we call the \textit{root let}. The expressions bound at the root let must not have the following form:
+We now define a simplified form of our Core language. When working with Core expressions we assume they are always simplified, and after constructing new expressions we always simplify them. Our simplified form requires that all variables in the top-level environment be bound to a (possibly empty) sequence of lambda expressions, followed by a let expression -- which we call the \textit{root let}.
+ 
+Within a let we remove any bindings that are not used and ensure all bound variables are unique. We also require that all expressions bound at a let must not have the following form:
 
 \begin{itemize}
-\item |App v []|, where |v| is bound at the root let -- we can remove the binding by inlining it.
+\item |App v []|, where |v| is bound at this let -- we can remove the binding by inlining it.
 \item |App v vs|, where |v| is bound to a |Con| -- the |App| can be replaced with a |Con| of higher arity.
 \item |App v vs|, where |v| is bound to |App w ws| and the arity of |w| is higher than the length of |ws| -- the |App| can be replaced with an |App| with more arguments.
-\item |App v vs|, where |v| is bound to a |Lam| -- the |App| can be replaced with the body of the lambda, with the variable substituted.
+\item |App v vs|, where |v| is bound to a |Lam| -- the |App| can be replaced with the body of the lambda, with the first variable substituted.
 \item |Case v w|, where |v| is bound to a |Con| -- the |Case| can be replaced with the appropriate alternative.
-\item |Let bs v| -- the bindings can be lifted into the root let, renaming variables if necessary.
+\item |Let bs v| -- the bindings can be lifted into the let, renaming variables if necessary.
 \end{itemize}
 
-We also remove any bindings which are not used, and ensure all bound variables are unique. As an example, we can simplify the following expression:
+As an example, we can simplify the following expression:
 
 \begin{code}
 let  v_1  = f
@@ -373,20 +375,20 @@ Looking at the first child expression, where |x = []|, the simplification rules 
 
 \begin{code}
 \g f z zs ->
-    let  v  = case  w  of [] -> []; y  :ys  -> g  y  : map g  ys
+    let  x  = z:zs
          w  = case  x  of [] -> []; z  :zs  -> f  z  : map f  zs
-         x  = z:zs
+         v  = case  w  of [] -> []; y  :ys  -> g  y  : map g  ys
     in   v
 \end{code}
 
 \noindent Which simplifies to:
 
 \begin{code}
-\g f z zs ->  let  v   = q : qs
+\g f z zs ->  let  y   = f z
+                   ys  = map f zs
                    q   = g y
                    qs  = map g ys
-                   y   = f z
-                   ys  = map f zs
+                   v   = q : qs
               in   v
 \end{code}
 
@@ -440,18 +442,18 @@ To determine which variable would be evaluated next, we define the functions |fo
            in   v_2
 \end{code}
 
-The function |next| returns |Just v_2|. Calling |force| on the expression |map g v_1| returns |map|, but since |map| is not bound at the root let we go no further. Therefore, to evaluate this expression we will start by evaluating |v_2|, and thus |map|. To perform an evaluation step we insert a fresh variable |v_3| bound to the body of |map|, and replace the |map| variable in |v_2| with |v_3|. This transformation results in:
+The function |next| returns |Just v_2|. Calling |force| on the expression |map g v_1| returns |map|, but since |map| is not bound at the root let we go no further. Therefore, to evaluate this expression we will start by evaluating |v_2|, and thus |map|. To perform an evaluation step we insert a fresh variable |w_1| bound to the body of |map|, and replace the |map| variable in |v_2| with |w_1|. This transformation results in:
 
 \begin{code}
 \g f x ->  let  v_1 =  map f x
-                v_2 =  v_3 g v_1
-                v_3 =  \f x -> case  x of
+                w_1 =  \f x -> case  x of
                                      []    -> []
                                      y:ys  -> f y : map f ys
+                v_2 =  w_1 g v_1
            in   v_2
 \end{code}
 
-Simplification immediately removes the lambda at |v_3|, replacing |v_2| with a case expression on |v_1|.
+Simplification immediately removes the lambda at |w_1|, replacing |v_2| with a case expression on |v_1|.
 
 More generally, we match any expression with the following pattern:
 
@@ -505,19 +507,19 @@ If the next expression is a case expression then we make the target a similar ca
 
 \begin{code}
 \x ->  case x of
-       []    -> <?  let  v =  case x of [] -> []; y:ys -> add y ys
-                         x =  []
+       []    -> <?  let  x =  []
+                         v =  case x of [] -> []; y:ys -> add y ys
                     in   v ?>
-       y:ys  -> <?  let  v =  case x of [] -> []; y:ys -> add y ys
-                         x =  y:ys
+       y:ys  -> <?  let  x =  y:ys
+                         v =  case x of [] -> []; y:ys -> add y ys
                     in   v ?>
 \end{code}
 
 Looking more closely at the second child, we start with the expression:
 
 \begin{code}
-\y ys ->  let  v  = case x of [] -> []; y:ys -> add y ys
-               x  = y : ys
+\y ys ->  let  x  = y : ys
+               v  = case x of [] -> []; y:ys -> add y ys
           in   v
 \end{code}
 
@@ -541,10 +543,16 @@ More generally, if |s| is the next expression to evaluate:
 
 \begin{onepage}\begin{code}
 \free -> case x of
-    p_1  -> <? let  s    = case x of p_1 -> e_1'; p_m -> e_m'
-                    v_1  = e_1; v_n = e_n; x = p_1 in v ?>
-    p_m  -> <? let  s    = case x of p_1 -> e_1'; p_m -> e_m'
-                    v_1  = e_1; v_n = e_n; x = p_m in v ?>
+    p_1  -> <? let  x    = p_1
+                    s    = e_1'
+                    v_1  = e_1
+                    v_n  = e_n
+               in   v  ?>
+    p_m  -> <? let  x    = p_m
+                    s    = e_m'
+                    v_1  = e_1
+                    v_n  = e_n
+               in   v ?>
 \end{code}\end{onepage}
 
 \subsubsection{Lambda}
@@ -553,30 +561,30 @@ More generally, if |s| is the next expression to evaluate:
 If the next binding to be evaluated is a lambda, then we place a lambda in the target program. The key point when splitting a lambda is that we do not reduce sharing. Consider the following example:
 
 \begin{code}
-\x ->  let  s    = \y -> add v_1 y
-            v_1  = expensive v_2
-            v_2  = f x
+\x ->  let  v_1  = f x
+            v_2  = expensive v_1
+            s    = \y -> add v_2 y
        in   s
 \end{code}
 
-The |add| function takes two arguments, but only has one so far. We cannot move the argument |y| upwards to form |\x y -> ...|, as this action potentially duplicates the expensive computation of |v_1|. Instead, we create child expressions for every variable binding, and for the body of the lambda:
+The |add| function takes two arguments, but only has one so far. We cannot move the argument |y| upwards to form |\x y -> ...|, as this action potentially duplicates the expensive computation of |v_2|. Instead, we create child expressions for every variable binding, and for the body of the lambda:
 
 \begin{code}
-\x ->  let  s    = \y -> <? add v_1 y ?>
-            v_1  = <? expensive v_2 ?>
-            v_2  = <? f x ?>
+\x ->  let  v_1  = <? f x ?>
+            v_2  = <? expensive v_1 ?>
+            s    = \y -> <? add v_2 y ?>
        in   s
 \end{code}
 
-Unfortunately, we have now split the bindings for |v_1| and |v_2| apart, when there is no real need. We therefore move binding |v_2| under |v_1|, because it is only referred to by |v_1|, to give:
+Unfortunately, we have now split the bindings for |v_1| and |v_2| apart, when there is no real need. We therefore move binding |v_1| under |v_2|, because it is only referred to by |v_2|, to give:
 
 \begin{code}
-\x ->  let  s    = \y -> <? add v_1 y ?>
-            v_1  = <? let v_2 = f x in expensive v_2 ?>
+\x ->  let  v_2  = <? let v_1 = f x in expensive v_1 ?>
+            s    = \y -> <? add v_2 y ?>
        in   s
 \end{code}
 
-We will now optimise the body of |v_1|, and the body of the lambda, which will be able to evaluate |add|. More generally, given:
+We will now optimise the body of |v_2|, and the body of the lambda, which will be able to evaluate |add|. More generally, given:
 
 \begin{code}
 \free ->  let  s    = \x -> e'
@@ -798,19 +806,19 @@ We can rewrite these expressions in our core language, with annotations for name
 
 \begin{code}
 \x_1 ->
-    let  v_1 = {-"\nameroot{1}"-}  rev v_2 x_1
-         v_2 = {-"\nameroot{2}"-}  []
-    in   v_1
+    let  v_1 = {-"\nameroot{2}"-}  []
+         v_2 = {-"\nameroot{1}"-}  rev v_1 x_1
+    in   v_2
 \x_1 x_2 ->
-    let  v_1 = {-"\namerev{1}"-}   rev v_2 x_2
-         v_2 = {-"\namerev{2}"-}   x_1:v_3
-         v_3 = {-"\nameroot{2}"-}  []
+    let  v_1 = {-"\nameroot{2}"-}  []
+         v_2 = {-"\namerev{2}"-}   x_1:v_1
+         v_3 = {-"\namerev{1}"-}   rev v_2 x_2
     in   v_1
 \x_1 x_2 x_3 ->
-    let  v_1 = {-"\namerev{1}"-}   rev v_2 x_3
-         v_2 = {-"\namerev{2}"-}   x_1:v_3
-         v_3 = {-"\namerev{2}"-}   x_2:v_4
-         v_4 = {-"\nameroot{2}"-}  []
+    let  v_1 = {-"\nameroot{2}"-}  []
+         v_2 = {-"\namerev{2}"-}   x_2:v_1
+         v_3 = {-"\namerev{2}"-}   x_1:v_2
+         v_4 = {-"\namerev{1}"-}   rev v_3 x_3
     in   v_1
 \end{code}
 
@@ -818,16 +826,16 @@ Under $\unlhd$ the first two expressions create a well-formed sequence, but the 
 
 \begin{code}
 \x_1 x_2 x_3 ->
-    let  v_1 = <?  let  v_1  = {-"\namerev{1}"-}   rev v_2 x_3
-                        v_2  = {-"\namerev{2}"-}   x_1:v_3
-                   in   v_1 ?>
-         v_3 = <?  let  v_3  = {-"\namerev{2}"-}   x_2:v_4
-                        v_4  = {-"\nameroot{2}"-}  []
-                   in   v_3 ?>
+    let  v_2 = <?  let  v_1  = {-"\nameroot{2}"-}  []
+                        v_2  = {-"\namerev{2}"-}   x_2:v_1
+                   in   v_2 ?>
+         v_4 = <?  let  v_3  = {-"\namerev{2}"-}   x_1:v_2
+                        v_4  = {-"\namerev{1}"-}   rev v_3 x_3
+                   in   v_4 ?>
     in   v_1
 \end{code}
 
-Part of the accumulator has been bound to |v_3|, and separated from the main expression. Continuing to optimise we get the sequence:
+Part of the accumulator has been bound to |v_2|, and separated from the main expression. Continuing to optimise we get the sequence:
 
 \begin{code}
 \x_1 -> rev [] x_1                          -- |reduce|

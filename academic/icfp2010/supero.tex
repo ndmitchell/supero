@@ -253,9 +253,9 @@ type Env = Var -> Maybe Exp
 data Tree = Tree
     {pre :: Exp, gen :: [Var] -> Exp, children :: [Tree]}
 
-supercompile :: Env -> [(Var,Exp)]
-supercompile env =
-    assign $ flatten $ optimise env $ fromJust $ env "root"
+manager :: Env -> [(Var,Exp)]
+manager env = assign (flatten (optimise env e))
+    where Just e = env "root"
 
 optimise :: Env -> Exp -> Tree
 optimise env = f []
@@ -280,7 +280,7 @@ assign ts = [(f t, gen t (map f (children t))) |  t <- ts]
     where  f t = fromJust (lookup (pre t) names)
            names = zip (map pre ts) functionNames
 \end{code}
-\caption{The |supercompile| function.}
+\caption{The |manager| function.}
 \label{fig:manager}
 \end{figure}
 
@@ -307,9 +307,9 @@ The manager first builds a tree (the type |Tree|), where each node has a source 
 
 \newcommand{\function}[1]{\paragraph{\textsf{#1:}}\hspace{-3mm}}
 
-\function{supercompile} This function puts all the parts together. Reading from right to left, we first generate a potentially infinite tree by optimising the function |root|, we then flatten the tree to a finite number of functions, and finally assign names to each of the result functions.
+\function{manager} This function puts all the parts together. Reading from right to left, we first generate a potentially infinite tree by optimising the expression bound to the function |root|, we then flatten the tree to a finite number of functions, and finally assign names to each of the result functions.
 
-\function{optimise} This function constructs the tree of result functions. While the tree may be infinite, we demand that any infinite path from the root must encounter the same |pre| value more than once. We require that for any infinite sequence of distinct expressions |h|, there must exist an |i| such that |terminate (<=||) (take i h) (h !! i+1)| returns |True|. If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |stop h| only produces subexpressions which pass the termination test. If the termination criteria do not force us to stop, then we call |reduce| to evaluate the expression.
+\function{optimise} This function constructs the tree of result functions. While the tree may be infinite, we demand that any infinite path from the root must encounter the same |pre| value more than once. We require that for any infinite sequence of distinct expressions |h|, there must exist an |i| such that |terminate (<=||) (take i h) (h !! i+1)| returns |True| (where |(!!)| is the Haskell list indexing operator). If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |stop h| only produces subexpressions which pass the termination test. If the termination criteria do not force us to stop, then we call |reduce| to evaluate the expression.
 
 \function{reduce} This function optimises an expression by repeatedly evaluating it with calls to |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence of expressions |h|, there must exist an |i| such that |terminate (<||) (take i h) (h !! i+1)| returns |True|.
 
@@ -343,7 +343,7 @@ To translate from the original expression using |<? bullet ?>| notation we pass 
 \subsubsection{Example}
 \label{sec:manager_example}
 
-Revisiting our initial example, |supercompile| first calls |optimise| with:
+Revisiting our initial example, |manager| first calls |optimise| with:
 
 \begin{code}
 \g f x -> map g (map f x)
@@ -421,7 +421,7 @@ force _              = Nothing
 
 next :: Exp -> Maybe Var
 next (Lam _ x) = next x
-next (Let bind v) = last $ Nothing : f v
+next (Let bind v) = last (Nothing : f v)
     where f v = case  lookup v bind of
                       Nothing -> []
                       Just e -> Just v : maybe [] f (force e)
@@ -694,7 +694,7 @@ We define the |terminate| function referred to in Figure \ref{fig:manager2} as:
 
 \begin{code}
 terminate  :: (Exp -> Exp -> Bool) -> History -> Exp -> Bool
-terminate (<) h e = not $ all (e <) h
+terminate (<) h e = not (all (e <) h)
 \end{code}
 
 The |terminate| function returns |False| if given a well-formed sequence (|h|), adding the expression |e| will keep the sequence well-formed.
@@ -947,27 +947,28 @@ GHC fails to eliminate all the lists and higher-order functions, which in turn m
 \label{sec:benchmarks}
 
 \begin{table}
-\begin{tabular}{@@{}lrrrr}
-\textbf{Program} & \textbf{Compile time} & \textbf{Runtime} & \textbf{Memory} & \textbf{Size} \\
-append & 0.1 + 0.6 & 0.85 & 0.84 & 1.00 \\
-bernouilli & 2.4 + 1.3 & 1.04 & 0.96 & 1.02 \\
-charcount & 0.1 + 0.6 & 0.14 & 0.01 & 0.99 \\
-digits-of-e2 & 2.0 + 0.8 & 0.40 & 0.45 & 0.99 \\
-exp3\_8 & 0.5 + 0.8 & 0.93 & 1.00 & 1.08 \\
-factorial & 0.1 + 0.6 & 0.98 & 1.00 & 1.00  \\
-linecount & 0.2 + 0.6 & 0.01 & 0.01 & 0.98 \\
-primes & 0.1 + 0.6 & 0.58 & 0.81 & 0.99 \\
-raytracer & 0.1 + 0.6 & 0.56 & 0.44 & 1.00 \\
-rfib & 0.1 + 0.7 & 0.77 & 1.01 & 0.98 \\
-sumsquare & 1.2 + 0.9 & 0.38 & 0.23 & 1.03 \\
-sumtree & 0.1 + 0.6 & 0.14 & 0.01 & 1.00 \\
-tak & 0.1 + 0.6 & 0.79 & 1.01 & 0.98 \\
-treeflip & 0.1 + 0.6 & 0.57 & 0.45 & 1.01 \\
-wordcount & 0.3 + 0.7 & 0.19 & 0.30 & 1.00 \\
-x2n1 & 0.1 + 0.8 & 0.90 & 0.99 & 1.00 \\
+\setlength{\tabcolsep}{1.39mm}
+\begin{tabular}{@@{}lrrrrr}
+\textbf{Program} & \textbf{Lines} & \textbf{Compile time} & \textbf{Runtime} & \textbf{Memory} & \textbf{Size} \\
+append & 8 & 0.1 + 0.6 & 0.85 & 0.84 & 1.00 \\
+bernouilli & 148 & 2.4 + 1.3 & 1.04 & 0.96 & 1.02 \\
+charcount & 32 & 0.1 + 0.6 & 0.14 & 0.01 & 0.99 \\
+digits-of-e2 & 100 & 2.0 + 0.8 & 0.40 & 0.45 & 0.99 \\
+exp3\_8 & 39 & 0.5 + 0.8 & 0.93 & 1.00 & 1.08 \\
+factorial & 12 & 0.1 + 0.6 & 0.98 & 1.00 & 1.00 \\
+linecount & 43 & 0.2 + 0.6 & 0.01 & 0.01 & 0.98 \\
+primes & 58 & 0.1 + 0.6 & 0.58 & 0.81 & 0.99 \\
+raytracer & 26 & 0.1 + 0.6 & 0.56 & 0.44 & 1.00 \\
+rfib & 16 & 0.1 + 0.7 & 0.77 & 1.01 & 0.98 \\
+sumsquare & 45 & 1.2 + 0.9 & 0.38 & 0.23 & 1.03 \\
+sumtree & 27 & 0.1 + 0.6 & 0.14 & 0.01 & 1.00 \\
+tak & 19 & 0.1 + 0.6 & 0.79 & 1.01 & 0.98 \\
+treeflip & 26 & 0.1 + 0.6 & 0.57 & 0.45 & 1.01 \\
+wordcount & 62 & 0.3 + 0.7 & 0.19 & 0.30 & 1.00 \\
+x2n1 & 36 & 0.1 + 0.8 & 0.90 & 0.99 & 1.00 \\
 \end{tabular}
 \\ \\
-\textbf{Program} is the name of the program as given in \S\ref{sec:benchmarks}. \textbf{Compile time} is the number of seconds to compile the program ($a+b$), including both compilation with our supercompiler ($a$) and the subsequent compilation with GHC ($b$). The final three columns are relative to \texttt{ghc -O2} being 1.00, with a lower number being better. \textbf{Runtime} is how long the optimised program takes to run. \textbf{Memory} is the amount of memory allocated on the heap. \textbf{Size} is the size of the optimised program on disk.
+\textbf{Program} is the name of the program as given in \S\ref{sec:benchmarks}. \textbf{Lines} is the number of lines of code in the original program, including library definitions, but excluding primitives. \textbf{Compile time} is the number of seconds to compile the program ($a+b$), including both compilation with our supercompiler ($a$) and the subsequent compilation with GHC ($b$). The final three columns are relative to \texttt{ghc -O2} being 1.00, with a lower number being better. \textbf{Runtime} is how long the optimised program takes to run. \textbf{Memory} is the amount of memory allocated on the heap. \textbf{Size} is the size of the optimised program on disk.
 \caption{Benchmark results.}
 \label{tab:results}
 \end{table}
@@ -1078,7 +1079,7 @@ Supercompilation is a powerful technique which generalises many of the transform
 I would like to thank Max Bolingbroke, Jason Reich, Simon Peyton Jones and Peter Jonsson for helpful discussions. Thanks to Ketil Malde for providing further inspiration to continue researching supercompilation. Thanks to Max Bolingbroke and Mike Dodds for comments on earlier drafts.
 
 \bibliographystyle{plainnat}
-\balance
+% \balance
 \bibliography
 
 \end{document}

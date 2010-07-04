@@ -1,0 +1,236 @@
+---------------------------------------------------------------------
+-- CORE LANGUAGE
+
+[GIVE AN AST FOR THE CORE LANGUAGE]
+
+* 2.2 PLEASE give the syntax for Simplified Core.  (Plus any invariants 
+  that are not purely syntactic.) There's no excuse for not doing this.
+  I still have very little idea of what you intend. I think it's something
+  like
+
+     sc ::= \x1..xn. let ...xi=rhsi... in v
+     rhs ::= ..I'm not quite sure what...
+
+  Maybe this is what you mean by "root let bindings"?   I'm not sure.
+
+
+[MAKE THE ARITY DETAILS MUCH CLEARER]
+
+The notion of function arity is introduced informally as follows: 
+"We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place" 
+However further (Section 2.6.2, Lemma) it is stated that  
+"number of arguments applied to .. application .. is bounded by the arity of that of the source function" 
+
+This is a subtle point: consider function id: 
+id = \x -> x 
+
+According to your definition the arity of id is 1. But in the source program there may appear an expression  
+id id id
+This application has more than 1 argument. So you need to distinguish arity of a function and the number of application arguments. 
+Actually, the boundedness of the number of function arguments depends on the typing discipline. This number (when transforming a program) is bounded for Hindley-Milner typing. 
+
+* 2.1 This stuff about arity is very dubious and vague. Precisely 
+  what variables have non-zero arity?  Just the let-bound ones? And
+  then only if they have syntactically visible lambdas?  So if I have
+    let f = let g = ... in \y. e in ...
+  then f has arity zero?  But after some transformation I can see that
+  f has arity 1. So arities can change??  Maybe they can decrease?
+  I'm pretty suspicous.
+
+
+[MAKE IT CLEAR THAT EXPRESSIONS MAY NOT HAVE UNIQUE VALUES]
+
+It is clear that for many expressions there is no unique expression in core language (it will be useful to note this in the paper), just because let bindings may be shifted.
+
+Also there is a subtle point about uniqueness of simplified form (when it exists), is it unique? 
+
+
+[THE SIMPLIFIER CAN INFINITE LOOP]
+
+However, there is an example when such simplification goes into infinite loop. There is just a scheme of this loop - without handling let-bindings: 
+
+data U = MkU (U -> Bool); 
+
+(\u -> case u of {MkU p -> p u;}) (MkU (\x -> case x of {MkU y -> y x;})) => 
+[by the 4th simplification rule] =>
+
+case (MkU (\x -> case x of {MkU y -> y x;})) of 
+{MkU p -> p (MkU (\x -> case x of {MkU y -> y x;}));} =>
+[by the 5th simplification rule] =?
+(\u -> case u of {MkU p -> p u;}) (MkU (\x -> case x of {MkU y -> y x;})) 
+and we are in the loop now. 
+
+So this expression is not in simplified form. Since further sections are based on simplified core, this problem should be resolved in some way. For example, it is possible to extract some lambda abstractions into global functions. 
+
+The non-termination issue was also spotted (after the submission of my paper) by Ilya Klyuchnikov, who has written a paper "Supercompiler HOSC 1.1: proof of termination". His paper discusses the non-termination problem, and I will include a citation. The non-termination is a corner case (unlikely to occur in real programs), but should be possible to fix with a small change to the simplifier. Thank you for finding this example.
+
+
+[SAY WHICH HASKELL PROGRAMS CAN BE TRANSLATED TO CORE]
+
+The paper describes supercompilation of programs in the core language. It seems that some Haskell programs cannot be translated into the core language. It is good to explicitly state which Haskell programs can be transformed into core language.
+
+
+[MAKE THE DETAILS ABOUT LETREC MUCH CLEARER]
+
+There is a subtle phrase about recursive lets: 
+"An alternative description is that we allow recursive let, but only if there is an equivalent nested non-recursive let that can represent the same expression. For example, we allow let x = y; y = C in C but not let x = y; y=x in C." 
+An example of an allowed recursive let may be useful. (The first given example is not a recursive let).
+
+
+[SAY THE TYPING IS HINDLEY MILNER]
+
+There is nothing said about the typing discipline for the core language. The typing discipline the source programs are assumed to obey should be explicitly specified.  
+
+
+[NORMALISED VARIABLE NAMES]
+
+Say variable names are normalized.
+
+
+---------------------------------------------------------------------
+-- METHOD
+
+[INTEGRATED TERMINATION ARGUMENT]
+
+* You never give an integrated termination argument for
+  'supercompile'.  There are several separate bits of termination
+  checking, one in optimise, one in reduce, and one in the tree
+  flattener.  Its seems odd to need three! Why?  
+
+  In 2.3 you say "we require that (stop h) only produces subexpressions
+  that pass the termination test".  Why? 
+
+  Similarly in 2.6.5 you say that "we require (split h e) only
+  produces subexpressions that are not forced to terminate by
+  (terminate <= h).  But why do we require that?  How does that
+  contribute to your overall termination argument?  Moreover note that
+  when 'reduce' calls 'stop' it passes the reduce-local 'h'.  But the
+  results of 'stop' are consuembe f inside 'optimise' whose 'h' is
+  entirely different.  So the requirement I quote above seems unlikely
+  to help at all.
+
+
+[SAY MORE ABOUT THE ORDERING (PERHAPS NOT SAY ORDERING)]
+
+* 2.6.1 Please give intutitions for your orderings.  Are they
+        well-quasi orderings?  Please say.  Are they even transitive?
+        I think perhaps not.  Please say -- that's very unusual for an
+        "ordering".
+
+In Section 2.6.1, it would help understanding to point out that the two
+"orderings" considered here are not transitive (hence, not really
+orderings in the mathematical sense).
+
+
+[BE CLEARER ABOUT THE NAME TRACKING]
+
+* 2.6.2 This name-tracking stuff seems very informal and arm-wavey to
+        me.  "When we move a sub-expression..."  
+ 
+  You are tracking expressions that are not source-program
+  expressions, because they've been simplified etc.  But I think your
+  claim is this:
+    1.  Termination asssured
+    - we allocate a finite number of Names
+    - after this, there are no new names
+    - therefore the termination argument will hold
+    2. Not terminating too soon
+        The requirements of (1) could be guaranteed if every
+        transformed expression had one constant name N.  (Still a
+        finite number.) But you give heuristics that try to
+        distinguish transformed expressions by the various ingredients
+        of input Names that went into them.  The better these
+        heuristics the less conservative the termination test will be.
+
+  So (2) can be more arm-wavey.  But you never say any of this.  Why
+  did you do the arity thing, which invents some new names (albeit a
+  finite number). Did you find it to be important in practice?
+
+
+[TERMINATION ARGUMENT]
+
+* Lemma "There are only a finite number of expressions for any bag".
+  I'm not sure what this even means, given the arm-waving above.  Nor
+  does it seem important. The important thing is that from each
+  expression we get a bag, and there is no infinite sequence of bags,
+  so there is no infinite sequence of expressions.
+
+
+[SPLITTINGS]
+
+The splitting described in the paper (section 2.5) is just one of possible splittings. It may be interesting to consider another splitting alternatives.
+
+* 2.5.2 "We have now split the bindings apart" Maybe so, but you have
+  not explained why that is a bad thing.
+
+* 2.5 You give three concerns, which is good, but each needs an example.
+  Otherwise it's all gobbledygook.
+
+
+[TOP LEVEL FUNCTIONS ARE SPECIAL]
+
+* Does step reduce under lambda? Presumably not, by analogy with
+  constructors.  But then how do you get started?  I think the top
+  level lambdas are somehow special.
+
+
+[FIXUP THE DETAILS]
+
+* The latter part of 2.6.3 is incomprehensible.
+
+
+[MAKE CLEARER]
+
+* 2.3.1 I had trouble understanding this section.   
+
+
+[MAKE CLEAR]
+
+* 2.4 "since map is not bound at the root" What on earth does that mean?
+
+
+[MAKE THIS CLEAR]
+
+In the paragraphs describing optimise and reduce on page 3, attention
+should be drawn to the fact that different orders are used as arguments
+to terminate. I had not noticed this initially, and thus was quite
+confused about the repetition.
+
+
+[MAKE CLEAR]
+
+* 2.4 "More generally we match any expression..." But that expression
+      didn't look like a pattern. Indeed I didn't understand what the
+      pattern was at all.
+
+
+---------------------------------------------------------------------
+-- RELATED WORK
+
+
+The description of partial evaluation in Section 5.2 tells only half the
+story. What is said there about binding time analysis and subsequent
+specialization based on the markings is specific only to *offline*
+partial evaluation. But there is *online* partial evaluation as well,
+which works differently, and is actually much closer to the kind of
+compile-time computations that happen in supercompilation. So a
+comparison to online partial evaluation would be more meaningful.
+
+I also find the description of deforestation techniques in Section 5.3 a
+bit sloppy, and the citations rather arbitrary. First of all, it would
+make more sense to cite Wadler's 1990 paper in TCS, rather than the
+preceding conference version. Also, it is then said that his technique
+was extended in many ways, among others to work on other data types than
+lists. But already Wadler's original technique works for arbitrary
+datatypes! After all, the title is "Transforming programs to eliminate
+*trees*". Moreover, the citation of Coutts et al. 2007b is rather
+strange in this context. Their technique has nothing to do with
+Wadler-style deforestation. If anything, it would be an example for
+combinator/rules-based optimizations as described in the subsequent
+paragraph. In that paragraph, it is implied that shortcut fusion and
+related techniques are restricted to lists. But again, these have
+straightforward extensions to arbitrary datatypes (see "A Generalization
+of Short-Cut Fusion and its Correctness Proof", Johann, HOSC 2002).
+
+There is a large literature on termination orderings which goes almost
+entirely uncited. Is there a reason for this?

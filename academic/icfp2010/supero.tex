@@ -65,22 +65,6 @@
 
 
 \begin{document}
-
-\todo{The non-termination issue was also spotted (after the submission of my paper) by Ilya Klyuchnikov, who has written a paper "Supercompiler HOSC 1.1: proof of termination". His paper discusses the non-termination problem, and I will include a citation. The non-termination is a corner case (unlikely to occur in real programs), but should be possible to fix with a small change to the simplifier. Thank you for finding this example.}
-
-\todo{The typing for Core programs is considered to be Hindley-Milner.}
-
-\todo{The references to termination orderings are somewhat light, I will rectify this.}
-
-\todo{The statement about inlining was intended to express that GHC uses inlining to move expressions together which allows them to reduce. My use of inlining in the post-processing phase is purely to reduce function call overhead. The main supercompilation phase subsumes inlining, so the techniques are not really comparable.}
-
-\todo{Thanks for the useful feedback on the areas that are less clear. I agree that a formal AST would help, and will include one - which I think will also make the arity definition clearer.}
-
-\todo{Thanks for the feedback on related work, I will revise the citations.}
-
-\todo{By manager I do mean the supercompile function - manager is certainly a better name.}
-
-
 \conferenceinfo{ICFP 2010}{}
 % \CopyrightYear{2009}
 % \copyrightdata{978-1-60558-508-6/09/09}
@@ -158,7 +142,7 @@ This section describes our supercompiler. We first present a Core language (\S\r
 root g f x = map g (map f x)
 
 map f []      = []
-map f (x:xs)  = f y : map f ys
+map f (x:xs)  = f x : map f xs
 \end{code}
 
 Our supercompiler always optimises the function named |root|. The |root| function applies |map| twice -- the expression |map f x| produces a list that is immediately consumed by |map g|. A good supercompiler should remove the intermediate list.
@@ -336,7 +320,7 @@ The manager first builds a tree (the type |Tree|), where each node has a source 
 \subsubsection{Notation}
 \label{sec:child_notation}
 
-To represent a value of type |([Var] -> Exp, [Exp])| we use |<? bullet ?>| notation to identify particular children of an expression. As an example:
+To represent values of type |([Var] -> Exp, [Exp])| we use |<? bullet ?>| notation to identify particular children of an expression. As an example:
 
 \begin{code}
 \g f -> map g (<? map f xs ?>)
@@ -415,7 +399,7 @@ Calling |step| produces |Nothing|, as the root of this expression is a construct
               in   v
 \end{code}
 
-When optimising |g (f z)| we get no optimisation, as there is no available information. To optimise |map g (map f zs)| we repeat the exact same steps we have already done. However, the |flatten| function will spot that both nodes have the same |pre| expression, and reduce them to one node, creating a recursive function. We then assign names using |assign|. For the purposes of display (not optimisation), we apply a number of simplifications given in \S\ref{sec:postprocess}. The end result is:
+When optimising |g (f z)| we get no optimisation, as there is no available information. To optimise |map g (map f zs)| we repeat the exact same steps we have already done. However, the |flatten| function will spot that both |Tree| nodes have the same |pre| expression (modulo variable renaming), and reduce them to one node, creating a recursive function. We then assign names using |assign|. For the purposes of display (not optimisation), we apply a number of simplifications given in \S\ref{sec:postprocess}. The end result is:
 
 \begin{code}
 root g f x = case  x of
@@ -423,7 +407,7 @@ root g f x = case  x of
                    z:zs  -> g (f z) : root g f zs
 \end{code}
 
-The final version has automatically removed the intermediate list, with no additional knowledge about the |map| function or it's fusion rules.
+The final version has automatically removed the intermediate list, with no additional knowledge about the |map| function or its fusion rules.
 
 \subsection{Evaluation}
 \label{sec:eval}
@@ -446,7 +430,7 @@ next (Let bind v) = last $ Nothing : f v
 \label{fig:stack}
 \end{figure}
 
-Evaluation is based around the |step| function. Given an expression, |step| either replaces a variable with it's associated value from the environment and returns |Just|, or if no suitable variable is found returns |Nothing|. We always replace the variable that would be evaluated next during normal evaluation.
+Evaluation is based around the |step| function. Given an expression, |step| either replaces a variable with its associated value from the environment and returns |Just|, or if no suitable variable is found returns |Nothing|. We always replace the variable that would be evaluated next during normal evaluation.
 
 To determine which variable would be evaluated next, we define the functions |force| and |next| in Figure \ref{fig:stack}. The function |force| determines which variable will be evaluated next given an expression -- either a case scrutinee or an applied variable. The function |next| determines which variable bound at the root let will be evaluated next, by following the forced variables of the let bindings. Looking at the original example:
 
@@ -566,7 +550,7 @@ More generally, if |s| is the next expression to evaluate:
 \subsubsection{Lambda}
 \label{sec:eval_split_lambda}
 
-If the top of the stack is a lambda, then we place a lambda in the target program. The key point when splitting a lambda is that we do not reduce sharing. Consider the following example:
+If the next binding to be evaluated is a lambda, then we place a lambda in the target program. The key point when splitting a lambda is that we do not reduce sharing. Consider the following example:
 
 \begin{code}
 \x ->  let  s    = \y -> add v_1 y
@@ -575,7 +559,7 @@ If the top of the stack is a lambda, then we place a lambda in the target progra
        in   s
 \end{code}
 
-The |add| function takes two arguments, but only has one so far. It is tempting to rewrite |\x -> ...| as |\x y -> ...|, but this potentially duplicates the expensive computation of |v_1|. Instead, we create child expressions for every variable binding, and for the body of the lambda:
+The |add| function takes two arguments, but only has one so far. We cannot move the argument |y| upwards to form |\x y -> ...|, as this action potentially duplicates the expensive computation of |v_1|. Instead, we create child expressions for every variable binding, and for the body of the lambda:
 
 \begin{code}
 \x ->  let  s    = \y -> <? add v_1 y ?>
@@ -751,7 +735,7 @@ The termination properties in \S\ref{sec:manager} are satisfied by the lemmas in
 \subsubsection{Termination Splitting}
 \label{sec:term_split}
 
-If we are forced to terminate we call |stop|, which splits the expression into several subexpressions, much like |split| (see \S\ref{sec:eval_split}). We require that |split h e| only produces subexpressions which are not forced to terminate by |terminate (<=||) h|. We trivially satisfy this requirement by using the termination criteria when defining |split|.
+If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |stop h e| only produces subexpressions which are not forced to terminate by |terminate (<=||) h|. We trivially satisfy this requirement by using the termination criteria when defining |stop|.
 
 Given an expression:
 
@@ -779,7 +763,7 @@ As a heuristic, we merge variable |v| before |w| if the name associated with |v|
 Many simple example programs (such as |map|/|map|) never trigger the termination criteria. The standard example of a function that does require termination is |reverse|, which can be written in a simplified form as:
 
 \begin{code}
-main xs = rev [] xs
+root xs = rev [] xs
 rev acc xs = case  xs of
                    []    -> acc
                    y:ys  -> rev (y:acc) ys
@@ -790,10 +774,10 @@ The |rev| function builds up an accumulator argument, which will be equal to the
 \begin{code}
 \xs -> case  xs of
              []    -> <? [] ?>
-             y:ys  -> <? rev (y:acc) ys ?>
+             y:ys  -> <? rev (y:[]) ys ?>
 \end{code}
 
-Focusing on the second alternative, we now add |rev [] xs| to the termination history, and continue optimising |rev (y:acc) ys|. This leads to the sequence of expressions:
+Focusing on the second alternative, we now add |rev [] xs| to the termination history, and continue optimising |rev (y:[]) ys|. This leads to the sequence of expressions:
 
 \begin{code}
 \x_1 -> rev [] x_1
@@ -804,29 +788,29 @@ Focusing on the second alternative, we now add |rev [] xs| to the termination hi
 
 We can rewrite these expressions in our core language, with annotations for names:
 
-\newlength{\lenmain}
+\newlength{\lenroot}
 \newlength{\lenrev}
-\settowidth{\lenmain}{|main|}
+\settowidth{\lenroot}{|root|}
 \settowidth{\lenrev}{|rev|}
-\addtolength{\lenmain}{-\lenrev}
-\newcommand{\namemain}[1]{\name{main}{#1}{0}}
-\newcommand{\namerev}[1]{\name{rev\hspace{\lenmain}}{#1}{0}\hspace{1mm}}
+\addtolength{\lenroot}{-\lenrev}
+\newcommand{\nameroot}[1]{\name{root}{#1}{0}}
+\newcommand{\namerev}[1]{\name{rev\hspace{\lenroot}}{#1}{0}\hspace{1mm}}
 
 \begin{code}
 \x_1 ->
-    let  v_1 = {-"\namemain{1}"-}  rev v_2 x_1
-         v_2 = {-"\namemain{2}"-}  []
+    let  v_1 = {-"\nameroot{1}"-}  rev v_2 x_1
+         v_2 = {-"\nameroot{2}"-}  []
     in   v_1
 \x_1 x_2 ->
     let  v_1 = {-"\namerev{1}"-}   rev v_2 x_2
          v_2 = {-"\namerev{2}"-}   x_1:v_3
-         v_3 = {-"\namemain{2}"-}  []
+         v_3 = {-"\nameroot{2}"-}  []
     in   v_1
 \x_1 x_2 x_3 ->
     let  v_1 = {-"\namerev{1}"-}   rev v_2 x_3
          v_2 = {-"\namerev{2}"-}   x_1:v_3
          v_3 = {-"\namerev{2}"-}   x_2:v_4
-         v_4 = {-"\namemain{2}"-}  []
+         v_4 = {-"\nameroot{2}"-}  []
     in   v_1
 \end{code}
 
@@ -838,7 +822,7 @@ Under $\unlhd$ the first two expressions create a well-formed sequence, but the 
                         v_2  = {-"\namerev{2}"-}   x_1:v_3
                    in   v_1 ?>
          v_3 = <?  let  v_3  = {-"\namerev{2}"-}   x_2:v_4
-                        v_4  = {-"\namemain{2}"-}  []
+                        v_4  = {-"\nameroot{2}"-}  []
                    in   v_3 ?>
     in   v_1
 \end{code}
@@ -863,13 +847,13 @@ As required, we have a finite number of distinct expressions, and end up with a 
 Our |split| function is structured to produce only one simple expression per target function -- for example a target function will never contain two constructors. While most opportunities to remove intermediate structure have been exploited, the target program will usually contain lots of small functions. We can eliminate many of these functions by inlining all functions which are only called once. For example, given the source program:
 
 \begin{code}
-main x = x : x : []
+root x = x : x : []
 \end{code}
 
 \noindent After supercompilation, we get the target program:
 
 \begin{code}
-main x = x : f x
+root x = x : f x
 f x = x : nil
 nil = []
 \end{code}
@@ -877,7 +861,7 @@ nil = []
 \noindent We can then inline all functions that are only called once:
 
 \begin{code}
-main x = x : x : []
+root x = x : x : []
 \end{code}
 
 It is important that the only optimisation intended from this post-processing is the reduction of function call overhead. This use of inlining is substantially different from other compilers \cite{spj:inlining}, where inlining is used to bring expressions together to trigger other optimisations.
@@ -992,7 +976,7 @@ In this section we run our supercompiler over a range of benchmarks drawn from o
 
 \begin{itemize}
 \item sumsquare is the introductory example used in the stream fusion paper \cite{coutts:stream_fusion}.
-\item charcount, linecount and wordcount are taken from our previous supercompiler work \cite{me:supero}, and wordcount is used as the example in \S\ref{sec:introduction}. For these benchmarks we have removed the actual IO operations, leaving the cost of the actual computation.
+\item charcount, linecount and wordcount are taken from our previous supercompiler work \cite{me:supero}, and wordcount is used as the example in \S\ref{sec:introduction}. For the purpose of benchmarking, we have removed the actual IO operations, leaving just the actual computation.
 \item append, factorial, treeflip, sumtree and raytracer have been used to benchmark other supercompilers \cite{jonsson:supercompilation}, and originate from papers on deforestation \cite{wadler:deforestation,kort:raytracer}.
 \item bernouilli, digits-of-e2, exp3\_8, primes, rfib, tak and x2n1 are all taken from the Imaginary section of the nofib benchmark suite \cite{nofib}.
 \end{itemize}

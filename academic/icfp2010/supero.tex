@@ -171,11 +171,12 @@ Our Core language for expressions is given in Figure \ref{fig:core}, and has muc
 
 \begin{itemize}
 \item We require variables in many places that would normally permit expressions, including let bodies and application. A standard Core language (such as from \citet{ghc_core}) can be translated to ours by inserting let expressions.
-\item Our let expression is non-recursive. Bindings within a let expression are bound in order, and an expression on the right-hand side may not refer to variables defined later. For example, we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
+\item Our let expression is non-recursive -- bindings within a let expression are bound in order. For example, we allow |let x = y; y = C in C| but not |let x = y; y = x in C|.
 \item We don't have default patterns in case expressions. These can be added without great complexity, but are of little interest when describing a supercompiler.
-\item We assume programs in our Core language are well-typed, in particular that we never over-apply a constructor or perform case analysis on a function.
+\item We assume programs in our Core language are well-typed using Hindley-Milner, in particular that we never over-apply a constructor or perform case analysis on a function. While most Haskell programs can be translated to our Core language, the typing restriction means some features are not supported (GADTs, existential types).
 \item Function application takes a list of arguments, rather than just a single argument -- the reasons are explained in \S\ref{sec:binaryapp}. We use an application with no arguments to represent just a variable.
 \item Variables may be either local (bound in an expression), or global (bound in a top-level environment). We require that all global variables occur as the first argument of |App|.
+\item When comparing expressions we always normalise local variable names and the order of let bindings.
 \end{itemize}
 
 We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place. Bound variables have an arity based on the number of lambda arguments they have -- i.e. |v = \x y -> z| causes |v| to have arity 2. Variables without definitions are assumed to have arity 0, unless they are primitives of known arity (e.g. integer addition has arity 2). In our example |map| has arity 2 and |root| has arity 3. The arity of |f|, |g| and |x| are all 0 as they lack definitions.
@@ -207,8 +208,8 @@ map = \f x -> case  x of
 \subsection{Simplified Core}
 \label{sec:simplify}
 
-We now define a simplified form of our Core language. When working with Core expressions we assume they are always simplified, and after constructing new expressions we always simplify them. Our simplified form requires that all variables in the top-level environment be bound to a (possibly empty) sequence of lambda expressions, followed by a let expression -- which we call the \textit{root let}.
- 
+We now define a simplified form of our Core language. When working with Core expressions we assume they are always simplified, and after constructing new expressions we always simplify them. Our simplified form requires that all variables in the top-level environment be bound to an expression consisting of a (possibly empty) sequence of lambda expressions, followed by a let expression. We call the first let expression within a top-level definition the \textit{root let}.
+
 Within a let we remove any bindings that are not used and ensure all bound variables are unique. We also require that all expressions bound at a let must not have the following form:
 
 \begin{itemize}

@@ -1,19 +1,6 @@
 ---------------------------------------------------------------------
 -- CORE LANGUAGE
 
-[GIVE AN AST FOR THE CORE LANGUAGE]
-
-* 2.2 PLEASE give the syntax for Simplified Core.  (Plus any invariants 
-  that are not purely syntactic.) There's no excuse for not doing this.
-  I still have very little idea of what you intend. I think it's something
-  like
-
-     sc ::= \x1..xn. let ...xi=rhsi... in v
-     rhs ::= ..I'm not quite sure what...
-
-  Maybe this is what you mean by "root let bindings"?   I'm not sure.
-
-
 [MAKE THE ARITY DETAILS MUCH CLEARER]
 
 The notion of function arity is introduced informally as follows: 
@@ -38,13 +25,6 @@ Actually, the boundedness of the number of function arguments depends on the typ
   I'm pretty suspicous.
 
 
-[MAKE IT CLEAR THAT EXPRESSIONS MAY NOT HAVE UNIQUE VALUES]
-
-It is clear that for many expressions there is no unique expression in core language (it will be useful to note this in the paper), just because let bindings may be shifted.
-
-Also there is a subtle point about uniqueness of simplified form (when it exists), is it unique? 
-
-
 [THE SIMPLIFIER CAN INFINITE LOOP]
 
 However, there is an example when such simplification goes into infinite loop. There is just a scheme of this loop - without handling let-bindings: 
@@ -63,28 +43,6 @@ and we are in the loop now.
 So this expression is not in simplified form. Since further sections are based on simplified core, this problem should be resolved in some way. For example, it is possible to extract some lambda abstractions into global functions. 
 
 The non-termination issue was also spotted (after the submission of my paper) by Ilya Klyuchnikov, who has written a paper "Supercompiler HOSC 1.1: proof of termination". His paper discusses the non-termination problem, and I will include a citation. The non-termination is a corner case (unlikely to occur in real programs), but should be possible to fix with a small change to the simplifier. Thank you for finding this example.
-
-
-[SAY WHICH HASKELL PROGRAMS CAN BE TRANSLATED TO CORE]
-
-The paper describes supercompilation of programs in the core language. It seems that some Haskell programs cannot be translated into the core language. It is good to explicitly state which Haskell programs can be transformed into core language.
-
-
-[MAKE THE DETAILS ABOUT LETREC MUCH CLEARER]
-
-There is a subtle phrase about recursive lets: 
-"An alternative description is that we allow recursive let, but only if there is an equivalent nested non-recursive let that can represent the same expression. For example, we allow let x = y; y = C in C but not let x = y; y=x in C." 
-An example of an allowed recursive let may be useful. (The first given example is not a recursive let).
-
-
-[SAY THE TYPING IS HINDLEY MILNER]
-
-There is nothing said about the typing discipline for the core language. The typing discipline the source programs are assumed to obey should be explicitly specified.  
-
-
-[NORMALISED VARIABLE NAMES]
-
-Say variable names are normalized.
 
 
 ---------------------------------------------------------------------

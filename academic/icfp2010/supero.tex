@@ -179,7 +179,7 @@ Our Core language for expressions is given in Figure \ref{fig:core}, and has muc
 \item When comparing expressions we always normalise local variable names and the order of let bindings.
 \end{itemize}
 
-We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place. Bound variables have an arity based on the number of lambda arguments they have -- i.e. |v = \x y -> z| causes |v| to have arity 2. Variables without definitions are assumed to have arity 0, unless they are primitives of known arity (e.g. integer addition has arity 2). In our example |map| has arity 2 and |root| has arity 3. The arity of |f|, |g| and |x| are all 0 as they lack definitions.
+We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place. For our purposes, it is important that for a variable with arity |n|, if less than |n| arguments are applied, no evaluation occurs. We approximate the arity of bound variables using the number of lambda arguments at the root of their expression, for primitives we use a known arity (e.g. integer addition has arity 2), and for all other variables we use arity 0. In our example |map| has arity 2, |root| has arity 3, and |f|, |g| and |x| have arity 0.
 
 We write expressions using standard Haskell syntax (e.g. |let| for |Let|, |case| for |Case| etc.). Rewriting the |map|/|map| example in our Core language gives:
 
@@ -208,9 +208,9 @@ map = \f x -> case  x of
 \subsection{Simplified Core}
 \label{sec:simplify}
 
-We now define a simplified form of our Core language. When working with Core expressions we assume they are always simplified, and after constructing new expressions we always simplify them. Our simplified form requires that all variables in the top-level environment be bound to an expression consisting of a (possibly empty) sequence of lambda expressions, followed by a let expression. We call the first let expression within a top-level definition the \textit{root let}.
+We now define a simplified form of our Core language. When working with Core expressions we assume they are always simplified, and after constructing new expressions we always simplify them. We require all expressions bound in the top-level environment consist of a (possibly empty) sequence of lambda expressions, followed by a let expression. We call the first let expression within a top-level definition the \textit{root let}.
 
-Within a let we remove any bindings that are not used and ensure all bound variables are unique. We also require that all expressions bound at a let must not have the following form:
+Within a let we remove any bindings that are not used and ensure all bound variables are unique. We also require that all expressions bound at a let must \textit{not} have the following form:
 
 \begin{itemize}
 \item |App v []|, where |v| is bound at this let -- we can remove the binding by inlining it.

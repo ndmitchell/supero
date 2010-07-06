@@ -1,30 +1,6 @@
 ---------------------------------------------------------------------
 -- CORE LANGUAGE
 
-[MAKE THE ARITY DETAILS MUCH CLEARER]
-
-The notion of function arity is introduced informally as follows: 
-"We define the arity of a variable to be the number of arguments that need to be applied before reduction takes place" 
-However further (Section 2.6.2, Lemma) it is stated that  
-"number of arguments applied to .. application .. is bounded by the arity of that of the source function" 
-
-This is a subtle point: consider function id: 
-id = \x -> x 
-
-According to your definition the arity of id is 1. But in the source program there may appear an expression  
-id id id
-This application has more than 1 argument. So you need to distinguish arity of a function and the number of application arguments. 
-Actually, the boundedness of the number of function arguments depends on the typing discipline. This number (when transforming a program) is bounded for Hindley-Milner typing. 
-
-* 2.1 This stuff about arity is very dubious and vague. Precisely 
-  what variables have non-zero arity?  Just the let-bound ones? And
-  then only if they have syntactically visible lambdas?  So if I have
-    let f = let g = ... in \y. e in ...
-  then f has arity zero?  But after some transformation I can see that
-  f has arity 1. So arities can change??  Maybe they can decrease?
-  I'm pretty suspicous.
-
-
 [THE SIMPLIFIER CAN INFINITE LOOP]
 
 However, there is an example when such simplification goes into infinite loop. There is just a scheme of this loop - without handling let-bindings: 

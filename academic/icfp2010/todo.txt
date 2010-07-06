@@ -1,3 +1,7 @@
+[STYLE]
+
+Add back \balance in the bibtex
+
 ---------------------------------------------------------------------
 -- CORE LANGUAGE
 

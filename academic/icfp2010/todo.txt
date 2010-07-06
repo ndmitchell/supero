@@ -2,6 +2,11 @@
 
 Add back \balance in the bibtex
 
+Fix up the page breaks
+
+Check for lines running over columns
+
+
 ---------------------------------------------------------------------
 -- CORE LANGUAGE
 
@@ -105,21 +110,9 @@ The splitting described in the paper (section 2.5) is just one of possible split
   Otherwise it's all gobbledygook.
 
 
-[TOP LEVEL FUNCTIONS ARE SPECIAL]
-
-* Does step reduce under lambda? Presumably not, by analogy with
-  constructors.  But then how do you get started?  I think the top
-  level lambdas are somehow special.
-
-
 [FIXUP THE DETAILS]
 
 * The latter part of 2.6.3 is incomprehensible.
-
-
-[MAKE CLEARER]
-
-* 2.3.1 I had trouble understanding this section.   
 
 
 [MAKE CLEAR]

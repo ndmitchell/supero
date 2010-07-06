@@ -323,13 +323,19 @@ The manager first builds a tree (the type |Tree|), where each node has a source 
 \subsubsection{Notation}
 \label{sec:child_notation}
 
-To represent values of type |([Var] -> Exp, [Exp])| we use |<? bullet ?>| notation to identify particular children of an expression. As an example:
+Values of type |([Var] -> Exp, [Exp])| can be described by taking an expression and removing some subexpressions (indicated by |<? bullet ?>|). The first component is a function to insert variables where subexpressions were removed, and the second component is a list of the removed subexpressions. Before removing each subexpression, we insert an applied lambda for all variables bound in the outer expression but free in the subexpression. As an example:
 
 \begin{code}
 \g f -> map g (<? map f xs ?>)
 \end{code}
 
-\noindent This expression denotes a value whose first component is the function that when given ``|name|'' returns:
+\noindent We first insert a lambda for the variable |f|:
+
+\begin{code}
+\g f -> map g ((<? \f -> map f xs ?>) f)
+\end{code}
+
+\noindent We then remove the subexpression. The first component of the result is a function that when given |["name"]| returns the expression:
 
 \begin{code}
 \g f -> map g (name f)
@@ -340,8 +346,6 @@ To represent values of type |([Var] -> Exp, [Exp])| we use |<? bullet ?>| notati
 \begin{code}
 \f -> map f xs
 \end{code}
-
-To translate from the original expression using |<? bullet ?>| notation we pass as arguments all the variables bound in the outer expression and free in the child expression (|f| in this example). The first component of the result is a function that replaces each child with a name, and the second component is the list of children.
 
 \subsubsection{Example}
 \label{sec:manager_example}

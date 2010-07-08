@@ -53,18 +53,6 @@ The non-termination issue was also spotted (after the submission of my paper) by
   to help at all.
 
 
-[SAY MORE ABOUT THE ORDERING (PERHAPS NOT SAY ORDERING)]
-
-* 2.6.1 Please give intutitions for your orderings.  Are they
-        well-quasi orderings?  Please say.  Are they even transitive?
-        I think perhaps not.  Please say -- that's very unusual for an
-        "ordering".
-
-In Section 2.6.1, it would help understanding to point out that the two
-"orderings" considered here are not transitive (hence, not really
-orderings in the mathematical sense).
-
-
 [BE CLEARER ABOUT THE NAME TRACKING]
 
 * 2.6.2 This name-tracking stuff seems very informal and arm-wavey to
@@ -92,47 +80,16 @@ orderings in the mathematical sense).
 
 [TERMINATION ARGUMENT]
 
-* Lemma "There are only a finite number of expressions for any bag".
+* 2.6.2: Lemma "There are only a finite number of expressions for any bag".
   I'm not sure what this even means, given the arm-waving above.  Nor
   does it seem important. The important thing is that from each
   expression we get a bag, and there is no infinite sequence of bags,
   so there is no infinite sequence of expressions.
 
 
-[SPLITTINGS]
-
-The splitting described in the paper (section 2.5) is just one of possible splittings. It may be interesting to consider another splitting alternatives.
-
-* 2.5.2 "We have now split the bindings apart" Maybe so, but you have
-  not explained why that is a bad thing.
-
-* 2.5 You give three concerns, which is good, but each needs an example.
-  Otherwise it's all gobbledygook.
-
-
 [FIXUP THE DETAILS]
 
 * The latter part of 2.6.3 is incomprehensible.
-
-
-[MAKE CLEAR]
-
-* 2.4 "since map is not bound at the root" What on earth does that mean?
-
-
-[MAKE THIS CLEAR]
-
-In the paragraphs describing optimise and reduce on page 3, attention
-should be drawn to the fact that different orders are used as arguments
-to terminate. I had not noticed this initially, and thus was quite
-confused about the repetition.
-
-
-[MAKE CLEAR]
-
-* 2.4 "More generally we match any expression..." But that expression
-      didn't look like a pattern. Indeed I didn't understand what the
-      pattern was at all.
 
 
 ---------------------------------------------------------------------

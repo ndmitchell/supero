@@ -314,7 +314,7 @@ The manager first builds a tree (the type |Tree|), where each node has a source 
 
 \function{optimise} This function constructs the tree of result functions. While the tree may be infinite, we demand that any infinite path from the root must encounter the same |pre| value more than once. We require that for any infinite sequence of distinct expressions |h|, there must exist an |i| such that |terminate (<=||) (take i h) (h !! i+1)| returns |True| (where |(!!)| is the Haskell list indexing operator). If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |stop h| only produces subexpressions which pass the termination test. If the termination criteria do not force us to stop, then we call |reduce| to evaluate the expression.
 
-\function{reduce} This function optimises an expression by repeatedly evaluating it with calls to |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence of expressions |h|, there must exist an |i| such that |terminate (<||) (take i h) (h !! i+1)| returns |True|.
+\function{reduce} This function optimises an expression by repeatedly evaluating it with calls to |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence of expressions |h|, there must exist an |i| such that |terminate (<||) (take i h) (h !! i+1)| returns |True|. Note that this termination criteria is more restrictive than that used by |optimise|.
 
 \function{flatten} This function takes a tree and extracts a finite number of functions from it, assuming the termination restrictions given in |optimise|. Our |flatten| function will only keep one tree associated with each source expression. These trees may have different target expressions if one resulted from a call to |stop|, while another resulted from a call to |reduce| -- but all are semantically equivalent.
 
@@ -323,7 +323,7 @@ The manager first builds a tree (the type |Tree|), where each node has a source 
 \subsubsection{Notation}
 \label{sec:child_notation}
 
-Values of type |([Var] -> Exp, [Exp])| can be described by taking an expression and removing some subexpressions (indicated by |<? bullet ?>|). The first component is a function to insert variables where subexpressions were removed, and the second component is a list of the removed subexpressions. Before removing each subexpression, we insert an applied lambda for all variables bound in the outer expression but free in the subexpression. As an example:
+Values of type |([Var] -> Exp, [Exp])| can be described by taking an expression and removing some subexpressions (indicated by |<? bullet ?>|). The first component is a function to insert variables where subexpressions were removed, and the second component is a list of the removed subexpressions. Before removing each subexpression, we insert an applied lambda for all variables bound in the expression but free in the subexpression. As an example:
 
 \begin{code}
 \g f -> map g (<? map f xs ?>)
@@ -485,16 +485,16 @@ As always, after generating a new expression we immediately apply the simplifica
 \subsection{Evaluation Splitting}
 \label{sec:eval_split}
 
-If evaluation cannot proceed, we split to produce a target expression, and a list of child expressions for further optimisation, using the |<? bullet ?>| notation described in \S\ref{sec:child_notation}. When splitting an expression there are three concerns:
+If evaluation cannot proceed, we split to produce a target expression, and a list of child expressions for further optimisation. When splitting an expression there are three concerns:
 
-\paragraph{Permit further optimisation:} We aim to place any constructs blocking evaluation in the target expression, so that the children are suitable for further optimisation.
+\paragraph{Permit further optimisation:} When we split, the current expression cannot be evaluated using the rules described in \S\ref{sec:eval}. We therefore aim to place the construct blocking evaluation in the target expression, allowing the child expressions to be optimised further.
 
-\paragraph{No unbounded loss of sharing:} A complex variable cannot be duplicated if that causes it to be evaluated multiple times at runtime. The target program cannot remove sharing present in the source program.
+\paragraph{No unbounded loss of sharing:} An expensive variable binding cannot be duplicated in a way that causes it to be evaluated multiple times at runtime. The target program cannot remove sharing present in the source program, or it would run slower.
 
-\paragraph{Keep expressions together:} If we split variables bound at the same let expression in to separate child expressions we lose optimisation opportunities, as the right-hand side of the variable is no longer available for optimisation. We aim to keep as many expressions together as possible, but not if that loses sharing.
+\paragraph{Keep bindings together:} If we split variables bound at the same let expression into separate child expressions, we reduce the potential for optimisation. If the expression associated with a variable is not available when evaluating, the evaluation will be forced to stop sooner. We aim to make child expressions as large as possible, but without losing sharing.
 
 \smallskip
-We split in one of three different ways, depending on the type of the next expression to be evaluated (as described in \S\ref{sec:eval}). We now describe each of the three ways to split, in each case we start with an example, then define the general rule.
+We split in one of three different ways, depending on the type of the next expression to be evaluated (as described in \S\ref{sec:eval}). We now describe each of the three ways to split, in each case we start with an example, then define the general rule. We use the |<? bullet ?>| notation described in \S\ref{sec:child_notation}.
 
 \subsubsection{Case Expression}
 \label{sec:eval_split_case}
@@ -668,7 +668,7 @@ In this section we first describe the |terminate|, $\lhd$ and $\unlhd$ functions
 \subsubsection{Termination Rule}
 \label{sec:term_rule}
 
-Our termination orderings are defined over bags (also known as multisets) of values drawn from a finite alphabet $\Sigma$. A bag of values is unordered, but may contain elements more than once. We define our orderings as:
+Our termination rules are defined over bags (also known as multisets) of values drawn from a finite alphabet $\Sigma$. A bag of values is unordered, but may contain elements more than once. We define our rules as:
 
 \vspace{-\bigskipamount}
 
@@ -897,7 +897,7 @@ The first version of this supercompiler had binary application, rather than vect
 
 \subsubsection{Alternative Termination Orderings}
 
-Our original termination ordering was:
+Our original termination rule was:
 
 \vspace{-\bigskipamount}
 
@@ -905,7 +905,7 @@ Our original termination ordering was:
 x \lhd y = x \setsup y \vee x \bagsub y
 \]
 
-Both this ordering and the one described in \S\ref{sec:term_rule} can be proved using the same argument. We switched to use our new ordering because it is simpler, follows more directly from the proof, and can be implemented very efficiently. Choosing a termination ordering is a tricky business -- no termination ordering can be the best for all programs, so there is always scope for experimentation.
+Both this rule and the one described in \S\ref{sec:term_rule} can be proved using the same argument. We switched to use our new rule because it is simpler, follows more directly from the proof, and can be implemented very efficiently. Choosing a termination rule is a tricky business -- no termination rule can be the best for all programs, so there is always scope for experimentation.
 
 \subsubsection{Recursive Lets}
 
@@ -1039,11 +1039,11 @@ Our previous work inlined all let bindings that it could show did not lead to a 
 
 \subsubsection{Termination Criteria}
 
-The standard termination criteria used by supercompilers is the homeomorphic embedding \cite{leuschel:homeomorphic}. The homeomorphic embedding is a well-quasi ordering, from Kruskal's Tree Theorem \cite{kruskal:tree}. The criteria requires that for every infinite sequence $e_1,e_2 \ldots$ there exist indicies $i < j$ such that $e_j \ntriangleleft e_i$. The intuition of homeomorphic embedding is that $x \ntriangleleft y$ holds if by removing nodes from $y$ you cannot obtain $x$. Our termination ordering uses the idea of a well-quasi ordering, but with a very different ordering relation.
+The standard termination criteria used by supercompilers is the homeomorphic embedding \cite{leuschel:homeomorphic}. The homeomorphic embedding is a well-quasi ordering, from Kruskal's Tree Theorem \cite{kruskal:tree}. The criteria requires that for every infinite sequence $e_1,e_2 \ldots$ there exist indicies $i < j$ such that $e_j \ntriangleleft e_i$. The intuition of homeomorphic embedding is that $x \ntriangleleft y$ holds if by removing nodes from $y$ you cannot obtain $x$. Our termination rule uses similar ideas to a well-quasi ordering, but with a very different comparison relation.
 
-We are unaware of any other supercompilers that have assigned names to expressions, or that have used a bag based termination ordering (most use tree orderings, or sometimes cost models/budgets). Without our particular treatment of expressions as a set of let bindings, and our particular simplification rules, it is not possible to use our termination ordering. For example, if we ever inline let bindings then subexpressions would be changed internally, and a single name for each subexpression would no longer be sufficient.
+We are unaware of any other supercompilers that have assigned names to expressions, or that have used a bag based termination rule (most use tree orderings, or sometimes cost models/budgets). Without our particular treatment of expressions as a set of let bindings, and our particular simplification rules, it is not possible to use our termination rule. For example, if we ever inline let bindings then subexpressions would be changed internally, and a single name for each subexpression would no longer be sufficient.
 
-In some cases, our ordering is certainly less restrictive than the homeomorphic embedding. The example in \S\ref{sec:term_example} would have stopped one step earlier with a homeomorphic embedding. Under a fairly standard interpretation of variable names and let expressions, we can show that our ordering is always less restrictive than the homeomorphic embedding -- although other differences in our treatment of expressions mean such a comparison is not necessarily meaningful. However, we did not choose our termination criteria to permit more expressions -- it was chosen for both simplicity and compilation speed.
+In some cases, our rule is certainly less restrictive than the homeomorphic embedding. The example in \S\ref{sec:term_example} would have stopped one step earlier with a homeomorphic embedding. Under a fairly standard interpretation of variable names and let expressions, we can show that our rule is always less restrictive than the homeomorphic embedding -- although other differences in our treatment of expressions mean such a comparison is not necessarily meaningful. However, we did not choose our termination criteria to permit more expressions -- it was chosen for both simplicity and compilation speed.
 
 We use two separate termination histories, one in |reduce| and another in |optimise| -- an idea suggested by \citet{me:thesis}, but not previously implemented. By separating the termination histories we gain better predictability, as |reduce| is not dependent on which functions have gone before. Additionally, the histories are kept substantially smaller, again improving compile-time performance. By splitting termination checks we also reduce the coupling between the separate aspects of supercompilation, allowing us to present a simpler manager than would otherwise be possible.
 

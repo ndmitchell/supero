@@ -31,14 +31,6 @@ The non-termination issue was also spotted (after the submission of my paper) by
 
 
 ---------------------------------------------------------------------
--- METHOD
-
-[FIXUP THE DETAILS]
-
-* The latter part of 2.6.3 is incomprehensible.
-
-
----------------------------------------------------------------------
 -- RELATED WORK
 
 

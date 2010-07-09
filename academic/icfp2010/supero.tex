@@ -766,9 +766,9 @@ We first split every variable bound at the let, to give:
           in   v
 \end{code}
 
-We now merge variable |v_i| under |v_j| using the same conditions as |split|, described in \S\ref{sec:eval_split_lambda}. In addition, we do not merge |v_i| under |v_j| if the resulting expression bound to |v_j| would violate the termination criteria |terminate (<=||) h|. Combined with with the property that all initial children are singleton name bags, which trivially satisfy $\unlhd$ for any expression, our merge restriction ensures no children violate the termination criteria.
+We now move variable |v_i| under |v_j| using the same conditions as |split|, described in \S\ref{sec:eval_split_lambda}. In addition, we do not merge |v_i| under |v_j| if the resulting expression bound to |v_j| would violate the termination criteria |terminate (<=||) h|. Combined with with the property that all initial children are singleton name bags, which trivially satisfy $\unlhd$ for any expression, our merge restriction ensures no children violate the termination criteria.
 
-As a heuristic, we merge variable |v| before |w| if the name associated with |v| occurs fewer times in the original expression. By favouring names used fewer times we hope to encourage splitting apart an expression that is growing in number, and will thus continue to grow in recursive calls. This heuristic has no effect on the correctness or termination, but can sometimes result in better optimisation.
+As a heuristic, we attempt to move variable |v| before |w| if the name associated with |v| occurs fewer times in the original expression. In most expressions that are growing, and therefore hit the termination criteria, there will be some name that keeps repeating. By favouring names that are less frequent we hope to keep together subexpressions that are not growing. This heuristic has no effect on the correctness or termination, but can sometimes result in better optimisation.
 
 \subsubsection{Example}
 \label{sec:term_example}

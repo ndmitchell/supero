@@ -312,7 +312,7 @@ The manager first builds a tree (the type |Tree|), where each node has a source 
 
 \function{manager} This function puts all the parts together. Reading from right to left, we first generate a potentially infinite tree by optimising the expression bound to the function |root|, we then flatten the tree to a finite number of functions, and finally assign names to each of the result functions.
 
-\function{optimise} This function constructs the tree of result functions. While the tree may be infinite, we demand that any infinite path from the root must encounter the same |pre| value more than once. We require that for any infinite sequence of distinct expressions |h|, there must exist an |i| such that |terminate (<=||) (take i h) (h !! i+1)| returns |True| (where |(!!)| is the Haskell list indexing operator). If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |stop h| only produces subexpressions which pass the termination test. If the termination criteria do not force us to stop, then we call |reduce| to evaluate the expression.
+\function{optimise} This function constructs the tree of result functions. While the tree may be infinite, we demand that any infinite path from the root must encounter the same |pre| value more than once. We require that for any infinite sequence of distinct expressions |h|, there must exist an |i| such that |terminate (<=||) (take i h) (h !! i+1)| returns |True| (where |(!!)| is the Haskell list indexing operator). If we are forced to terminate we call |stop|, which splits the expression into several subexpressions. We require that |stop h| only produces subexpressions which pass the termination test, so that when |f| is applied to the subexpressions they all call |reduce|. If the termination criteria do not force us to stop, then we call |reduce| to evaluate the expression.
 
 \function{reduce} This function optimises an expression by repeatedly evaluating it with calls to |step|. If we can't evaluate any further we call |split|. We use a local termination test to ensure the evaluation terminates. We require that for any infinite sequence of expressions |h|, there must exist an |i| such that |terminate (<||) (take i h) (h !! i+1)| returns |True|. Note that this termination criteria is more restrictive than that used by |optimise|.
 
@@ -737,13 +737,13 @@ We map an expression to a bag of names by taking the names of all expressions bo
 
 All subexpressions are assigned expression indices in advance, so there are only a finite number of function name/index values. We only increase the argument count when increasing the number of arguments applied to a constructor or application, which is bounded by the arity of that constructor or the source function. Therefore, there are only a finite number of names.
 
-\lemma{There are a finite number of expressions for any bag}
+\lemma{A bag of names represents a finite number of expressions}
 
 Given a bag of names, there are only a finite number of expressions that could have generated it. We first assume that when simplifying an expression we always normalise the free variables -- naming the let body |v_1|, and naming all other variables as they are reached from |v_1|. Each name refers to one particular subexpression, but may have different variable names. A finite number of subexpressions can only be combined to produce a finite number of expressions, if we ignore variable names, which the normalisation handles.
 
 \lemma{The termination properties required by \S\ref{sec:manager} are satisfied}
 
-The termination properties in \S\ref{sec:manager} are satisfied by the lemmas in this section. We have shown that the alphabet of names, $\Sigma$, is finite. For |terminate (<=||)| we have shown that there can only be a finite number of distinct name bags, and that each name bag can only correspond to a finite number of expressions. For |terminate (<||)| we have shown that there can only be a finite number of name bags.
+The termination properties in \S\ref{sec:manager} are satisfied by the lemmas in this section. We have shown that the alphabet of names, $\Sigma$, is finite. For |terminate (<=||)| we have shown that there can only be a finite number of distinct name bags, and that each name bag can only correspond to a finite number of expressions, therefore there are a finite number of distinct expressions. For |terminate (<||)| we have shown that there can only be a finite number of name bags.
 
 \subsubsection{Termination Splitting}
 \label{sec:term_split}

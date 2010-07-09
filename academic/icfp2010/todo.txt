@@ -14,14 +14,6 @@ Remove \todo's
 -- RELATED WORK
 
 
-The description of partial evaluation in Section 5.2 tells only half the
-story. What is said there about binding time analysis and subsequent
-specialization based on the markings is specific only to *offline*
-partial evaluation. But there is *online* partial evaluation as well,
-which works differently, and is actually much closer to the kind of
-compile-time computations that happen in supercompilation. So a
-comparison to online partial evaluation would be more meaningful.
-
 I also find the description of deforestation techniques in Section 5.3 a
 bit sloppy, and the citations rather arbitrary. First of all, it would
 make more sense to cite Wadler's 1990 paper in TCS, rather than the

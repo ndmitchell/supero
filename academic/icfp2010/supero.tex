@@ -256,9 +256,9 @@ data U = MkU (U -> Bool)
 e =  let f = \x -> case x of MkU y -> y x in f (MkU f)
 \end{code}
 
-This program encodes recursion via a data type, and any attempt to apply all the simplification rules will not terminate. We are aware of two solutions: 1) We could avoid performing case analysis on types which have \todo{property here} \cite{spj:inlining}; 2) We could avoid simplifying certain expressions, using the size measure from the HOSC supercompiler \cite{klyuchnikov:termination}.
+This program encodes recursion via a data type, and any attempt to apply all the simplification rules will not terminate. We are aware of two solutions: 1) We could avoid performing case elimination on contravariant data types \cite{spj:inlining}; 2) We could avoid simplifying certain expressions, using the size measure from the HOSC supercompiler \cite{klyuchnikov:termination}.
 
-We have chosen to leave this problem unsolved. The problem only occurs for contrived programs which encode recursion via a data type, and is a problem shared with GHC, which will also non-terminate when compiling this example. The later stages of our supercompiler do not rely on the simplifications having been performed, so either solution could be applied in future.
+We have chosen to leave this problem unsolved. The problem only occurs for contrived programs which encode recursion via a data type, and it is a problem shared with GHC, which will also non-terminate when compiling this example. The later stages of our supercompiler do not rely on the simplifications having been performed, so either solution could be applied in future.
 
 \subsection{Manager}
 \label{sec:manager}
@@ -1070,9 +1070,9 @@ Supercompilation and partial evaluation both remove abstraction overhead within 
 
 \subsection{Deforestation}
 
-Deforestation \cite{wadler:deforestation} removes intermediate lists from computations. This technique has been extended in many ways to encompass higher order deforestation \cite{marlow:higher_order_deforestation} and work on other data types \cite{coutts:string_fusion}. In many cases the gains from supercompilation are just particular forms of deforestation.
+Deforestation \cite{wadler:deforestation} removes intermediate trees (most commonly lists) from computations. This technique has been extended in many ways, including to encompass higher-order deforestation \cite{marlow:higher_order_deforestation}. In many cases the gains from supercompilation are just particular forms of deforestation.
 
-Probably the most practically applied work on deforestation uses GHC's rewrite rules to optimise programs \cite{spj:rules}. Shortcut deforestation rewrites many definitions in terms of |foldr| and |build|, then combines |foldr|/|build| pairs \cite{gill:shortcut_deforestation}. Stream fusion works similarly, but relies on |stream|/|unstream| rules \cite{coutts:stream_fusion}. In both cases the optimisation only applies to lists, and only to functions written in terms of the correct primitives. The advantage of supercompilation is that it applies to many types and functions, without any special effort from the program author.
+Probably the most practically applied work on deforestation uses GHC's rewrite rules to optimise programs \cite{spj:rules}. Shortcut deforestation rewrites many definitions in terms of |foldr| and |build|, then combines |foldr|/|build| pairs \cite{gill:shortcut_deforestation} to deforest lists. Stream fusion works similarly, but relies on |stream|/|unstream| rules \cite{coutts:stream_fusion}. All these schemes are only able to optimise functions written in terms of the correct primitives, which have had fusion rules defined. The advantage of supercompilation is that it applies to many types and functions, without any special effort from the program author.
 
 \subsection{Lower Level Optimisations}
 
@@ -1105,7 +1105,7 @@ Supercompilation is a powerful technique which generalises many of the transform
 I would like to thank Max Bolingbroke, Jason Reich, Simon Peyton Jones and Peter Jonsson for helpful discussions. Thanks to Ketil Malde for providing further inspiration to continue researching supercompilation. Thanks to Max Bolingbroke, Mike Dodds and the anonymous referees for helpful comments on earlier drafts.
 
 \bibliographystyle{plainnat}
-% \balance
+\balance
 \bibliography
 
 \end{document}

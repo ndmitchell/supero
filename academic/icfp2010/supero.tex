@@ -247,6 +247,34 @@ let  v_5  = f y x
 in   v_5
 \end{code}
 
+%if 0
+\subsubsection{Simplifier Non-Termination}
+
+The simplifier as presented will not terminate for all programs. Take the following example:
+
+\begin{code}
+data U = MkU (U -> Bool)
+
+e = (\u -> case u of MkU p -> p u)
+    (MkU (\x -> case x of MkU y -> y x)) 
+\end{code}
+
+This program encodes recursion via a data type, and has no simplified representation. This problem has been covered 
+
+However, in the presence of data constructors it is possible to define
+(well-typed!) fix-point combinator by means of lambdas and pattern
+matching only.
+
+
+
+This problem also effects GHC, and has been described in by \citet{klyuchnikov:termination}. There are no easy changes to fix this, but you could put a numeric bound on the number of simplification steps -- however it's a corner case which is unlikely to occur in real programs.
+
+The non-termination issue was also spotted (after the submission of my paper) by Ilya Klyuchnikov, who has written a paper "Supercompiler HOSC 1.1: proof of termination". His paper discusses the non-termination problem, and I will include a citation. The non-termination is a corner case (unlikely to occur in real programs), but should be possible to fix with a small change to the simplifier. Thank you for finding this example.
+
+\cite{spj:inlining}
+%endif
+
+
 \subsection{Manager}
 \label{sec:manager}
 

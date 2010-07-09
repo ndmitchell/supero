@@ -6,29 +6,9 @@ Fix up the page breaks
 
 Check for lines running over columns
 
+Check still 12 pages
 
----------------------------------------------------------------------
--- CORE LANGUAGE
-
-[THE SIMPLIFIER CAN INFINITE LOOP]
-
-However, there is an example when such simplification goes into infinite loop. There is just a scheme of this loop - without handling let-bindings: 
-
-data U = MkU (U -> Bool); 
-
-(\u -> case u of {MkU p -> p u;}) (MkU (\x -> case x of {MkU y -> y x;})) => 
-[by the 4th simplification rule] =>
-
-case (MkU (\x -> case x of {MkU y -> y x;})) of 
-{MkU p -> p (MkU (\x -> case x of {MkU y -> y x;}));} =>
-[by the 5th simplification rule] =?
-(\u -> case u of {MkU p -> p u;}) (MkU (\x -> case x of {MkU y -> y x;})) 
-and we are in the loop now. 
-
-So this expression is not in simplified form. Since further sections are based on simplified core, this problem should be resolved in some way. For example, it is possible to extract some lambda abstractions into global functions. 
-
-The non-termination issue was also spotted (after the submission of my paper) by Ilya Klyuchnikov, who has written a paper "Supercompiler HOSC 1.1: proof of termination". His paper discusses the non-termination problem, and I will include a citation. The non-termination is a corner case (unlikely to occur in real programs), but should be possible to fix with a small change to the simplifier. Thank you for finding this example.
-
+Remove \todo's
 
 ---------------------------------------------------------------------
 -- RELATED WORK

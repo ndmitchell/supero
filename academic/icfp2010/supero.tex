@@ -247,33 +247,18 @@ let  v_5  = f y x
 in   v_5
 \end{code}
 
-%if 0
 \subsubsection{Simplifier Non-Termination}
 
-The simplifier as presented will not terminate for all programs. Take the following example:
+Sadly, not all expressions have a simplified form. Take the following example:
 
 \begin{code}
 data U = MkU (U -> Bool)
-
-e = (\u -> case u of MkU p -> p u)
-    (MkU (\x -> case x of MkU y -> y x)) 
+e =  let f = \x -> case x of MkU y -> y x in f (MkU f)
 \end{code}
 
-This program encodes recursion via a data type, and has no simplified representation. This problem has been covered 
+This program encodes recursion via a data type, and any attempt to apply all the simplification rules will not terminate. We are aware of two solutions: 1) We could avoid performing case analysis on types which have \todo{property here} \cite{spj:inlining}; 2) We could avoid simplifying certain expressions, using the size measure from the HOSC supercompiler \cite{klyuchnikov:termination}.
 
-However, in the presence of data constructors it is possible to define
-(well-typed!) fix-point combinator by means of lambdas and pattern
-matching only.
-
-
-
-This problem also effects GHC, and has been described in by \citet{klyuchnikov:termination}. There are no easy changes to fix this, but you could put a numeric bound on the number of simplification steps -- however it's a corner case which is unlikely to occur in real programs.
-
-The non-termination issue was also spotted (after the submission of my paper) by Ilya Klyuchnikov, who has written a paper "Supercompiler HOSC 1.1: proof of termination". His paper discusses the non-termination problem, and I will include a citation. The non-termination is a corner case (unlikely to occur in real programs), but should be possible to fix with a small change to the simplifier. Thank you for finding this example.
-
-\cite{spj:inlining}
-%endif
-
+We have chosen to leave this problem unsolved. The problem only occurs for contrived programs which encode recursion via a data type, and is a problem shared with GHC, which will also non-terminate when compiling this example. The later stages of our supercompiler do not rely on the simplifications having been performed, so either solution could be applied in future.
 
 \subsection{Manager}
 \label{sec:manager}
@@ -330,7 +315,7 @@ stop :: History -> Exp -> ([Var] -> Exp, [Var]) -- \S\ref{sec:term_split}
 \label{fig:manager2}
 \end{figure}
 
-Our supercompiler is based around a manager, that integrates the answers to the questions of supercompilation. The manager itself has two main purposes: to ensure termination, and to create recursive functions. In our experience the creation of recursive functions is often the most delicate part of a supercompiler, so we deliberately include all the details. The code for our manager is given in Figure \ref{fig:manager}, making use of a some auxiliary functions whose types are given in Figure \ref{fig:manager2}. We first give an intuition for how the manager works, then describe each part separately.
+Our supercompiler is based around a manager, that integrates the answers to the questions of supercompilation. The manager itself has two main purposes: to create recursive functions, and to ensure termination (assuming the simplifier terminates). In our experience the creation of recursive functions is often the most delicate part of a supercompiler, so we deliberately include all the details. The code for our manager is given in Figure \ref{fig:manager}, making use of a some auxiliary functions whose types are given in Figure \ref{fig:manager2}. We first give an intuition for how the manager works, then describe each part.
 
 Our supercompiler takes a source program, and generates a target program. Functions in these programs are distinct -- target expressions cannot refer to source functions. The source and target program are equivalent, but hopefully the target program runs faster. We use the type |Env| to represent a mapping from source function names to expressions, allowing a result of |Nothing| to indicate a primitive function.
 

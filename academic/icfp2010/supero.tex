@@ -114,15 +114,15 @@ One informal description of supercompilation is that you simply ``run the progra
 
 \subsection{Contributions}
 
-Our primary contribution is the design of a new supercompiler (\S\ref{sec:method}). Our supercompiler has many differences from previous supercompilers (\S\ref{sec:comparison}), including a new core language, a substantially different treatment of let expressions and an entirely new termination criteria. The result is a supercompiler with a number of desirable properties:
+Our primary contribution is the design of a new supercompiler (\S\ref{sec:method}). Our supercompiler has many differences from previous supercompilers (\S\ref{sec:comparison}), including a new core language, a substantially different treatment of let expressions and entirely new termination criteria. The result is a supercompiler with a number of desirable properties:
 
 \begin{description}
-\item[Simple] Our supercompiler is designed to be simple. From the descriptions given in this paper a reader should be able to write their own supercompiler. We have written a supercompiler following our design which is available online\footnote{\verb"http://hackage.haskell.org/package/supero"}. Much of the code (for example Figure \ref{fig:manager}) has been copied verbatim in to our implementation. The supercompiler can be implemented in under 300 lines of Haskell.
+\item[Simple] Our supercompiler is designed to be simple. From the descriptions given in this paper a reader should be able to write their own supercompiler. We have written a supercompiler following our design which is available online\footnote{\verb"http://hackage.haskell.org/package/supero"}. Much of the code (for example Figure \ref{fig:manager}) has been copied verbatim into our implementation. The supercompiler can be implemented in under 300 lines of Haskell.
 \item[Fast compilation] Previous supercompilers have reported compilation times of up to five minutes for small examples \cite{me:supero}. Our compilation times are under four seconds, and there are many further compile time improvements that could be made (\S\ref{sec:benchmarks_compile}).
 \item[Fast runtime] We have benchmarked our supercompiler on a range of small examples (\S\ref{sec:benchmarks}). Some programs optimised with our supercompiler, and then compiled with GHC, are more than twice as fast than when compiled with GHC alone.
 \end{description}
 
-We give several examples of how our supercompiler performs (\S\ref{sec:manager_example}), including how it subsumes list fusion and specialisation (\S\ref{sec:examples}), and what happens when the termination criteria are needed (\S\ref{sec:term_example}).
+We give examples of how our supercompiler performs (\S\ref{sec:manager_example}), including how it subsumes list fusion and specialisation (\S\ref{sec:examples}), and what happens when the termination criteria are needed (\S\ref{sec:term_example}).
 
 \section{Method}
 \label{sec:method}
@@ -427,7 +427,7 @@ root g f x = case  x of
                    z:zs  -> g (f z) : root g f zs
 \end{code}
 
-The final version has automatically removed the intermediate list, with no additional knowledge about the |map| function or its fusion rules.
+The final version has removed the intermediate list, with no additional knowledge about the |map| function or its fusion rules.
 
 \subsection{Evaluation}
 \label{sec:eval}
@@ -781,7 +781,7 @@ We first split every variable bound at the let, to give:
 
 We now move variable |v_i| under |v_j| using the same conditions as |split|, described in \S\ref{sec:eval_split_lambda}. In addition, we do not merge |v_i| under |v_j| if the resulting expression bound to |v_j| would violate the termination criteria |terminate (<=||) h|. Combined with with the property that all initial children are singleton name bags, which trivially satisfy $\unlhd$ for any expression, our merge restriction ensures no children violate the termination criteria.
 
-As a heuristic, we attempt to move variable |v| before |w| if the name associated with |v| occurs fewer times in the original expression. In most expressions that are growing, and therefore hit the termination criteria, there will be some name that keeps repeating. By favouring names that are less frequent we hope to keep together subexpressions that are not growing. This heuristic has no effect on the correctness or termination, but can sometimes result in better optimisation.
+As a heuristic, we attempt to move variable |v| before |w| if the name associated with |v| occurs fewer times in the original expression. In most expressions that are growing, and therefore hit the termination criteria, there will be some name that keeps repeating. By favouring less frequent names we hope to keep together subexpressions that are not growing. This heuristic has no effect on the correctness or termination, but sometimes gives better optimisation.
 
 \subsubsection{Example}
 \label{sec:term_example}

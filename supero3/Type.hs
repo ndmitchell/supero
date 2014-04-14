@@ -194,7 +194,7 @@ fromExp (If a b c) = fromExp $ H.Case a [f "True" b, f "False" c]
     where f con x = Alt sl (PApp (UnQual $ Ident con) []) (UnGuardedAlt x) (BDecls [])
 fromExp o@(H.Let (BDecls xs) x) = Let noname ((f1,fromExp x):concatMap fromDecl xs) f1
     where f1:_ = freshNames o
-fromExp o@(Tuple xs) = Let noname
+fromExp o@(Tuple _ xs) = Let noname
     ((f1, Con noname (fromTuple xs) (take (length xs) fs)) : zipWith (\f x -> (f,fromExp x)) fs xs) f1
     where f1:fs = freshNames o
 fromExp (H.Con (Special (TupleCon _ n))) = Con noname (fromTuple $ replicate n ()) []
@@ -215,7 +215,7 @@ fromPat (PList []) = Con noname "[]" []
 fromPat (PApp (Special Cons) xs) = Con noname ":" $ map fromPatVar xs
 fromPat (PInfixApp a b c) = fromPat $ PApp b [a,c]
 fromPat (PApp (UnQual c) xs) = Con noname (fromName c) $ map fromPatVar xs
-fromPat (PTuple xs) = Con noname (fromTuple xs) $ map fromPatVar xs
+fromPat (PTuple _ xs) = Con noname (fromTuple xs) $ map fromPatVar xs
 fromPat (PApp (Special (TupleCon _ n)) xs) = Con noname (fromTuple xs) $ map fromPatVar xs
 fromPat PWildCard = App noname "_wild" []
 fromPat x = error $ "Unhandled fromPat: " ++ show x

@@ -25,7 +25,7 @@ main = do
     forM_ files $ \x -> do
         let y = dropExtension x <.> "opt.hs"
         src <- readFile x
-        let res = fleshOut src $ prettyPrint $ toHSE $ supercompile $ env $ simplifyProg $ fromHSE $
+        let res = fleshOut src $ prettyPrint $ toHSE $ supercompile $ simplifyProg $ fromHSE $
                         fromParseResult $ parseFileContents $ cpphs ["SUPERO"] src
         when ("--only" `notElem` opts) $ do
             timer $ writeFile y res

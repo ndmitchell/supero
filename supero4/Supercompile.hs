@@ -10,21 +10,61 @@ module Supercompile(supercompile) where
 
 import Type
 import Simplify
-import Terminate
 import Util
 import Data.List
 import Data.Maybe
 import Control.Arrow
+import Control.Monad.State
 import Data.Generics.Uniplate.Data hiding (children)
+import Control.Applicative
+
 
 ---------------------------------------------------------------------
 -- MANAGER
 
-data Tree = Tree {pre :: Exp, gen :: [Var] -> Exp, children :: [Tree]}
+type S = [(Var, Exp, Exp)]
 
 
-supercompile :: Env -> [(Var,Exp)]
-supercompile env = resetTime $ assign $ flatten $ optimise env $ fromJustNote "can't find root" $ env "root"
+supercompile :: [(Var,Exp)] -> [(Var,Exp)]
+supercompile inp = resetTime $ flip evalState [] $ do
+    env <- return $ env inp
+    res <- define env $ fromJustNote "can't find root" $ env "root"
+    s <- get
+    return $ ("root",res) : reverse [(a,b) | (a,_,b) <- s]
+
+
+define :: Env -> Exp -> State S Exp
+define env x = do
+    s <- get
+    name <- case find (\(_,t,_) -> t == x) s of
+        Just (name,_,_) -> return name
+        Nothing -> do
+            let name = "f" ++ show (length s + 1)
+            modify ((name,x,Var "undefined"):)
+            bod <- optimise env x
+            modify $ map $ \o@(name2,t,_) -> if name == name2 then (name,t,bod) else o
+            return name
+    return $ Var name
+
+
+optimise :: Env -> Exp -> State S Exp
+optimise env (Var x) = maybe (return $ Var x) (optimise env) $ env x
+optimise env x | Just x <- unfold env $ simplify2 x = optimise env x
+optimise env x = error $ "optimise\n" ++ pretty (simplify2 x)
+
+
+unfold :: Env -> Exp -> Maybe Exp
+unfold env x = case x of
+    Var v -> env v
+    Lam v x -> Lam v <$> f x
+    App x y -> flip App y <$> f x
+    Let x y -> Let x <$> f y
+    Case x y -> flip Case y <$> f x
+    _ -> Nothing
+    where f = unfold env
+
+
+{-
 
 
 optimise :: Env -> Exp -> Tree
@@ -266,3 +306,4 @@ stop hist x = if time 10000 then
     where
         res = share (not . terminate (<=|) hist) $ fromFlat $ FlatExp free (map (second Box) bind) root
         FlatExp free bind root = toFlat x
+-}

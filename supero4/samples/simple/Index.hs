@@ -9,7 +9,7 @@ main x n = x !! n
     [] -> error "bad"
     x:zs -> case y == 0 of
         True -> x
-        False -> (!!) zs (y-1)
+        False -> (!!) zs (jail (y-1))
 
     
     

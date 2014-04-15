@@ -47,13 +47,13 @@ map f x = case x of
     y:ys -> f y : map f ys
     [] -> []
 
-iterate f x = x : iterate f (f x)
+iterate f x = x : iterate f (jail (f x))
 
 (!!) :: [a] -> Int -> a
 (!!) xs y = case xs of
     [] -> error "bad"
     x:xs -> case y == 0 of
         True -> x
-        False -> (!!) xs (y - 1)
+        False -> (!!) xs (jail (y - 1))
 
 #endif

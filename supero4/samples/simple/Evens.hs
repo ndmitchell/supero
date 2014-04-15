@@ -21,11 +21,11 @@ filter f x = case x of
         True -> x : filter f xs
         False -> filter f xs
 
-iterate f x = x : iterate f (f x)
+iterate f x = x : iterate f (jail (f x))
 
 (!!) :: [a] -> Int -> a
 (!!) xs y = case xs of
     [] -> error "bad"
     x:xs -> case eq y of
         True -> x
-        False -> (!!) xs (sub y)
+        False -> (!!) xs (jail (sub y))

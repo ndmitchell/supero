@@ -1,0 +1,4 @@
+:set -fno-warn-overlapping-patterns
+:def go \x -> return $ ":main samples/simple/" ++ x ++ ".hs"
+:def mapmap const $ return ":go MapMap"
+:load Main

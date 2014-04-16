@@ -6,6 +6,7 @@ import Exp
 import Simplify
 import Util
 
+import Control.Applicative
 import Control.Monad
 import Language.Haskell.Exts
 import System.Environment
@@ -20,23 +21,49 @@ import System.IO.Unsafe
 
 
 main = do
-    xs <- getArgs
-    let (opts,files) = partition ("-" `isPrefixOf`) xs
-    forM_ files $ \x -> do
-        let y = dropExtension x <.> "opt.hs"
-        src <- readFile x
-        let res = fleshOut src $ prettyPrint $ toHSE $ supercompile $ simplifys $ fromHSE $
+    args <- getArgs
+    when (null args) $ do
+        putStrLn $ "Arguments: --compile --test --benchmark [FILE|DIR]"
+        exitSuccess
+    let (opts,files) = partition ("-" `isPrefixOf`) args
+    files <- findFiles files
+    createDirectoryIfMissing True "obj"
+    let modu = intercalate "." . splitDirectories . dropExtension
+    forM_ files $ \inp -> do
+        let out = dropExtension inp ++ "_gen.hs"
+        src <- readFile inp
+        let res = fleshOut (modu out) src $ prettyPrint $ toHSE $ supercompile $ simplifys $ fromHSE $
                         fromParseResult $ parseFileContents $ cpphs ["SUPERO"] src
-        when ("--only" `notElem` opts) $ do
-            timer $ writeFile y res
+        timer $ writeFile out res
         when ("--compile" `elem` opts) $ do
-            withDirectory (takeDirectory x) $ do
-                timer $ system_ $ "ghc --make -O2 " ++ takeFileName y ++ " -ddump-simpl > " ++ takeFileName y ++ ".log"
-                system_ $ "ghc --make -O2 " ++ takeFileName x ++ " -ddump-simpl -cpp -DMAIN -DMAIN_GHC > " ++ takeFileName x ++ ".log"
+            createDirectoryIfMissing True $ "obj" </> takeDirectory out
+            timer $ system_ $ "ghc -O2 " ++ out ++ " -ddump-simpl -outputdir obj > obj/" ++ out ++ ".core"
 
--- not unsafe since no include files
+    when ("--test" `elem` opts) $ do
+        createDirectoryIfMissing True "obj"
+        let ms = map modu files
+        writeFile "Test_gen.hs" $ unlines $
+            ["module Test_gen(main) where"
+            ,"import Support"] ++
+            ["import qualified " ++ m ++ "; import qualified " ++ m ++ "_gen" | m <- ms] ++
+            ["main = do"] ++
+            ["    testEqual \"" ++ m ++ "\" " ++ m ++ ".main " ++ m ++ "_gen.main" | m <- ms]
+        system_ $ "ghc -O2 --make Test_gen.hs -outputdir obj -XCPP -DMAIN -o obj/Test_gen.exe -main-is Test_gen.main"
+        system_ $ "obj" </> "Test_gen.exe"
+
+    when ("--benchmark" `elem` opts) $ do
+        putStrLn "benchmark here"
+
+
+-- safe since no include files
 cpphs :: [String] -> String -> String
 cpphs defs = unsafePerformIO . runCpphs defaultCpphsOptions{defines=map (flip (,) "1") defs} ""
+
+
+findFiles :: [String] -> IO [FilePath]
+findFiles want = do
+    xs <- filter ((==) ".hs" . takeExtension) <$> getDirectoryContentsRecursive ""
+    return $ filter (\x -> any (`elem` map (lower . dropExtension) (splitDirectories x)) $ map lower want) xs
 
 
 withDirectory new act = do
@@ -53,6 +80,8 @@ system_ cmd = do
     when (res /= ExitSuccess) $ error "system command failed"
 
 
-fleshOut :: String -> String -> String
-fleshOut orig new = "{-# OPTIONS_GHC -O2 #-}\nmodule Main(main) where\n" ++ f "IMPORT_SUPERO" ++ f "MAIN" ++ f "MAIN_SUPERO" ++ new ++ "\n\n"
+fleshOut :: String -> String -> String -> String
+fleshOut modu orig new =
+    "{-# OPTIONS_GHC -O2 #-}\nmodule " ++ modu ++ "(main) where\n" ++
+    f "IMPORT_SUPERO" ++ f "MAIN" ++ f "MAIN_SUPERO" ++ new ++ "\n\n"
     where f x = unlines $ takeWhile (/= "#endif") $ drop 1 $ dropWhile (/= ("#if " ++ x)) $ lines orig

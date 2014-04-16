@@ -1,1 +1,4 @@
 *.opt.hs
+*.exe
+*.hi
+*.o

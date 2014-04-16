@@ -1,4 +1,4 @@
-*.opt.hs
+*_gen.hs
 *.exe
 *.hi
 *.o

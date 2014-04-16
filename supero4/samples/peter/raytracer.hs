@@ -10,8 +10,8 @@ zipWith f xs ys = case xs of
 sum xs = sumWith 0 xs
 
 sumWith acc xs = case xs of
-    [] -> acc
-    x:xs -> sumWith (x+acc) xs
+    [] -> jail acc
+    x:xs -> sumWith (x+ jail acc) xs
 
 root xs ys = sum (zipWith (*) xs ys)
 

@@ -26,8 +26,8 @@ mul'2 = (*) :: Int -> Int -> Int
 sum xs = sumWith 0 xs
 
 sumWith acc xs = case xs of
-    [] -> acc
-    x:xs -> sumWith (x+acc) xs
+    [] -> jail acc
+    x:xs -> sumWith (x+ jail acc) xs
 
 enumFromTo i j = if i > j then [] else i : enumFromTo (i+1) j
 

@@ -3,7 +3,7 @@ Compute digits of e
 Due to John Hughes, Aug 2001
 -}
 
-module Main where
+module Main(main) where
 
 {-
 Here's a way to compute all the digits of e. We use the series

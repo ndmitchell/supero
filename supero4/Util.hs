@@ -11,6 +11,11 @@ import System.IO.Unsafe
 import Data.Time.Clock.POSIX(getPOSIXTime)
 
 
+rlookup :: Eq a => a -> [(b,a)] -> Maybe b
+rlookup x y = lookup x $ map swap y
+
+swap (x,y) = (y,x)
+
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
 sortOn f = sortBy (compare `on` f)
 

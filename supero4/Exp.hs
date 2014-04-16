@@ -2,9 +2,9 @@
 
 module Exp(
     Var(..), Con(..), Exp(..), Pat(..),
-    fromApps, lets, lams, apps,
+    fromApps, fromLams, lets, lams, apps,
     prettys, pretty,
-    vars, free, subst, relabel, count, linear,
+    vars, free, subst, relabel, count, linear, fresh,
     fromHSE, toHSE
     ) where
 
@@ -56,13 +56,18 @@ lets ((a,b):ys) x = Let a b $ lets ys x
 isVar (Var _) = True; isVar _ = False
 isCon (Con _) = True; isCon _ = False
 
+fromLams (Lam x y) = (x:a, b)
+    where (a,b) = fromLams y
+fromLams x = ([], x)
 
 fromApps (App x y) = (a,b ++ [y])
     where (a,b) = fromApps x
 fromApps x = (x,[])
 
 pretty :: Exp -> String
-pretty = prettyPrint . toExp
+pretty = prettyPrint . unparen . inflate . toExp
+    where unparen (Paren x) = x
+          unparen x = x
 
 prettys :: [(Var,Exp)] -> String
 prettys = prettyPrint . toHSE
@@ -108,12 +113,17 @@ count v (App x y) = count v x + count v y
 count v _ = 0
 
 relabel :: Exp -> Exp
-relabel x = evalState (f x) (fresh \\ free x)
+relabel x = evalState (f $ safe x) (fresh $ free x)
     where
+        safe :: Exp -> Exp
+        -- imagine: \b a, trying to rename to \a b, the first subst doesn't work
+        safe x = transformBi (\v -> if v `elem` frees then v else V $ '!' : fromVar v) x
+            where frees = free x
+
         f :: Exp -> State [Var] Exp
         f (Lam v x) = do i <- var; Lam i <$> f (subst [(v,Var i)] x)
         f (Let v x y) = do i <- var; Let i <$> f x <*> f (subst [(v,Var i)] y)
-        f (Case x alts) = Case x <$> mapM g alts
+        f (Case x alts) = Case <$> f x <*> mapM g alts
         f (App x y) = App <$> f x <*> f y
         f x = return x
 
@@ -122,9 +132,11 @@ relabel x = evalState (f x) (fresh \\ free x)
 
         var = do s:ss <- get; put ss; return s
 
-        fresh = map V $ concatMap new [1..]
-        new 1 = map return ['a'..'z']
-        new i = [a ++ b | a <- new 1, b <- new (i-1)]
+fresh :: [Var] -> [Var]
+fresh used = map V (concatMap f [1..]) \\ used
+    where f 1 = map return ['a'..'z']
+          f i = [a ++ b | a <- f 1, b <- f (i-1)]
+
 
 ---------------------------------------------------------------------
 -- FROM HSE

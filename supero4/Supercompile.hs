@@ -10,7 +10,7 @@ module Supercompile(supercompile) where
 
 import Exp
 import Simplify
-import Util
+import Util hiding (fresh)
 import Data.List
 import Data.Maybe
 import Control.Arrow
@@ -43,11 +43,11 @@ supercompile env = resetTime $ unsafePerformIO $ flip evalStateT [] $ do
 define :: [(Var,Exp)] -> Exp -> S Exp
 define env x = do
     s <- get
-    x <- return $ relabel x
+    x <- return $ relabel $ simplify x
     name <- case find (\(_,t,_) -> t == x) s of
         Just (name,_,_) -> return name
         Nothing -> do
-            let name = V $ "f" ++ show (length s + 1)
+            let name = V $ "_" ++ show (length s + 1)
             debug $ "define: " ++ fromVar name ++ " = " ++ pretty x
             modify ((name,x,Var $ V "undefined"):)
             bod <- optimise env x
@@ -57,25 +57,55 @@ define env x = do
 
 
 optimise :: [(Var,Exp)] -> Exp -> S Exp
-optimise env (Var x) = maybe (return $ Var x) (optimise env) $ lookup x env
-optimise env x | Just x <- unfold env $ simplify x = optimise env x
-optimise env x = peel env $ simplify x
+optimise env (simplify -> x)
+    | V "jail" `elem` free x = dejail env x
+    | Just x <- unfold env x = optimise env x
+    | otherwise = do debug $ "peel: " ++ pretty x; peel env $ simplify x
+
+
+dejail :: [(Var,Exp)] -> Exp -> S Exp
+dejail env (fromLams -> (root, x)) = do
+        debug "fail"
+        --debug $ "dejail in: " ++ pretty x
+        (bod,(_,(unzip -> (vs,xs)))) <- return $ runState (f [] x) (fresh $ vars x, [])
+        --debug $ "dejail out: " ++ pretty (lams root $ lets (zip vs xs) bod)
+        let def x = let fv = root `intersect` free x in flip apps (map Var fv) <$> define env (lams fv x)
+        lams root <$> (apps <$> def (lams vs bod) <*> mapM def xs)
+    where
+        f :: [Var] -> Exp -> State ([Var], [(Var,Exp)]) Exp
+        f vs (Lam v x) = Lam v <$> f (vs++[v]) x
+        f vs (Case v xs) = Case <$> f vs v <*> mapM (g vs) xs
+        f vs (Let v x y) = Let v <$> f vs x <*> f (vs++[v]) y
+        f vs (App (Var (V "jail")) x) = do
+                let vs2 = reverse $ nub $ reverse $ vs `intersect` free x
+                (n:ew,bnd) <- get
+                case rlookup (lams vs2 x) bnd of
+                    Just n -> return $ apps (Var n) $ map Var vs2
+                    Nothing -> do
+                        put (ew,(n,lams vs2 x):bnd)
+                        return $ apps (Var n) $ map Var vs2
+        f vs (App x y) = App <$> f vs x <*> f vs y
+        f vs x = return x
+
+        g vs (PWild, x) = (PWild,) <$> f vs x
+        g vs (PCon c ps, x) = (PCon c ps,) <$> f (vs ++ ps) x
 
 
 peel :: [(Var,Exp)] -> Exp -> S Exp
-peel env x = f [] False x
+peel env = f [] False
     where
         f vs down (Lam v x) = Lam v <$> f (vs++[v]) down x
-        f vs down (Case v xs) = Case v <$> mapM (g vs) xs
+        f vs down (Case v xs) = Case <$> f vs down v <*> mapM (g vs) xs
         f vs down (fromApps -> (Con c, xs)) = apps (Con c) <$> mapM (f vs True) xs
         f vs down (fromApps -> (Var v, xs)) | v `elem` vs || isNothing (lookup v env) = apps (Var v) <$> mapM (f vs True) xs
         f vs False (App x y) = App <$> f vs True x <*> f vs True y
-        f vs False (Let v x y) = Let v <$> f (vs++[v]) True x <*> f (vs++[v]) True y
-        f vs down x = flip apps (map Var vs2) <$> define env (lams (vs2) x)
+        f vs False (Let v x y) = Let v <$> f vs True x <*> f (vs++[v]) True y
+        f vs down x = flip apps (map Var vs2) <$> define env (lams vs2 x)
             where vs2 = reverse $ nub $ reverse $ vs `intersect` free x
 
         g vs (PWild, x) = (PWild,) <$> f vs True x
         g vs (PCon c ps, x) = (PCon c ps,) <$> f (vs ++ ps) True x
+
 
 unfold :: [(Var,Exp)] -> Exp -> Maybe Exp
 unfold env x = case x of

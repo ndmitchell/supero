@@ -64,9 +64,10 @@ inflate =
 inflateExp :: Exp -> Exp
 inflateExp (Lambda sl ps (Paren x)) = inflateExp $ Lambda sl ps x
 inflateExp (Lambda sl ps1 (Lambda _ ps2 x)) | null $ names ps1 `intersect` names ps2 = Lambda sl (ps1++ps2) x
-inflateExp (Paren (Paren x)) = Paren x
+inflateExp (Paren (Paren x)) = inflateExp $ Paren x
 inflateExp (Paren (Var x)) = Var x
 inflateExp (Paren (Con x)) = Con x
+inflateExp (Paren (List x)) = List x
 inflateExp (App (Paren (App a b)) c) = App (App a b) c
 inflateExp (Con (UnQual (Symbol "[]"))) = List []
 inflateExp x = x

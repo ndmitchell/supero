@@ -23,7 +23,8 @@ spec (TupleCon Boxed i) = UnQual $ Ident $ "(" ++ replicate (i-1) ',' ++ ")"
 spec x = Special x
 
 deflateDecl :: Decl -> Decl
-deflateDecl (FunBind [Match sl f vars Nothing (UnGuardedRhs x) (BDecls [])]) = PatBind sl (PVar f) Nothing (UnGuardedRhs $ Lambda sl vars x) (BDecls [])
+deflateDecl (FunBind [Match sl f vars Nothing (UnGuardedRhs x) (BDecls [])]) =
+    PatBind sl (PVar f) Nothing (UnGuardedRhs $ Lambda sl vars x) (BDecls [])
 deflateDecl x = x
 
 deflateQName :: QName -> QName
@@ -56,7 +57,8 @@ deflatePat x = x
 
 inflate :: Data a => a -> a
 inflate =
-    transformBi inflateRhs . transformBi inflateGuardedAlts . transformBi inflatePat . transformBi inflateExp . transformBi inflatePat .
+    transformBi inflateRhs . transformBi inflateAlt . transformBi inflateGuardedAlts .
+    transformBi inflatePat . transformBi inflateExp .
     transformBi Paren . transformBi PParen
 
 inflateExp :: Exp -> Exp
@@ -66,16 +68,22 @@ inflateExp (Paren (Paren x)) = Paren x
 inflateExp (Paren (Var x)) = Var x
 inflateExp (Paren (Con x)) = Con x
 inflateExp (App (Paren (App a b)) c) = App (App a b) c
+inflateExp (Con (UnQual (Symbol "[]"))) = List []
 inflateExp x = x
 
 inflatePat :: Pat -> Pat
 inflatePat (PParen (PParen x)) = PParen x
 inflatePat (PParen (PVar x)) = PVar x
+inflatePat (PApp (UnQual (Symbol "[]")) []) = PList []
 inflatePat x = x
 
 inflateRhs :: Rhs -> Rhs
 inflateRhs (UnGuardedRhs (Paren x)) = UnGuardedRhs x
 inflateRhs x = x
+
+inflateAlt :: Alt -> Alt
+inflateAlt (Alt sl (PParen p) x y) = Alt sl p x y
+inflateAlt x = x
 
 inflateGuardedAlts :: GuardedAlts -> GuardedAlts
 inflateGuardedAlts (UnGuardedAlt (Paren x)) = UnGuardedAlt x

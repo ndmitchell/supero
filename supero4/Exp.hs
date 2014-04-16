@@ -1,10 +1,10 @@
-{-# LANGUAGE DeriveDataTypeable, PatternGuards #-}
+{-# LANGUAGE DeriveDataTypeable, PatternGuards, TupleSections #-}
 
 module Exp(
     Var(..), Con(..), Exp(..), Pat(..),
-    fromApps, lets,
+    fromApps, lets, lams, apps,
     prettys, pretty,
-    vars, free, subst, fresh, count, linear,
+    vars, free, subst, relabel, count, linear,
     fromHSE, toHSE
     ) where
 
@@ -12,6 +12,7 @@ module Exp(
 import Data.Maybe
 import Data.List
 import Data.Data
+import Control.Applicative
 import Control.Monad.State
 import Data.Char
 import Control.Arrow
@@ -44,6 +45,9 @@ data Pat
 
 apps x (y:ys) = apps (App x y) ys
 apps x [] = x
+
+lams (y:ys) x = Lam y $ lams ys x
+lams [] x = x
 
 lets [] x = x
 lets ((a,b):ys) x = Let a b $ lets ys x
@@ -78,7 +82,7 @@ free (Var x) = [x]
 free (App x y) = nub $ free x ++ free y
 free (Lam x y) = delete x $ free y
 free (Case x y) = nub $ free x ++ concat [free b \\ varsP a | (a,b) <- y]
-free (Let a b y) = delete a $ nub $ free b ++ free y
+free (Let a b y) = nub $ free b ++ delete a (free y)
 free _ = []
 
 subst :: [(Var,Exp)] -> Exp -> Exp
@@ -88,12 +92,9 @@ subst ren e = case e of
     App x y -> App (f [] x) (f [] y)
     Lam x y -> Lam x (f [x] y)
     Case x y -> Case (f [] x) [(a, f (varsP a) b) | (a,b) <- y]
-    Let a b y -> Let a (f [a] b) $ f [a] y
+    Let a b y -> Let a (f [] b) $ f [a] y
     x -> x
     where f del x = subst (filter (flip notElem del . fst) ren) x
-
-fresh :: Exp -> [Var]
-fresh x = [V $ "v" ++ show i | i <- [1..]] \\ vars x 
 
 linear :: Var -> Exp -> Bool
 linear v x = count v x <= 1
@@ -101,11 +102,29 @@ linear v x = count v x <= 1
 count :: Var -> Exp -> Int
 count v (Var x) = if v == x then 1 else 0
 count v (Lam w y) = if v == w then 0 else count v y
-count v (Let w x y) = if v == w then 0 else count v x + count v y
+count v (Let w x y) = count v x + (if v == w then 0 else count v y)
 count v (Case x alts) = count v x + maximum [if v `elem` varsP p then 0 else count v c | (p,c) <- alts]
 count v (App x y) = count v x + count v y
 count v _ = 0
 
+relabel :: Exp -> Exp
+relabel x = evalState (f x) (fresh \\ free x)
+    where
+        f :: Exp -> State [Var] Exp
+        f (Lam v x) = do i <- var; Lam i <$> f (subst [(v,Var i)] x)
+        f (Let v x y) = do i <- var; Let i <$> f x <*> f (subst [(v,Var i)] y)
+        f (Case x alts) = Case x <$> mapM g alts
+        f (App x y) = App <$> f x <*> f y
+        f x = return x
+
+        g (PWild, x) = (PWild,) <$> f x
+        g (PCon c vs, x) = do is <- replicateM (length vs) var; (PCon c is,) <$> f (subst (zip vs $ map Var is) x)
+
+        var = do s:ss <- get; put ss; return s
+
+        fresh = map V $ concatMap new [1..]
+        new 1 = map return ['a'..'z']
+        new i = [a ++ b | a <- new 1, b <- new (i-1)]
 
 ---------------------------------------------------------------------
 -- FROM HSE

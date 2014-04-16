@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE PatternGuards, GeneralizedNewtypeDeriving, TupleSections, ViewPatterns #-}
 
 {-
 TODO:
@@ -14,31 +14,41 @@ import Util
 import Data.List
 import Data.Maybe
 import Control.Arrow
-import Control.Monad.State
+import Control.Monad.Trans.State
+import Control.Monad.IO.Class
 import Data.Generics.Uniplate.Data hiding (children)
 import Control.Applicative
+import System.IO.Unsafe
+
+
+---------------------------------------------------------------------
+-- MONAD
+
+type S a = StateT [(Var, Exp, Exp)] IO a
+
+debug :: String -> S ()
+debug = liftIO . putStrLn
 
 
 ---------------------------------------------------------------------
 -- MANAGER
 
-type S = [(Var, Exp, Exp)]
-
-
 supercompile :: [(Var,Exp)] -> [(Var,Exp)]
-supercompile env = resetTime $ flip evalState [] $ do
+supercompile env = resetTime $ unsafePerformIO $ flip evalStateT [] $ do
     res <- define env $ fromJustNote "Could not find root in env" $ lookup (V "root") env
     s <- get
     return $ (V "root",res) : reverse [(a,b) | (a,_,b) <- s]
 
 
-define :: [(Var,Exp)] -> Exp -> State S Exp
+define :: [(Var,Exp)] -> Exp -> S Exp
 define env x = do
     s <- get
+    x <- return $ relabel x
     name <- case find (\(_,t,_) -> t == x) s of
         Just (name,_,_) -> return name
         Nothing -> do
             let name = V $ "f" ++ show (length s + 1)
+            debug $ "define: " ++ fromVar name ++ " = " ++ pretty x
             modify ((name,x,Var $ V "undefined"):)
             bod <- optimise env x
             modify $ map $ \o@(name2,t,_) -> if name == name2 then (name,t,bod) else o
@@ -46,11 +56,26 @@ define env x = do
     return $ Var $ name
 
 
-optimise :: [(Var,Exp)] -> Exp -> State S Exp
+optimise :: [(Var,Exp)] -> Exp -> S Exp
 optimise env (Var x) = maybe (return $ Var x) (optimise env) $ lookup x env
 optimise env x | Just x <- unfold env $ simplify x = optimise env x
-optimise env x = error $ "optimise\n" ++ pretty (simplify x)
+optimise env x = peel env $ simplify x
 
+
+peel :: [(Var,Exp)] -> Exp -> S Exp
+peel env x = f [] False x
+    where
+        f vs down (Lam v x) = Lam v <$> f (vs++[v]) down x
+        f vs down (Case v xs) = Case v <$> mapM (g vs) xs
+        f vs down (fromApps -> (Con c, xs)) = apps (Con c) <$> mapM (f vs True) xs
+        f vs down (fromApps -> (Var v, xs)) | v `elem` vs || isNothing (lookup v env) = apps (Var v) <$> mapM (f vs True) xs
+        f vs False (App x y) = App <$> f vs True x <*> f vs True y
+        f vs False (Let v x y) = Let v <$> f (vs++[v]) True x <*> f (vs++[v]) True y
+        f vs down x = flip apps (map Var vs2) <$> define env (lams (vs2) x)
+            where vs2 = reverse $ nub $ reverse $ vs `intersect` free x
+
+        g vs (PWild, x) = (PWild,) <$> f vs True x
+        g vs (PCon c ps, x) = (PCon c ps,) <$> f (vs ++ ps) True x
 
 unfold :: [(Var,Exp)] -> Exp -> Maybe Exp
 unfold env x = case x of
@@ -61,6 +86,7 @@ unfold env x = case x of
     Case x y -> flip Case y <$> f x
     _ -> Nothing
     where f = unfold env
+
 
 
 {-

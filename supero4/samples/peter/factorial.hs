@@ -2,7 +2,7 @@
 fac :: Int -> Int
 fac n = case n == 0 of
     True -> 1
-    False -> n * fac (n-1)
+    False -> n * fac (jail (n-1))
 
 root x = fac x
 

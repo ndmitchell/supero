@@ -2,7 +2,7 @@
 module Main where
 
 
-main x = map id x
+root x = map id x
 
 map f x = case x of
     [] -> []

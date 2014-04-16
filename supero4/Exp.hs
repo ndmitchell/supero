@@ -1,8 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, PatternGuards #-}
 
 module Exp(
-    Var(..), Fun(..), Con(..), Prm(..),
-    Exp(..), Pat(..),
+    Var(..), Con(..), Exp(..), Pat(..),
     fromApps, lets,
     prettys, pretty,
     vars, free, subst, fresh, count, linear,
@@ -26,16 +25,12 @@ import qualified Data.Map as Map
 ---------------------------------------------------------------------
 -- TYPE
 
-newtype Var = V {fromVar :: String} deriving (Data,Typeable,Eq,Show) -- a locally defined variable
-newtype Fun = F {fromFun :: String} deriving (Data,Typeable,Eq,Show) -- a top-level function
-newtype Con = C {fromCon :: String} deriving (Data,Typeable,Eq,Show) -- a constructor
-newtype Prm = P {fromPrm :: String} deriving (Data,Typeable,Eq,Show) -- a primitive
+newtype Var = V {fromVar :: String} deriving (Data,Typeable,Eq,Show)
+newtype Con = C {fromCon :: String} deriving (Data,Typeable,Eq,Show)
 
 data Exp
     = Var Var
-    | Fun Fun
     | Con Con
-    | Prm Prm 
     | App Exp Exp
     | Let Var Exp Exp -- non-recursive
     | Lam Var Exp
@@ -166,8 +161,6 @@ toDecl (V f) x = PatBind sl (PVar $ toName f) Nothing (UnGuardedRhs $ toExp x) (
 
 toExp :: Exp -> H.Exp
 toExp (Var (V x)) = H.Var $ UnQual $ toName x
-toExp (Fun (F x)) = H.Var $ UnQual $ toName x
-toExp (Prm (P x)) = H.Var $ UnQual $ toName x
 toExp (Con (C x)) = H.Con $ UnQual $ toName x
 toExp (Lam (V x) y) = Lambda sl [PVar $ toName x] $ toExp y
 toExp (Let a b y) = H.Let (BDecls [toDecl a b]) $ toExp y

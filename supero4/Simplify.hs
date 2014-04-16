@@ -31,9 +31,7 @@ simplify = transform f
                                    | otherwise = Nothing
         f x = x
 
-cheap (Fun _) = True
 cheap (Var _) = True
 cheap (Con _) = True
-cheap (Prm _) = True
 cheap (Lam _ _) = True
 cheap _ = False

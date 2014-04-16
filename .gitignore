@@ -2,3 +2,4 @@
 *.exe
 *.hi
 *.o
+*.core

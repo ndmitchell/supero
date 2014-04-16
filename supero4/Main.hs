@@ -5,6 +5,7 @@ import Supercompile
 import Exp
 import Simplify
 import Util
+import Support() -- just to ensure it does compile
 
 import Control.Applicative
 import Control.Monad

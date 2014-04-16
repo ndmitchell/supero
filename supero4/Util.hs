@@ -12,6 +12,8 @@ import Data.Time.Clock.POSIX(getPOSIXTime)
 import System.Directory
 import System.FilePath
 import Data.Char
+import System.IO
+import GHC.IO.Handle(hDuplicate,hDuplicateTo)
 
 
 rlookup :: Eq a => a -> [(b,a)] -> Maybe b
@@ -137,3 +139,25 @@ concatMapM f = liftM concat . mapM f
 
 lower = map toLower
 upper = map toUpper
+
+captureOutput :: IO () -> IO String
+captureOutput act = do
+    tmp <- getTemporaryDirectory
+    (f,h) <- openTempFile tmp "hlint"
+    sto <- hDuplicate stdout
+    ste <- hDuplicate stderr
+    hDuplicateTo h stdout
+    hDuplicateTo h stderr
+    hClose h
+    act
+    hDuplicateTo sto stdout
+    hDuplicateTo ste stderr
+    res <- readFile' f
+    removeFile f
+    return res
+
+readFile' :: FilePath -> IO String
+readFile' x = listM' =<< readFile x
+
+listM' :: Monad m => [a] -> m [a]
+listM' x = length x `seq` return x

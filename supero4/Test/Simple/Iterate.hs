@@ -1,5 +1,5 @@
 
-module Main(main) where
+module Test.Simple.Iterate(main) where
 
 #if STREAM
 import Prelude hiding((!!), iterate, map)

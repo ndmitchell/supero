@@ -3,7 +3,7 @@ Compute digits of e
 Due to John Hughes, Aug 2001
 -}
 
-module Main(main) where
+module Test.Nofib.Digits_of_e2(main) where
 
 {-
 Here's a way to compute all the digits of e. We use the series

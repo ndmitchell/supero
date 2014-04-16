@@ -6,7 +6,7 @@
 -- rather that the output itself, thus avoiding having to generate such a 
 -- huge output file to get a reasonable execution time.
 
-module Main (main) where
+module Test.Nofib.Gen_regexps (main) where
 
 import Char
 

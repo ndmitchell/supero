@@ -8,7 +8,7 @@ at the end so can merge two cheaps which are then merged.
 
 module Supercompile(supercompile) where
 
-import Type
+import Exp
 import Simplify
 import Util
 import Data.List
@@ -26,39 +26,38 @@ type S = [(Var, Exp, Exp)]
 
 
 supercompile :: [(Var,Exp)] -> [(Var,Exp)]
-supercompile inp = resetTime $ flip evalState [] $ do
-    env <- return $ env inp
-    res <- define env $ fromJustNote "can't find root" $ env "root"
+supercompile env = resetTime $ flip evalState [] $ do
+    res <- define env $ fromJustNote "Could not find root in env" $ lookup (V "root") env
     s <- get
-    return $ ("root",res) : reverse [(a,b) | (a,_,b) <- s]
+    return $ (V "root",res) : reverse [(a,b) | (a,_,b) <- s]
 
 
-define :: Env -> Exp -> State S Exp
+define :: [(Var,Exp)] -> Exp -> State S Exp
 define env x = do
     s <- get
     name <- case find (\(_,t,_) -> t == x) s of
         Just (name,_,_) -> return name
         Nothing -> do
-            let name = "f" ++ show (length s + 1)
-            modify ((name,x,Var "undefined"):)
+            let name = V $ "f" ++ show (length s + 1)
+            modify ((name,x,Var $ V "undefined"):)
             bod <- optimise env x
             modify $ map $ \o@(name2,t,_) -> if name == name2 then (name,t,bod) else o
             return name
-    return $ Var name
+    return $ Var $ name
 
 
-optimise :: Env -> Exp -> State S Exp
-optimise env (Var x) = maybe (return $ Var x) (optimise env) $ env x
-optimise env x | Just x <- unfold env $ simplify2 x = optimise env x
-optimise env x = error $ "optimise\n" ++ pretty (simplify2 x)
+optimise :: [(Var,Exp)] -> Exp -> State S Exp
+optimise env (Var x) = maybe (return $ Var x) (optimise env) $ lookup x env
+optimise env x | Just x <- unfold env $ simplify x = optimise env x
+optimise env x = error $ "optimise\n" ++ pretty (simplify x)
 
 
-unfold :: Env -> Exp -> Maybe Exp
+unfold :: [(Var,Exp)] -> Exp -> Maybe Exp
 unfold env x = case x of
-    Var v -> env v
+    Var v -> lookup v env
     Lam v x -> Lam v <$> f x
     App x y -> flip App y <$> f x
-    Let x y -> Let x <$> f y
+    Let a b y -> Let a b <$> f y
     Case x y -> flip Case y <$> f x
     _ -> Nothing
     where f = unfold env

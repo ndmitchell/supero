@@ -1,9 +1,10 @@
 
 module Test.Simple.Rev(test) where
 
+#include "Include.h"
+
 #if MAIN
 test = (root, "neil")
-jail = id
 #endif
 
 root xs = rev [] xs

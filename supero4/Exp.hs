@@ -2,7 +2,7 @@
 
 module Exp(
     Var(..), Con(..), Exp(..), Pat(..),
-    fromApps, fromLams, lets, lams, apps,
+    fromApps, fromLams, fromLets, lets, lams, apps,
     prettys, pretty,
     vars, free, subst, relabel, count, linear, fresh,
     fromHSE, toHSE
@@ -55,6 +55,10 @@ lets ((a,b):ys) x = Let a b $ lets ys x
 
 isVar (Var _) = True; isVar _ = False
 isCon (Con _) = True; isCon _ = False
+
+fromLets (Let x y z) = ((x,y):a, b)
+    where (a,b) = fromLets z
+fromLets x = ([], x)
 
 fromLams (Lam x y) = (x:a, b)
     where (a,b) = fromLams y

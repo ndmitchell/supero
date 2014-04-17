@@ -1,4 +1,5 @@
 
+module Test.Nofib.Exp3_8(test) where
 
 x +& y = case x of
     Z -> y
@@ -20,26 +21,11 @@ x ^^^ y = case y of
     Z   -> S Z
     S y -> x *& (x ^^^ y)
 
-
 root n = int (fromInteger_ 3 ^^^ fromInteger_ n)
 
 
 #if MAIN
-
-addInt'2 = (+) :: Int -> Int -> Int
-subInt'2 = (-) :: Int -> Int -> Int
-ltInt'2 = (<) :: Int -> Int -> Bool
-
 data Nat = Z | S Nat
 
-main = print $ (root (9::Int) :: Int)
-
-#endif
-
-#if SUPERO
-
-(+) = addInt'2
-(-) = subInt'2
-(<) = ltInt'2
-
+test = (\i -> root (i :: Int) :: Int, 8 :: Int)
 #endif

@@ -58,9 +58,20 @@ take n x = case n == 0 of
 
 repeat x = x : repeat x
 
+not x = case x of
+    True -> False
+    False -> True
+
 ($) f x = f x
 
 (.) f g x = f (g x)
+
+
+enumFrom x = x : enumFrom (x + 1)
+
+enumFromTo from to = case from > to of
+    True -> []
+    False -> from : enumFromTo (jail from + 1) to
 
 #else
 

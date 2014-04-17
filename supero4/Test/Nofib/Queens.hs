@@ -1,11 +1,11 @@
 -- !!! count the number of solutions to the "n queens" problem.
 -- (grabbed from LML dist)
 
-module Main(main) where
+module Test.Nofib.Queens(test) where
 
 
 #if MAIN
-main = print $ root 12
+test = (\i -> root i :: Int, 12 :: Int)
 addInt'2 = (+) :: Int -> Int -> Int
 subInt'2 = (-) :: Int -> Int -> Int
 neqInt'2 = (/=) :: Int -> Int -> Bool

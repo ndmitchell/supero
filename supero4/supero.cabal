@@ -12,16 +12,24 @@ synopsis:           A Supercompiler
 description:
     A demo supercompiler - not really ready for public use yet.
 homepage:           http://community.haskell.org/~ndm/supero/
-stability:          Beta
+bug-reports:        https://github.com/ndmitchell/supero/issues
+tested-with:        GHC==7.8.2, GHC==7.6.3
+extra-source-files:
+    CHANGES.txt
+
+source-repository head
+    type:     git
+    location: https://github.com/ndmitchell/supero.git
 
 executable supero
     build-depends:      base == 4.*, directory, process, filepath, time, mtl, containers,
-                        haskell-src-exts == 1.9.0, cpphs == 1.11, uniplate == 1.5.*
+                        haskell-src-exts, transformers, cpphs, uniplate
     hs-source-dirs:     .
     main-is:            Main.hs
     other-modules:
+        Exp
+        HSE
         Simplify
         Supercompile
-        Terminate
-        Type
+        Support
         Util

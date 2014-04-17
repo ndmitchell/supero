@@ -1,2 +1,3 @@
 language: haskell
+install: cd supero4 && (cabal install --only-dependencies || cabal install --only-dependencies || cabal install --only-dependencies)
 script: cd supero4 && (wget https://raw.github.com/ndmitchell/neil/master/travis.sh -O - --no-check-certificate --no-cache --quiet | sh)

@@ -68,6 +68,7 @@ inflateExp (Paren (Paren x)) = inflateExp $ Paren x
 inflateExp (Paren (Var x)) = Var x
 inflateExp (Paren (Con x)) = Con x
 inflateExp (Paren (List x)) = List x
+inflateExp (Paren (Lit x)) = Lit x
 inflateExp (App (Paren (App a b)) c) = App (App a b) c
 inflateExp (Con (UnQual (Symbol "[]"))) = List []
 inflateExp x = x

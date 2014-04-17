@@ -1,8 +1,8 @@
 
-module Test.Simple.Prims(main) where
+module Test.Simple.Prims(test) where
 
 #if MAIN
-main = print $ root 8 7 12
+test = (\(a,b,c) -> root (a::Int) (b::Int) (c::Int), (8::Int,7::Int,12::Int))
 #endif
 
 root x y z = if z == 0 then x * y else (x+y) * z

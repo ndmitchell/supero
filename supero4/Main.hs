@@ -48,7 +48,7 @@ main = do
             ,"import Support"] ++
             ["import qualified " ++ m ++ "; import qualified " ++ m ++ "_gen" | m <- ms] ++
             ["main = " ++ lower fun ++ "s"] ++
-            ["    " ++ (if i == 0 then "[" else ",") ++ lower fun ++ " \"" ++ m ++ "\" " ++ m ++ ".main " ++ m ++ "_gen.main"
+            ["    " ++ (if i == 0 then "[" else ",") ++ lower fun ++ " \"" ++ m ++ "\" " ++ m ++ ".test " ++ m ++ "_gen.test"
                 | (i,m) <- zip [0..] ms] ++
             ["    " ++ ['[' | null ms] ++ "]"]
         system_ $ "ghc -O2 --make obj/" ++ fun ++ "_gen.hs -outputdir obj -XCPP -DMAIN -o obj/" ++ fun ++ "_gen.exe -main-is " ++ fun ++ "_gen.main"
@@ -57,7 +57,7 @@ main = do
     when ("--test" `elem` opts) $
         execute "Test" ""
     when ("--benchmark" `elem` opts) $ do
-        execute "Benchmark" "-oreport.html -ureport.csv > /dev/null"
+        execute "Benchmark" "-oreport.html -ureport.csv"
         src <- lines <$> readFile' "report.csv"
         let grab s = head [read $ takeWhile (/= ',') x :: Double | x <- src, Just x <- [stripPrefix ("\"" ++ s ++ "\",") x]]
         forM_ (map modu files) $ \m ->
@@ -76,6 +76,6 @@ findFiles want = do
 
 fleshOut :: String -> String -> String -> String
 fleshOut modu orig new =
-    "{-# OPTIONS_GHC -O2 #-}\nmodule " ++ modu ++ "(main) where\n" ++
+    "module " ++ modu ++ "(test) where\n" ++
     f "IMPORT_SUPERO" ++ f "MAIN" ++ f "MAIN_SUPERO" ++ new ++ "\n\n"
     where f x = unlines $ takeWhile (/= "#endif") $ drop 1 $ dropWhile (/= ("#if " ++ x)) $ lines orig

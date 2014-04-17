@@ -1,8 +1,8 @@
 
-module Test.Simple.Rev(main) where
+module Test.Simple.Rev(test) where
 
 #if MAIN
-main = print $ root "neil"
+test = (root, "neil")
 jail = id
 #endif
 

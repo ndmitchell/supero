@@ -3,7 +3,7 @@ Compute digits of e
 Due to John Hughes, Aug 2001
 -}
 
-module Test.Nofib.Digits_of_e2(main) where
+module Test.Nofib.Digits_of_e2(test) where
 
 {-
 Here's a way to compute all the digits of e. We use the series
@@ -63,7 +63,7 @@ root i = take i e
 
 #if MAIN
 
-main = print $ root (1000 :: Int)
+test = (root, 1000 :: Int)
 
 #endif
 

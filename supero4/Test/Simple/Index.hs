@@ -1,8 +1,8 @@
 
-module Test.Simple.Index(main) where
+module Test.Simple.Index(test) where
 
 #if MAIN
-main = print $ root "test" 2
+test = (\(s,i) -> root s (i::Int), ("test", 2::Int))
 #endif
 
 root x n = x !! n

@@ -1,8 +1,8 @@
 
-module Test.Simple.MapId(main) where
+module Test.Simple.MapId(test) where
 
 #if MAIN
-main = print $ root "test"
+test = (root, "test")
 #endif
 
 root x = map id x

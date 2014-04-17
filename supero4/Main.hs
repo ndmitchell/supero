@@ -71,7 +71,7 @@ cpphs defs = unsafePerformIO . runCpphs defaultCpphsOptions{defines=map (flip (,
 
 findFiles :: [String] -> IO [FilePath]
 findFiles want = do
-    xs <- filter ((==) ".hs" . takeExtension) <$> getDirectoryContentsRecursive ""
+    xs <- filter ((==) ".hs" . takeExtension) . map (drop 2) <$> getDirectoryContentsRecursive "."
     return $ filter (\x -> any (`elem` map (lower . dropExtension) (splitDirectories x)) $ map lower want) xs
 
 

@@ -8,7 +8,7 @@ f n = sum (concatMap (\k -> map (\m -> k * m) (enumFromTo 1 k)) (enumFromTo 1 n)
 root x = f x
 
 #if MAIN
-test = (\i -> root i :: Int, 10000 :: Int)
+test = (\i -> root i :: Int, 1000 :: Int)
 
 eq'2 = (==) :: Int -> Int -> Bool
 gt'2 = (>) :: Int -> Int -> Bool

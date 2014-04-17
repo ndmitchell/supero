@@ -27,5 +27,5 @@ root n = int (fromInteger_ 3 ^^^ fromInteger_ n)
 #if MAIN
 data Nat = Z | S Nat
 
-test = (\i -> root (i :: Int) :: Int, 8 :: Int)
+test = (\i -> root (i :: Int) :: Int, 7 :: Int)
 #endif

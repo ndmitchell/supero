@@ -61,5 +61,5 @@ root i = take i $ (('2':[])++) $
     2:repeat 1
 
 #if MAIN
-test = (\i -> root (i :: Int), 1000 :: Int)
+test = (\i -> root (i :: Int), 100 :: Int)
 #endif

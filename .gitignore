@@ -3,3 +3,4 @@
 *.hi
 *.o
 *.core
+/supero4/dist/

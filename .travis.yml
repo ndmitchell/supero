@@ -1,0 +1,2 @@
+language: haskell
+script: cd supero4 && (wget https://raw.github.com/ndmitchell/neil/master/travis.sh -O - --no-check-certificate --no-cache --quiet | sh)

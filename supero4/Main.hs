@@ -52,8 +52,8 @@ main = do
             ["    " ++ (if i == 0 then "[" else ",") ++ lower fun ++ " \"" ++ m ++ "\" " ++ m ++ ".test " ++ m ++ "_gen.test"
                 | (i,m) <- zip [0..] ms] ++
             ["    " ++ ['[' | null ms] ++ "]"]
-        system_ $ "ghc " ++ opt ++ " --make obj/" ++ fun ++ "_gen.hs -outputdir obj -XCPP -DMAIN -I. -o obj/" ++ fun ++ "_gen.exe -main-is " ++ fun ++ "_gen.main"
-        system_ $ "obj" </> fun ++ "_gen.exe " ++ args
+        system_ $ "ghc " ++ opt ++ " -rtsopts --make obj/" ++ fun ++ "_gen.hs -outputdir obj -XCPP -DMAIN -I. -o obj/" ++ fun ++ "_gen.exe -main-is " ++ fun ++ "_gen.main"
+        system_ $ "obj" </> fun ++ "_gen.exe +RTS -K20M -RTS " ++ args
 
     when ("--test" `elem` opts) $
         execute "Test" ""

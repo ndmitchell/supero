@@ -3,6 +3,7 @@ module Main where
 
 import Supercompile
 import Exp
+import HSE
 import Simplify
 import Util
 -- import Support() -- just to ensure it does compile
@@ -33,7 +34,7 @@ main = do
     forM_ files $ \inp -> do
         let out = dropExtension inp ++ "_gen.hs"
         src <- readFile inp
-        let res = fleshOut (modu out) src $ prettyPrint $ toHSE $ supercompile $ simplifys $ fromHSE $
+        let res = fleshOut (modu out) src $ prettyPrint $ noCAF $ toHSE $ supercompile $ simplifys $ fromHSE $
                         fromParseResult $ parseFileContents $ cpphs ["SUPERO"] src
         timer $ writeFile out res
         when ("--compile" `elem` opts || "--test" `elem` opts || "--benchmark" `elem` opts) $ do
@@ -77,6 +78,7 @@ findFiles want = do
 
 fleshOut :: String -> String -> String -> String
 fleshOut modu orig new =
+    "{-# LANGUAGE UnboxedTuples #-}\n" ++
     "module " ++ modu ++ "(test) where\n" ++
     f "IMPORT_SUPERO" ++ f "MAIN" ++ f "MAIN_SUPERO" ++ new ++ "\n\n"
     where f x = unlines $ takeWhile (/= "#endif") $ drop 1 $ dropWhile (/= ("#if " ++ x)) $ lines orig

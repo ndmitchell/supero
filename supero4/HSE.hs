@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, PatternGuards #-}
 
-module HSE(deflate, inflate, sl) where
+module HSE(deflate, inflate, noCAF, sl) where
 
 import Data.Data
 import Data.List
@@ -94,3 +94,23 @@ names :: Data a => a -> [String]
 names = map f . universeBi
     where f (Ident x) = x
           f (Symbol x) = x
+
+
+---------------------------------------------------------------------
+-- CAF AVOIDANCE
+
+noCAF :: Module -> Module
+noCAF (Module a b c d exp e bod) = inflate $ Module a b c d exp e $ transformBi addDefn $ transformBi addCall bod
+    where
+        bad = [n | PatBind _ (PVar n) _ (UnGuardedRhs e) (BDecls []) <- bod, not $ isZeroCost e] \\ universeBi exp
+        addDefn (PatBind sl (PVar n) ty (UnGuardedRhs e) dec) | n `elem` bad =
+                (PatBind sl (PVar n) ty (UnGuardedRhs $ Lambda sl [PApp (Special UnboxedSingleCon) []] e) dec)
+        addDefn x = x
+        addCall (Var (UnQual n)) | n `elem` bad = App (Var $ UnQual n) (Con $ Special UnboxedSingleCon)
+        addCall x = x
+
+isZeroCost Lambda{} = True
+isZeroCost (Let (BDecls [PatBind _ (PVar _) _ (UnGuardedRhs e1) (BDecls [])]) e2) = isZeroCost e1 && isZeroCost e2
+isZeroCost (Var _) = True
+isZeroCost (Paren x) = isZeroCost x
+isZeroCost _ = False

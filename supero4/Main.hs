@@ -21,6 +21,7 @@ import Control.Exception
 import Language.Preprocessor.Cpphs
 import System.IO.Unsafe
 
+works = words "simple peter other digits_of_e2 exp3_8 rfib tak x2n1"
 
 main = do
     args <- getArgs
@@ -28,7 +29,7 @@ main = do
         putStrLn $ "Arguments: --compile --test --benchmark [FILE|DIR]"
         exitSuccess
     let (opts,files) = partition ("-" `isPrefixOf`) args
-    files <- findFiles files
+    files <- findFiles $ (if "--work" `elem` opts then works else []) ++ files
     createDirectoryIfMissing True "obj"
     let modu = intercalate "." . splitDirectories . dropExtension
     forM_ files $ \inp -> do

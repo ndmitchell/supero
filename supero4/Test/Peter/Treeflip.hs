@@ -18,24 +18,8 @@ buildTree n t = case n == 0 of
 root :: Int -> Int
 root n = sumtr (flip (flip (buildTree n (Leaf 1))))
 
-
 #if MAIN
-
 data Tree a = Leaf a | Branch (Tree a) (Tree a)
 
-test = (\i -> root i :: Int, 22 :: Int)
-
-eq'2 = (==) :: Int -> Int -> Bool
-add'2 = (+) :: Int -> Int -> Int
-sub'2 = (-) :: Int -> Int -> Int
-mul'2 = (*) :: Int -> Int -> Int
+test = (\i -> root (i :: Int) :: Int, 22 :: Int)
 #endif
-
-#if SUPERO
-(==) = eq'2
-(+) = add'2
-(*) = mul'2
-(-) = sub'2
-#endif
-
-

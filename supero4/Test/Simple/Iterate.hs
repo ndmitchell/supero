@@ -9,7 +9,7 @@ import Data.List.Stream
 #endif
 
 #if MAIN
-test = (\i -> root (i :: Int), 400000 :: Int)
+test = (\i -> root (i :: Int) :: Int, 400000 :: Int)
 #endif
 
 root n = map square (iterate inc 1) !! n

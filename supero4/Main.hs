@@ -40,7 +40,7 @@ main = do
             createDirectoryIfMissing True $ "obj" </> takeDirectory out
             timer $ system_ $ "ghc -O2 " ++ out ++ " -ddump-simpl -outputdir obj > obj/" ++ out ++ ".core"
 
-    let execute fun = do
+    let execute fun args = do
         createDirectoryIfMissing True "obj"
         let ms = map modu files
         writeFile ("obj/" ++ fun ++ "_gen.hs") $ unlines $
@@ -52,10 +52,16 @@ main = do
                 | (i,m) <- zip [0..] ms] ++
             ["    " ++ ['[' | null ms] ++ "]"]
         system_ $ "ghc -O2 --make obj/" ++ fun ++ "_gen.hs -outputdir obj -XCPP -DMAIN -o obj/" ++ fun ++ "_gen.exe -main-is " ++ fun ++ "_gen.main"
-        system_ $ "obj" </> fun ++ "_gen.exe -oreport.html"
+        system_ $ "obj" </> fun ++ "_gen.exe " ++ args
 
-    when ("--test" `elem` opts) $ execute "Test"
-    when ("--benchmark" `elem` opts) $ execute "Benchmark"
+    when ("--test" `elem` opts) $
+        execute "Test" ""
+    when ("--benchmark" `elem` opts) $ do
+        execute "Benchmark" "-oreport.html -ureport.csv"
+        src <- lines <$> readFile' "report.csv"
+        let grab s = head [read $ takeWhile (/= ',') x :: Double | x <- src, Just x <- [stripPrefix ("\"" ++ s ++ "\",") x]]
+        forM_ (map modu files) $ \m ->
+            putStrLn $ m ++ " = " ++ show (grab (m ++ "/Supero") / grab (m ++ "/GHC"))
 
 
 -- safe since no include files

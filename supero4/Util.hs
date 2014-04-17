@@ -2,6 +2,7 @@
 
 module Util(module Util, trace) where
 
+import System.Info
 import Data.Function
 import Data.List
 import Control.Monad.State
@@ -161,3 +162,5 @@ readFile' x = listM' =<< readFile x
 
 listM' :: Monad m => [a] -> m [a]
 listM' x = length x `seq` return x
+
+devNull = if os == "mingw32" then "nul" else "/dev/null"

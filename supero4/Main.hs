@@ -57,7 +57,7 @@ main = do
     when ("--test" `elem` opts) $
         execute "Test" ""
     when ("--benchmark" `elem` opts) $ do
-        execute "Benchmark" "-oreport.html -ureport.csv"
+        execute "Benchmark" "-oreport.html -ureport.csv > /dev/null"
         src <- lines <$> readFile' "report.csv"
         let grab s = head [read $ takeWhile (/= ',') x :: Double | x <- src, Just x <- [stripPrefix ("\"" ++ s ++ "\",") x]]
         forM_ (map modu files) $ \m ->

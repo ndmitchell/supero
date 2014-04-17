@@ -14,13 +14,10 @@ tests = sequence_
 
 test :: String -> IO () -> IO () -> IO ()
 test name orig opt = do
-    putStr $ "Testing " ++ name ++ "... "
-    putStrLn "ORIGINAL"
-    orig
-    putStrLn "OPTIMISED"
-    opt
-    a <- captureOutput orig
-    b <- captureOutput opt
+    putStr $ "Testing " ++ name ++ " ... "
+    a <- captureStdout orig
+    putStr "... "
+    b <- captureStdout opt
     when (a /= b) $ do
         error $ unlines ["","FATAL: Results do not match","WANTED:",a,"GOT:",b]
     putStrLn "success"

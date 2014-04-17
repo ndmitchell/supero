@@ -160,6 +160,19 @@ captureOutput act = do
     removeFile f
     return res
 
+captureStdout :: IO () -> IO String
+captureStdout act = do
+    tmp <- getTemporaryDirectory
+    (f,h) <- openTempFile tmp "hlint"
+    sto <- hDuplicate stdout
+    hDuplicateTo h stdout
+    hClose h
+    act
+    hDuplicateTo sto stdout
+    res <- readFile' f
+    removeFile f
+    return res
+
 readFile' :: FilePath -> IO String
 readFile' x = listM' =<< readFile x
 

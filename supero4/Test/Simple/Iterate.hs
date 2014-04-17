@@ -1,5 +1,5 @@
 
-module Test.Simple.Iterate(main) where
+module Test.Simple.Iterate(test) where
 
 #if STREAM
 import Prelude hiding((!!), iterate, map)
@@ -9,7 +9,7 @@ import Data.List.Stream
 
 #if MAIN
 
-main = print (root (400000 :: Int) :: Int)
+test = (\i -> root (i :: Int), 400000 :: Int)
 
 #endif
 

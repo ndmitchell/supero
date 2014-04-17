@@ -38,7 +38,7 @@ main = do
         timer $ writeFile out res
         when ("--compile" `elem` opts || "--test" `elem` opts || "--benchmark" `elem` opts) $ do
             createDirectoryIfMissing True $ "obj" </> takeDirectory out
-            timer $ system_ $ "ghc -O2 " ++ out ++ " -ddump-simpl -outputdir obj > obj/" ++ out ++ ".core"
+            timer $ system_ $ "ghc " ++ opt ++ " " ++ out ++ " -ddump-simpl -outputdir obj > obj/" ++ out ++ ".core"
 
     let execute fun args = do
         createDirectoryIfMissing True "obj"
@@ -51,7 +51,7 @@ main = do
             ["    " ++ (if i == 0 then "[" else ",") ++ lower fun ++ " \"" ++ m ++ "\" " ++ m ++ ".test " ++ m ++ "_gen.test"
                 | (i,m) <- zip [0..] ms] ++
             ["    " ++ ['[' | null ms] ++ "]"]
-        system_ $ "ghc -O2 --make obj/" ++ fun ++ "_gen.hs -outputdir obj -XCPP -DMAIN -o obj/" ++ fun ++ "_gen.exe -main-is " ++ fun ++ "_gen.main"
+        system_ $ "ghc " ++ opt ++ " --make obj/" ++ fun ++ "_gen.hs -outputdir obj -XCPP -DMAIN -o obj/" ++ fun ++ "_gen.exe -main-is " ++ fun ++ "_gen.main"
         system_ $ "obj" </> fun ++ "_gen.exe " ++ args
 
     when ("--test" `elem` opts) $
@@ -63,6 +63,7 @@ main = do
         forM_ (map modu files) $ \m ->
             putStrLn $ m ++ " = " ++ show (grab (m ++ "/Supero") / grab (m ++ "/GHC"))
 
+opt = "-O2 -fno-full-laziness"
 
 -- safe since no include files
 cpphs :: [String] -> String -> String

@@ -51,15 +51,12 @@ carryPropagate base ds = case ds of
               False -> (dCorrected `div` base) : (dCorrected `mod` base) : fraction
     [] -> error "carryPropagate"
 
-e :: String
-e = (('2':[])++) $ 
+root :: Int -> String
+root i = take i $ (('2':[])++) $ 
     tail . concat $
     map (show.head) $
     iterate (carryPropagate 2 . map (10*) . tail) $
     2:repeat 1
-
-
-root i = take i e
 
 #if MAIN
 

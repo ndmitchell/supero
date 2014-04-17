@@ -5,6 +5,8 @@ Due to John Hughes, Aug 2001
 
 module Test.Nofib.Digits_of_e2(test) where
 
+#include "Include.h"
+
 {-
 Here's a way to compute all the digits of e. We use the series
 
@@ -59,71 +61,5 @@ root i = take i $ (('2':[])++) $
     2:repeat 1
 
 #if MAIN
-
-test = (root, 1000 :: Int)
-
-#endif
-
-
-#if MAIN_SUPERO
-
-addInt'2 = (+)
-eqInt'2 = (==)
-neqInt'2 = (/=) :: Int -> Int -> Bool
-modInt'2 = mod
-showInt'1 = show :: Int -> String
-mulInt'2 = (*)
-divInt'2 = div
-subInt'2 = (-)
-error'1 = error
-
-#endif
-
-#if SUPERO
-
-(+) = addInt'2
-(*) = mulInt'2
-(==) = eqInt'2
-(/=) = neqInt'2
-(-) = subInt'2
-mod = modInt'2
-div = divInt'2
-show = showInt'1
-error = error'1
-
-head x = case x of
-    [] -> error "head"
-    x:xs -> x
-
-tail x = case x of
-    [] -> error "tail"
-    x:xs -> xs
-
-map f x = case x of
-    y:ys -> f y : map f ys
-    [] -> []
-
-concat x = case x of
-    [] -> []
-    x:xs -> x ++ concat xs
-
-(++) xs ys = case xs of
-    [] -> ys
-    x:xs -> x : (xs ++ ys)
-
-iterate f x = x : iterate f (f x)
-
-take :: Int -> [a] -> [a]
-take n x = case n == 0 of
-    True -> []
-    False -> case x of
-        [] -> []
-        x:xs -> x : take (n-1) xs
-
-repeat x = x : repeat x
-
-($) f x = f x
-
-(.) f g x = f (g x)
-
+test = (\i -> root (i :: Int), 1000 :: Int)
 #endif

@@ -33,6 +33,35 @@ sumWith acc xs = case xs of
     [] -> jail acc
     x:xs -> sumWith (x + jail acc) xs
 
+head x = case x of
+    [] -> error "head"
+    x:xs -> x
+
+tail x = case x of
+    [] -> error "tail"
+    x:xs -> xs
+
+concat x = case x of
+    [] -> []
+    x:xs -> x ++ concat xs
+
+(++) xs ys = case xs of
+    [] -> ys
+    x:xs -> x : (xs ++ ys)
+
+take :: Int -> [a] -> [a]
+take n x = case n == 0 of
+    True -> []
+    False -> case x of
+        [] -> []
+        x:xs -> x : take (n-1) xs
+
+repeat x = x : repeat x
+
+($) f x = f x
+
+(.) f g x = f (g x)
+
 #else
 
 {-# INLINE jail #-}

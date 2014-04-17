@@ -1,11 +1,19 @@
 
-module Support(testEqual) where
+module Support(
+    tests, test,
+    benchmarks, benchmark
+    ) where
 
 import Util
 import Control.Monad
+import Criterion.Main
 
-testEqual :: String -> IO () -> IO () -> IO ()
-testEqual name orig opt = do
+
+tests :: [IO ()] -> IO ()
+tests = sequence_
+
+test :: String -> IO () -> IO () -> IO ()
+test name orig opt = do
     putStr $ "Testing " ++ name ++ "... "
     a <- captureOutput orig
     b <- captureOutput opt
@@ -16,3 +24,10 @@ testEqual name orig opt = do
         putStrLn "GOT:"
         putStrLn b
     putStrLn "success"
+
+
+benchmarks :: [Benchmark] -> IO ()
+benchmarks = defaultMain
+
+benchmark :: String -> IO () -> IO () -> Benchmark
+benchmark name orig opt = bgroup name [bench "GHC" orig, bench "Supero" opt]

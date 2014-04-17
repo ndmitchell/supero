@@ -5,7 +5,7 @@ import Supercompile
 import Exp
 import Simplify
 import Util
-import Support() -- just to ensure it does compile
+-- import Support() -- just to ensure it does compile
 
 import Control.Applicative
 import Control.Monad
@@ -36,24 +36,26 @@ main = do
         let res = fleshOut (modu out) src $ prettyPrint $ toHSE $ supercompile $ simplifys $ fromHSE $
                         fromParseResult $ parseFileContents $ cpphs ["SUPERO"] src
         timer $ writeFile out res
-        when ("--compile" `elem` opts) $ do
+        when ("--compile" `elem` opts || "--test" `elem` opts || "--benchmark" `elem` opts) $ do
             createDirectoryIfMissing True $ "obj" </> takeDirectory out
             timer $ system_ $ "ghc -O2 " ++ out ++ " -ddump-simpl -outputdir obj > obj/" ++ out ++ ".core"
 
-    when ("--test" `elem` opts) $ do
+    let execute fun = do
         createDirectoryIfMissing True "obj"
         let ms = map modu files
-        writeFile "Test_gen.hs" $ unlines $
-            ["module Test_gen(main) where"
+        writeFile ("obj/" ++ fun ++ "_gen.hs") $ unlines $
+            ["module " ++ fun ++ "_gen(main) where"
             ,"import Support"] ++
             ["import qualified " ++ m ++ "; import qualified " ++ m ++ "_gen" | m <- ms] ++
-            ["main = do"] ++
-            ["    testEqual \"" ++ m ++ "\" " ++ m ++ ".main " ++ m ++ "_gen.main" | m <- ms]
-        system_ $ "ghc -O2 --make Test_gen.hs -outputdir obj -XCPP -DMAIN -o obj/Test_gen.exe -main-is Test_gen.main"
-        system_ $ "obj" </> "Test_gen.exe"
+            ["main = " ++ lower fun ++ "s"] ++
+            ["    " ++ (if i == 0 then "[" else ",") ++ lower fun ++ " \"" ++ m ++ "\" " ++ m ++ ".main " ++ m ++ "_gen.main"
+                | (i,m) <- zip [0..] ms] ++
+            ["    " ++ ['[' | null ms] ++ "]"]
+        system_ $ "ghc -O2 --make obj/" ++ fun ++ "_gen.hs -outputdir obj -XCPP -DMAIN -o obj/" ++ fun ++ "_gen.exe -main-is " ++ fun ++ "_gen.main"
+        system_ $ "obj" </> fun ++ "_gen.exe -oreport.html"
 
-    when ("--benchmark" `elem` opts) $ do
-        putStrLn "benchmark here"
+    when ("--test" `elem` opts) $ execute "Test"
+    when ("--benchmark" `elem` opts) $ execute "Benchmark"
 
 
 -- safe since no include files

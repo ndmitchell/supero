@@ -74,21 +74,6 @@ findFiles want = do
     xs <- filter ((==) ".hs" . takeExtension) . map (drop 2) <$> getDirectoryContentsRecursive "."
     return $ filter (\x -> any (`elem` map (lower . dropExtension) (splitDirectories x)) $ map lower want) xs
 
-
-withDirectory new act = do
-    old <- getCurrentDirectory
-    bracket_
-        (setCurrentDirectory new)
-        (setCurrentDirectory old)
-        act
-
-
-system_ cmd = do
-    putStrLn cmd
-    res <- system cmd
-    when (res /= ExitSuccess) $ error "system command failed"
-
-
 fleshOut :: String -> String -> String -> String
 fleshOut modu orig new =
     "{-# OPTIONS_GHC -O2 #-}\nmodule " ++ modu ++ "(main) where\n" ++

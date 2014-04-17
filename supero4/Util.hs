@@ -3,6 +3,9 @@
 module Util(module Util, trace) where
 
 import System.Info
+import System.Cmd
+import Control.Exception
+import System.Exit
 import Data.Function
 import Data.List
 import Control.Monad.State
@@ -164,3 +167,17 @@ listM' :: Monad m => [a] -> m [a]
 listM' x = length x `seq` return x
 
 devNull = if os == "mingw32" then "nul" else "/dev/null"
+
+withDirectory new act = do
+    old <- getCurrentDirectory
+    bracket_
+        (setCurrentDirectory new)
+        (setCurrentDirectory old)
+        act
+
+system_ cmd = do
+    putStrLn cmd
+    res <- system cmd
+    when (res /= ExitSuccess) $ error $ "system command failed: " ++ cmd
+
+

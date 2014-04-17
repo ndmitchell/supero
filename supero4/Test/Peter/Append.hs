@@ -1,10 +1,8 @@
 
+module Test.Peter.Append(test) where
 
 #if MAIN
-
-main = print $ length $ root (replicate n 'x') (replicate n 'y') (replicate n 'z')
-    where n = 10000000
-
+test = (\n -> length $ root (replicate n 'x') (replicate n 'y') (replicate n 'z'), 10000000 :: Int)
 #endif
 
 app xs ys = case xs of

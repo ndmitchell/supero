@@ -1,4 +1,6 @@
 
+module Test.Peter.Sumtree(test) where
+
 sumtr t = case t of
     Leaf x -> x
     Branch l r -> sumtr l + sumtr r
@@ -18,7 +20,7 @@ root n = sumtr (squaretr (buildTree n (Leaf 1)))
 
 data Tree a = Leaf a | Branch (Tree a) (Tree a)
 
-main = print $ root 22
+test = (\i -> root i :: Int, 22 :: Int)
 
 eq'2 = (==) :: Int -> Int -> Bool
 add'2 = (+) :: Int -> Int -> Int

@@ -1,6 +1,7 @@
 
-import Prelude hiding(zipWith, sum)
+module Test.Peter.Raytracer(test) where
 
+#if SUPERO
 zipWith f xs ys = case xs of
     [] -> []
     x:xs -> case ys of
@@ -12,12 +13,12 @@ sum xs = sumWith 0 xs
 sumWith acc xs = case xs of
     [] -> jail acc
     x:xs -> sumWith (x+ jail acc) xs
+#endif
 
 root xs ys = sum (zipWith (*) xs ys)
 
 #if MAIN
-main = print (root (replicate n 1) (replicate n 2) :: Int)
-    where n = 1000000
+test = (\n -> root (replicate n 1) (replicate n 2) :: Int, 1000000 :: Int)
 
 eq'2 = (==) :: Int -> Int -> Bool
 add'2 = (+) :: Int -> Int -> Int

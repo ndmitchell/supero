@@ -1,4 +1,6 @@
 
+module Test.Peter.Factorial(test) where
+
 fac :: Int -> Int
 fac n = case n == 0 of
     True -> 1
@@ -6,9 +8,10 @@ fac n = case n == 0 of
 
 root x = fac x
 
-
 #if MAIN
-main = print $ (root (1000000 :: Int) :: Int)
+test = (\i -> root i :: Int, 1000000 :: Int)
+
+jail = id
 
 eq'2 = (==) :: Int -> Int -> Bool
 add'2 = (+) :: Int -> Int -> Int

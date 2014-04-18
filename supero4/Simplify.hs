@@ -20,18 +20,21 @@ simplifys :: [(Var,Exp)] -> [(Var,Exp)]
 simplifys = map (second simplify)
 
 simplify :: Exp -> Exp
-simplify = transform f
+simplify = \x -> let y = transform f x; yy = transform f y in if y == yy then y else
+                 error $ "Simplify not idempotent!\nOriginal\n" ++ pretty x ++ "\nFirst result\n" ++ pretty y ++ "\nSecond result\n" ++ pretty yy
     where
-        f o@(App (fromLets -> (bs@(_:_), Lam v z)) q) = simplify $ Let v2 q $ lets bs $ subst [(v,Var v2)] z
+        fs = transform f
+
+        f o@(App (fromLets -> (bs@(_:_), Lam v z)) q) = fs $ Let v2 q $ lets bs $ subst [(v,Var v2)] z
             where v2:_ = fresh $ vars o
-        f o@(Case (Let v x y) alts) = Let v2 x $ Case (subst [(v,Var v2)] y) alts
+        f o@(Case (Let v x y) alts) = fs $ Let v2 x $ Case (subst [(v,Var v2)] y) alts
             where v2:_ = fresh $ vars o
         f (App (Lam v x) y) = f $ Let v y x
-        f (Let v x y) | cheap x || linear v y = simplify $ subst [(v,x)] y
-        f (Case (Case on alts1) alts2) = simplify $ Case on [(a,Case c alts2) | (a,c) <- alts1]
+        f (Let v x y) | cheap x || linear v y = fs $ subst [(v,x)] y
+        f (Case (Case on alts1) alts2) = fs $ Case on [(a,Case c alts2) | (a,c) <- alts1]
         f o@(Case (fromApps -> (Con ctr, xs)) alts) = headNote ("Couldn't match constructor: " ++ pretty o) $ mapMaybe g alts
             where g (PWild, x) = Just $ x
-                  g (PCon c vs, x) | c == ctr = Just $ simplify $ lets (zip vs xs) x
+                  g (PCon c vs, x) | c == ctr = Just $ fs $ lets (zip vs xs) x
                                    | otherwise = Nothing
         f x = x
 

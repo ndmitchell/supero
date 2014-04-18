@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, PatternGuards, TupleSections, ViewPatterns #-}
 
 module Exp(
-    Var(..), Con(..), Exp(..), Pat(..),
+    Var(..), Con(..), Fun(..), Exp(..), Pat(..),
     fromApps, fromLams, fromLets, lets, lams, apps, (~>),
     prettys, pretty,
     vars, free, subst, relabel, count, linear, fresh,
@@ -28,11 +28,13 @@ import qualified Data.Map as Map
 -- TYPE
 
 newtype Var = V {fromVar :: String} deriving (Data,Typeable,Eq,Show)
+newtype Fun = F {fromFun :: String} deriving (Data,Typeable,Eq,Show)
 newtype Con = C {fromCon :: String} deriving (Data,Typeable,Eq,Show)
 
 data Exp
     = Var Var
     | Con Con
+    | Fun Fun
     | App Exp Exp
     | Let Var Exp Exp -- non-recursive
     | Lam Var Exp

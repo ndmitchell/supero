@@ -43,6 +43,7 @@ define env x = do
         Nothing -> do
             let name = V $ "_" ++ show (length s + 1)
             debug $ "define: " ++ fromVar name ++ " = " ++ pretty x
+            -- liftIO getLine
             modify ((name,x,Var $ V "undefined"):)
             bod <- optimise env x
             modify $ map $ \o@(name2,t,_) -> if name == name2 then (name,t,bod) else o
@@ -59,10 +60,9 @@ optimise env (simplify -> x)
 
 dejail :: [(Var,Exp)] -> Exp -> S Exp
 dejail env (fromLams -> (root, x)) = do
-        debug "fail"
-        --debug $ "dejail in: " ++ pretty x
+        -- debug $ "dejail in: " ++ pretty x
         (bod,(_,(unzip -> (vs,xs)))) <- return $ runState (f [] x) (fresh $ vars x, [])
-        --debug $ "dejail out: " ++ pretty (lams root $ lets (zip vs xs) bod)
+        -- debug $ "dejail out: " ++ pretty (lams root $ lets (zip vs xs) bod)
         let def x = let fv = root `intersect` free x in flip apps (map Var fv) <$> define env (lams fv x)
         lams root <$> (apps <$> def (lams vs bod) <*> mapM def xs)
     where

@@ -32,9 +32,9 @@ newtype Fun = F {fromFun :: String} deriving (Data,Typeable,Eq,Show)
 newtype Con = C {fromCon :: String} deriving (Data,Typeable,Eq,Show)
 
 data Exp
-    = Var Var
+    = Var Var -- local variables
     | Con Con
-    | Fun Fun
+    | Fun Fun -- top-level functions
     | App Exp Exp
     | Let Var Exp Exp -- non-recursive
     | Lam Var Exp
@@ -56,9 +56,6 @@ lets [] x = x
 lets ((a,b):ys) x = Let a b $ lets ys x
 
 
-isVar (Var _) = True; isVar _ = False
-isCon (Con _) = True; isCon _ = False
-
 fromLets (Let x y z) = ((x,y):a, b)
     where (a,b) = fromLets z
 fromLets x = ([], x)
@@ -76,7 +73,7 @@ pretty = prettyPrint . unparen . inflate . toExp
     where unparen (Paren x) = x
           unparen x = x
 
-prettys :: [(Var,Exp)] -> String
+prettys :: [(Fun,Exp)] -> String
 prettys = prettyPrint . toHSE
 
 
@@ -147,7 +144,7 @@ fresh used = map V (concatMap f [1..]) \\ used
 
 (~>) :: Exp -> Exp -> Exp
 (~>) x y | f x == f y = y
-         | otherwise = error $ "Different!\n" ++ pretty (f x) ++ "\nIs not the same as:\n" ++ pretty (f y)
+         | otherwise = error $ "Different!\n" ++ pretty (id x) ++ "\nIs not the same as:\n" ++ pretty (id y)
     where
         f = relabel . transform decase . transform delam . transform delet
         decase (Case (Case on alts1) alts2) = transform decase $ Case on [(a,Case c alts2) | (a,c) <- alts1]
@@ -165,9 +162,14 @@ fresh used = map V (concatMap f [1..]) \\ used
 ---------------------------------------------------------------------
 -- FROM HSE
 
-fromHSE :: Module -> [(Var,Exp)]
-fromHSE m = concatMap fromDecl xs
+fromHSE :: Module -> [(Fun,Exp)]
+fromHSE m = addFun $ concatMap fromDecl xs
   where Module _ _ _ _ _ _ xs = deflate m
+
+addFun :: [(Var,Exp)] -> [(Fun,Exp)]
+addFun xs = [(F x, transformBi (f $ free y) y) | (V x,y) <- xs]
+    where f vs (Var (V v)) | V v `elem` vs = Fun $ F v
+          f vs x = x
 
 fromDecl :: Decl -> [(Var,Exp)]
 fromDecl (PatBind _ (PVar f) Nothing (UnGuardedRhs x) (BDecls [])) = [(V $ fromName f, fromExp x)]
@@ -208,14 +210,16 @@ fromPatVar x = error $ "Unhandled fromPatVar: " ++ show x
 ---------------------------------------------------------------------
 -- TO HSE
 
-toHSE :: [(Var,Exp)] -> Module
-toHSE xs = inflate $ Module sl (ModuleName "") [] Nothing Nothing [] $ map (uncurry toDecl) xs
+toHSE :: [(Fun,Exp)] -> Module
+toHSE xs = inflate $ Module sl (ModuleName "") [] Nothing Nothing [] $ map (uncurry toDecl . first f2v) xs
+    where f2v (F v) = V v
 
 toDecl :: Var -> Exp -> Decl
 toDecl (V f) x = PatBind sl (PVar $ toName f) Nothing (UnGuardedRhs $ toExp x) (BDecls [])
 
 toExp :: Exp -> H.Exp
 toExp (Var (V x)) = H.Var $ UnQual $ toName x
+toExp (Fun (F x)) = H.Var $ UnQual $ toName x
 toExp (Con (C x)) = H.Con $ UnQual $ toName x
 toExp (Lam (V x) y) = Lambda sl [PVar $ toName x] $ toExp y
 toExp (Let a b y) = H.Let (BDecls [toDecl a b]) $ toExp y

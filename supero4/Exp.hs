@@ -1,8 +1,8 @@
-{-# LANGUAGE DeriveDataTypeable, PatternGuards, TupleSections #-}
+{-# LANGUAGE DeriveDataTypeable, PatternGuards, TupleSections, ViewPatterns #-}
 
 module Exp(
     Var(..), Con(..), Exp(..), Pat(..),
-    fromApps, fromLams, fromLets, lets, lams, apps,
+    fromApps, fromLams, fromLets, lets, lams, apps, (~>),
     prettys, pretty,
     vars, free, subst, relabel, count, linear, fresh,
     fromHSE, toHSE
@@ -19,6 +19,7 @@ import Control.Arrow
 import Language.Haskell.Exts hiding (Exp,Name,Pat,Var,Let,App,Case,Con,name)
 import qualified Language.Haskell.Exts as H
 import HSE
+import Util hiding (fresh)
 import Data.Generics.Uniplate.Data
 import qualified Data.Map as Map
 
@@ -140,6 +141,23 @@ fresh :: [Var] -> [Var]
 fresh used = map V (concatMap f [1..]) \\ used
     where f 1 = map return ['a'..'z']
           f i = [a ++ b | a <- f 1, b <- f (i-1)]
+
+
+(~>) :: Exp -> Exp -> Exp
+(~>) x y | f x == f y = y
+         | otherwise = error $ "Different!\n" ++ pretty (f x) ++ "\nIs not the same as:\n" ++ pretty (f y)
+    where
+        f = relabel . transform decase . transform delam . transform delet
+        decase (Case (Case on alts1) alts2) = transform decase $ Case on [(a,Case c alts2) | (a,c) <- alts1]
+        decase o@(Case (fromApps -> (Con ctr, xs)) alts) = headNote ("Corrupted constructor:\n" ++ pretty x ++ "\nVs\n" ++ pretty y) $ mapMaybe g alts
+            where g (PWild, x) = Just x
+                  g (PCon c vs, x) | c == ctr = Just $ transform decase $ subst (zip vs xs) x
+                                   | otherwise = Nothing
+        decase x = x
+        delam (App (Lam x y) z) = transform delam $ subst [(x,z)] y
+        delam x = x
+        delet (Let x y z) = subst [(x,y)] z
+        delet x = x
 
 
 ---------------------------------------------------------------------

@@ -3,6 +3,7 @@
 
 module Test.Nofib.Queens(test) where
 
+#include "Include.h"
 
 #if MAIN
 test = (\i -> root i :: Int, 12 :: Int)
@@ -30,33 +31,3 @@ gen nq n = case n == 0 of
     False -> 
         --[ (q:b) | b <- gen nq (n-1), q <- [1..nq], safe q 1 b]
         concatMap (\b -> concatMap (\q -> if safe q 1 b then [q:b] else []) (enumFromTo 1 nq)) (gen nq (n-1))
-
-
-#if SUPERO
-
-(+) = addInt'2
-(-) = subInt'2
-(/=) = neqInt'2
-(>) = gtInt'2
-(==) = eqInt'2
-
-
-a && b = case a of
-    True -> b
-    False -> False
-
-enumFromTo i j = if i > j then [] else i : enumFromTo (i+1) j
-
-length x = case x of
-    [] -> 0
-    x:xs -> 1 + length xs
-
-concatMap f x = case x of
-    [] -> []
-    x:xs -> f x ++ concatMap f xs
-
-(++) xs ys = case xs of
-    [] -> ys
-    x:xs -> x : (xs ++ ys)
-
-#endif

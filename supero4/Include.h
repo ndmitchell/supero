@@ -81,6 +81,14 @@ a && b = case a of
     True -> b
     False -> False
 
+length x = case x of
+    [] -> 0
+    x:xs -> 1 + length xs
+
+concatMap f x = case x of
+    [] -> []
+    x:xs -> f x ++ concatMap f xs
+
 #else
 
 {-# INLINE jail #-}

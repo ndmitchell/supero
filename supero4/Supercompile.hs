@@ -12,6 +12,7 @@ import Control.Monad.Trans.State
 import Control.Monad.IO.Class
 import Data.Generics.Uniplate.Data hiding (children)
 import Control.Applicative
+import Control.Exception
 import System.IO.Unsafe
 
 
@@ -60,10 +61,13 @@ optimise env (simplify -> x)
 
 dejail :: [(Var,Exp)] -> Exp -> S Exp
 dejail env (fromLams -> (root, x)) = do
-        -- debug $ "dejail in: " ++ pretty x
+        debug $ "dejail: " ++ pretty x
         (bod,(_,(unzip -> (vs,xs)))) <- return $ runState (f [] x) (fresh $ vars x, [])
         -- debug $ "dejail out: " ++ pretty (lams root $ lets (zip vs xs) bod)
         let def x = let fv = root `intersect` free x in flip apps (map Var fv) <$> define env (lams fv x)
+        liftIO $ evaluate $
+            Let (V "jail") (Lam (V "x") (Var (V "x"))) (lams root x) ~>
+            Let (V "jail") (Lam (V "x") (Var (V "x"))) (lams root (apps (lams vs bod) xs))
         lams root <$> (apps <$> def (lams vs bod) <*> mapM def xs)
     where
         f :: [Var] -> Exp -> State ([Var], [(Var,Exp)]) Exp
@@ -89,9 +93,9 @@ peel :: [(Var,Exp)] -> Exp -> S Exp
 peel env = f [] False
     where
         f vs down (Lam v x) = Lam v <$> f (vs++[v]) down x
-        f vs down (Case v xs) = Case <$> f vs down v <*> mapM (g vs) xs
         f vs down (fromApps -> (Con c, xs)) = apps (Con c) <$> mapM (f vs True) xs
         f vs down (fromApps -> (Var v, xs)) | v `elem` vs || isNothing (lookup v env) = apps (Var v) <$> mapM (f vs True) xs
+        f vs False (Case v xs) = Case <$> f vs True v <*> mapM (g vs) xs
         f vs False (App x y) = App <$> f vs True x <*> f vs True y
         f vs False (Let v x y) = Let v <$> f vs True x <*> f (vs++[v]) True y
         f vs down x = flip apps (map Var vs2) <$> define env (lams vs2 x)

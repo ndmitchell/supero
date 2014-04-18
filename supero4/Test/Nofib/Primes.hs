@@ -14,10 +14,9 @@ the_filter ns = case ns of
     (n:ns) -> filter (isdivs n) ns
     [] -> error "the_filter"
 
-primes :: [Int]
-primes = map head (iterate the_filter (iterate suCC 2))
-
-root x = primes !! x
+root x =
+    let primes = map head (iterate the_filter (iterate suCC 2))
+    in primes !! x
 
 #if MAIN
 main = (\i -> root (i :: Int) :: Int, 4000 :: Int)

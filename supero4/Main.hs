@@ -33,6 +33,7 @@ main = do
     createDirectoryIfMissing True "obj"
     let modu = intercalate "." . splitDirectories . dropExtension
     forM_ files $ \inp -> do
+        putStrLn $ "Converting " ++ inp
         let out = dropExtension inp ++ "_gen.hs"
         src <- readFile inp
         let res = fleshOut (modu out) src $ prettyPrint $ noCAF $ toHSE $ supercompile $ simplifys $ fromHSE $

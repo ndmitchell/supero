@@ -21,5 +21,5 @@ root n = sumtr (flip (flip (buildTree n (Leaf 1))))
 #if MAIN
 data Tree a = Leaf a | Branch (Tree a) (Tree a)
 
-test = (\i -> root (i :: Int) :: Int, 22 :: Int)
+test = (\i -> root (i :: Int) :: Int, 20 :: Int)
 #endif

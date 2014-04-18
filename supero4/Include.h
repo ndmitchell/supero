@@ -73,6 +73,14 @@ enumFromTo from to = case from > to of
     True -> []
     False -> from : enumFromTo (jail from + 1) to
 
+a || b = case a of
+    True -> True
+    False -> b
+
+a && b = case a of
+    True -> b
+    False -> False
+
 #else
 
 {-# INLINE jail #-}

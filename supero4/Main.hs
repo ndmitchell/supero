@@ -21,7 +21,7 @@ import Control.Exception
 import Language.Preprocessor.Cpphs
 import System.IO.Unsafe
 
-works = words "simple peter other digits_of_e2 exp3_8 rfib tak x2n1"
+works = words "simple peter other digits_of_e2 exp3_8 rfib tak x2n1 primes"
 
 main = do
     args <- getArgs

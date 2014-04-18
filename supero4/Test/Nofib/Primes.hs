@@ -19,5 +19,5 @@ root x =
     in primes !! x
 
 #if MAIN
-main = (\i -> root (i :: Int) :: Int, 4000 :: Int)
+test = (\i -> root (i :: Int) :: Int, 4000 :: Int)
 #endif

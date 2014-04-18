@@ -29,7 +29,7 @@ simplify = transform f
         f (App (Lam v x) y) = f $ Let v y x
         f (Let v x y) | cheap x || linear v y = simplify $ subst [(v,x)] y
         f (Case (Case on alts1) alts2) = simplify $ Case on [(a,Case c alts2) | (a,c) <- alts1]
-        f (Case (fromApps -> (Con ctr, xs)) alts) = head $ mapMaybe g alts
+        f o@(Case (fromApps -> (Con ctr, xs)) alts) = headNote ("Couldn't match constructor: " ++ pretty o) $ mapMaybe g alts
             where g (PWild, x) = Just $ x
                   g (PCon c vs, x) | c == ctr = Just $ simplify $ lets (zip vs xs) x
                                    | otherwise = Nothing

@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternGuards #-}
 
-module Util(module Util, trace) where
+module Util(module Util, module Safe, trace) where
 
 import System.Info
 import System.Cmd
@@ -18,6 +18,7 @@ import System.FilePath
 import Data.Char
 import System.IO
 import GHC.IO.Handle(hDuplicate,hDuplicateTo)
+import Safe
 
 
 rlookup :: Eq a => a -> [(b,a)] -> Maybe b
@@ -113,10 +114,6 @@ resetTime :: a -> a
 resetTime x = unsafePerformIO $ do
     writeIORef timeRef 0
     return x
-
-
-fromJustNote msg Nothing = error $ "fromJustNote: " ++ msg
-fromJustNote msg (Just x) = x
 
 
 type Id x = x -> x

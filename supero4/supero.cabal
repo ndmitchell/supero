@@ -23,7 +23,7 @@ source-repository head
 
 executable supero
     build-depends:      base == 4.*, directory, process, filepath, time, mtl, containers,
-                        haskell-src-exts, transformers, cpphs, uniplate
+                        haskell-src-exts, transformers, cpphs, uniplate, safe
     hs-source-dirs:     .
     main-is:            Main.hs
     other-modules:

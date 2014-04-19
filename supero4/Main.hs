@@ -21,10 +21,9 @@ import Control.Exception
 import Language.Preprocessor.Cpphs
 import System.IO.Unsafe
 
-works = words "simple peter other digits_of_e2 exp3_8 rfib tak x2n1 primes"
+works = words "simple peter other digits_of_e2 digits_of_e1 exp3_8 rfib tak x2n1 primes"
     -- bernouilli - has CAFs
-    -- digits_of_e1 - equivalence bug in Simplify
-    -- gen_regexps - equivalence bug in Simplify
+    -- gen_regexps - non-termination
     -- integrate - letrec/CAFs
     -- paraffins - unconverted (lots of list comp and arrays)
     -- queens - non-termination

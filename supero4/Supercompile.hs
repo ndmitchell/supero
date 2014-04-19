@@ -29,7 +29,7 @@ vJail = V "jail"
 vRoot = V "root"
 
 
-equivalent = equivalentOn (relabel . eval . relabel . transform f)
+equivalent = equivalentOn (eval . transform f)
     where f (Var v) | v == vJail || v == vDefine = Lam (V "v") $ Var $ V "v"
           f x = x
 

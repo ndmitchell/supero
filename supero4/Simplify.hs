@@ -30,10 +30,15 @@ simplify = \x -> equivalent "simplify" x $ idempotent "simplify" fs x
             where v2:_ = fresh $ vars o
         f (App (Lam v x) y) = f $ Let v y x
         f (Let v x y) | cheap x || linear v y = fs $ subst [(v,x)] y
-        f (Case (Case on alts1) alts2) = fs $ Case on [(a,Case c alts2) | (a,c) <- alts1]
+        f o@(Case (Case on alts1) alts2) = fs $ Case on $ map g alts1
+            where new = fresh $ vars o
+                  g (PWild, c) = (PWild, Case c alts2)
+                  g (PCon a vs, c) = let vs2 = take (length vs) new
+                                     in (PCon a vs2, Case (subst (zip vs $ map Var vs2) c) alts2)
         f o@(Case (fromApps -> (Con ctr, xs)) alts) = headNote ("Couldn't match constructor: " ++ pretty o) $ mapMaybe g alts
             where g (PWild, x) = Just $ x
-                  g (PCon c vs, x) | c == ctr = Just $ fs $ lets (zip vs xs) x
+                  g (PCon c vs, x) | c == ctr = let vs2 = take (length vs) $ fresh $ vars o
+                                                in Just $ fs $ lets (zip vs2 xs) $ subst (zip vs $ map Var vs2) x
                                    | otherwise = Nothing
         f x = x
 

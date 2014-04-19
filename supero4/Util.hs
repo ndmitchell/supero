@@ -210,18 +210,20 @@ idempotent name f x0
 equivalentOn :: (ShowNice a, ShowNice b, Eq b) => (a -> b) -> String -> a -> a -> a
 equivalentOn op name x y
     | xx == yy = y
-    | otherwise = error $ unlines
-        ["START Equivalent check failed for " ++ name ++ "!"
-        ,"Input:"
-        ,showNice x
-        ,"Output:"
-        ,showNice y
-        ,"Input (reduced):"
-        ,showNice xx
-        ,"Output (reduced):"
-        ,showNice yy
-        ,"END Equivalent check failed for " ++ name ++ "!"
-        ]
+    | otherwise = unsafePerformIO $ do
+        writeFile "error.log" $ "-- Equivalent check failed for " ++ name ++ "\n" ++ showNice x
+        error $ unlines
+            ["START Equivalent check failed for " ++ name ++ "!"
+            ,"Input:"
+            ,showNice x
+            ,"Output:"
+            ,showNice y
+            ,"Input (reduced):"
+            ,showNice xx
+            ,"Output (reduced):"
+            ,showNice yy
+            ,"END Equivalent check failed for " ++ name ++ "!"
+            ]
     where xx = op x
           yy = op y
 

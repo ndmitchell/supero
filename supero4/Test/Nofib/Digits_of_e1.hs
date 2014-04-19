@@ -26,7 +26,7 @@ toDigits xs = case xs of (x:xs) -> x:toDigits (jail (ratTrans (10,0,0,1) (jail x
 root n = take n $ toDigits $ 2:aux 2
 
 #if MAIN
-test = (root, 1000)
+test = (root :: Int -> [Integer], 1000 :: Int)
 
 op'5 a b c d q = ((signum c == signum d) || (abs c < abs d)) && -- No pole in range
                  (c+d)*q <= a+b && (c+d)*q + (c+d) > a+b

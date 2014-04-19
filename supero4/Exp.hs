@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, PatternGuards, TupleSections, ViewPatterns #-}
 
 module Exp(
-    Var(..), Con(..), Exp(..), Pat(..), (~>),
+    Var(..), Con(..), Exp(..), Pat(..),
     fromApps, fromLams, fromLets, lets, lams, apps,
     prettys, pretty,
     vars, free, subst, relabel, count, linear, fresh,
@@ -144,25 +144,8 @@ fresh used = map V (concatMap f [1..]) \\ used
           f i = [a ++ b | a <- f 1, b <- f (i-1)]
 
 
-(~>) :: Exp -> Exp -> Exp
-(~>) x y | f x == f y = y
-         | otherwise = error $ "Different!\n" ++ pretty (f x) ++ "\nIs not the same as:\n" ++ pretty (f y)
-    where
-        f = relabel . transform decase . transform delam . transform delet
-        decase (Case (Case on alts1) alts2) = transform decase $ Case on [(a,Case c alts2) | (a,c) <- alts1]
-        decase o@(Case (fromApps -> (Con ctr, xs)) alts) = headNote ("Corrupted constructor:\n" ++ pretty x ++ "\nVs\n" ++ pretty y) $ mapMaybe g alts
-            where g (PWild, x) = Just x
-                  g (PCon c vs, x) | c == ctr = Just $ transform decase $ subst (zip vs xs) x
-                                   | otherwise = Nothing
-        decase x = x
-        delam (App (Lam x y) z) = transform delam $ subst [(x,z)] y
-        delam x = x
-        delet (Let x y z) = subst [(x,y)] z
-        delet x = x
-
-
 eval :: Exp -> Exp
-eval = flip f id
+eval = relabel . flip f id . relabel
     where
         f (Lam v x) k = k $ Lam v $ f x id
         f (Let v x y) k = f (subst [(v,x)] y) k
@@ -170,7 +153,8 @@ eval = flip f id
             Lam v x -> f (subst [(v,y)] x) k
             x -> f y $ k . App x
         f o@(Case x alts) k = f x $ \x -> case x of
-            (fromApps -> (Con ctr, xs)) -> f (headNote ("Corrupted constructor:\n" ++ pretty x ++ "\nVs\n" ++ pretty o) $ mapMaybe (g ctr xs) alts) k
+            (fromApps -> (Con ctr, xs)) ->
+                f (headNote ("Corrupted constructor:\n" ++ pretty x ++ "\nVs\n" ++ pretty o) $ mapMaybe (g ctr xs) alts) k
             x -> Case x [(a, f b k) | (a,b) <- alts]
         f x k = k x
 
@@ -180,7 +164,7 @@ eval = flip f id
 
 
 equivalent :: String -> Exp -> Exp -> Exp
-equivalent = equivalentOn (relabel . eval . relabel)
+equivalent = equivalentOn eval
 
 
 ---------------------------------------------------------------------

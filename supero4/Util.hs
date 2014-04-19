@@ -191,3 +191,38 @@ system_ cmd = do
     when (res /= ExitSuccess) $ error $ "system command failed: " ++ cmd
 
 
+idempotent :: (ShowNice a, Eq a) => String -> (a -> a) -> (a -> a)
+idempotent name f x0
+    | x1 == x2 = x1
+    | otherwise = error $ unlines
+        ["START Idempotent check failed for " ++ name ++ "!"
+        ,"Input:"
+        ,showNice x0
+        ,"After first application:"
+        ,showNice x1
+        ,"After second application:"
+        ,showNice x2
+        ,"END Idempotent check failed for " ++ name ++ "!"
+        ]
+    where x1 = f x0
+          x2 = f x1
+
+equivalentOn :: (ShowNice a, ShowNice b, Eq b) => (a -> b) -> String -> a -> a -> a
+equivalentOn op name x y
+    | xx == yy = y
+    | otherwise = error $ unlines
+        ["START Equivalent check failed for " ++ name ++ "!"
+        ,"Input:"
+        ,showNice x
+        ,"Output:"
+        ,showNice y
+        ,"Input (reduced):"
+        ,showNice xx
+        ,"Output (reduced):"
+        ,showNice yy
+        ,"END Equivalent check failed for " ++ name ++ "!"
+        ]
+    where xx = op x
+          yy = op y
+
+class ShowNice a where showNice :: a -> String

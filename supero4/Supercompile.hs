@@ -24,9 +24,13 @@ type S a = StateT [(Var, Exp, Exp)] IO a
 debug :: String -> S ()
 debug = liftIO . putStrLn
 
+vDefine = V "define"
+vJail = V "jail"
+vRoot = V "root"
+
 
 equivalent = equivalentOn (relabel . eval . relabel . transform f)
-    where f (Var (V i)) | i == "jail" || i == "define" = Lam (V "v") $ Var $ V "v"
+    where f (Var v) | v == vJail || v == vDefine = Lam (V "v") $ Var $ V "v"
           f x = x
 
 ---------------------------------------------------------------------
@@ -34,9 +38,19 @@ equivalent = equivalentOn (relabel . eval . relabel . transform f)
 
 supercompile :: [(Var,Exp)] -> [(Var,Exp)]
 supercompile env = resetTime $ unsafePerformIO $ flip evalStateT [] $ do
-    res <- define env $ fromJustNote "Could not find root in env" $ lookup (V "root") env
+    res <- define env $ fromJustNote "Could not find root in env" $ lookup vRoot env
     s <- get
-    return $ (V "root",res) : reverse [(a,b) | (a,_,b) <- s]
+    return $ (vRoot,res) : reverse [(a,b) | (a,_,b) <- s]
+
+
+defines :: [(Var,Exp)] -> Exp -> S Exp
+defines env o = f o
+    where
+        f (App (Var ((==) vDefine -> True)) x)
+            | not $ free x `subset` free o = error "Free variables are not a subset in defines"
+            | otherwise = define env x
+        f (Var ((==) vDefine -> True)) = error "Reached define with no immediate argument"
+        f x = descendM f x
 
 
 define :: [(Var,Exp)] -> Exp -> S Exp
@@ -64,16 +78,16 @@ optimise env (simplify -> x)
 
 
 dejail :: [(Var,Exp)] -> Exp -> S Exp
-dejail env (fromLams -> (root, x)) = do
+dejail env o@(fromLams -> (root, x)) = do
         debug $ "dejail: " ++ pretty x
         (bod,(_,(unzip -> (vs,xs)))) <- return $ runState (f [] x) (fresh $ vars x, [])
         -- debug $ "dejail out: " ++ pretty (lams root $ lets (zip vs xs) bod)
-        let def x = let fv = root `intersect` free x in flip apps (map Var fv) <$> define env (lams fv x)
+        let def x = let fv = root `intersect` free x in apps (App (Var vDefine) (lams fv x)) (map Var fv)
         liftIO $ evaluate $
             equivalent "dejail"
             (lams root x)
             (lams root (apps (lams vs bod) xs))
-        lams root <$> (apps <$> def (lams vs bod) <*> mapM def xs)
+        defines env $ equivalent "dejail" o $ lams root $ apps (def (lams vs bod)) (map def xs)
     where
         f :: [Var] -> Exp -> State ([Var], [(Var,Exp)]) Exp
         f vs (Lam v x) = Lam v <$> f (vs++[v]) x

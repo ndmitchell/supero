@@ -109,19 +109,19 @@ dejail env o@(fromLams -> (root, x)) = do
 
 
 peel :: [(Var,Exp)] -> Exp -> S Exp
-peel env = f [] False
+peel env = defines env . f [] False
     where
-        f vs down (Lam v x) = Lam v <$> f (vs++[v]) down x
-        f vs down (fromApps -> (Con c, xs)) = apps (Con c) <$> mapM (f vs True) xs
-        f vs down (fromApps -> (Var v, xs)) | v `elem` vs || isNothing (lookup v env) = apps (Var v) <$> mapM (f vs True) xs
-        f vs False (Case v xs) = Case <$> f vs True v <*> mapM (g vs) xs
-        f vs False (App x y) = App <$> f vs True x <*> f vs True y
-        f vs False (Let v x y) = Let v <$> f vs True x <*> f (vs++[v]) True y
-        f vs down x = flip apps (map Var vs2) <$> define env (lams vs2 x)
+        f vs down (Lam v x) = Lam v $ f (vs++[v]) down x
+        f vs down (fromApps -> (Con c, xs)) = apps (Con c) $ map (f vs True) xs
+        f vs down (fromApps -> (Var v, xs)) | v `elem` vs || isNothing (lookup v env) = apps (Var v) $ map (f vs True) xs
+        f vs False (Case v xs) = Case (f vs True v) (map (g vs) xs)
+        f vs False (App x y) = App (f vs True x) (f vs True y)
+        f vs False (Let v x y) = Let v (f vs True x) (f (vs++[v]) True y)
+        f vs down x = apps (App (Var vDefine) $ lams vs2 x) (map Var vs2)
             where vs2 = reverse $ nub $ reverse $ vs `intersect` free x
 
-        g vs (PWild, x) = (PWild,) <$> f vs True x
-        g vs (PCon c ps, x) = (PCon c ps,) <$> f (vs ++ ps) True x
+        g vs (PWild, x) = (PWild, f vs True x)
+        g vs (PCon c ps, x) = (PCon c ps, f (vs ++ ps) True x)
 
 
 unfold :: [(Var,Exp)] -> Exp -> Maybe Exp

@@ -21,6 +21,24 @@ import Control.Exception
 import Language.Preprocessor.Cpphs
 import System.IO.Unsafe
 
+{-
+Current thoughts about where jail is necessary:
+
+* Accumulating parameter.
+* Even with primities (X2n1 with accumulating sum requires a primitive)
+* Duplicating recursive call (see exp3_8)?
+* Recursive call underneath a non-primitive?
+
+Next step:
+
+* Pull out a few examples with minimal uses of jails, including
+  - exp3_8 &* requires a jail
+  - x2n1 with sum accumulating requires a jail
+  - reverse requires a jail
+-}
+
+
+
 works = words "simple peter other digits_of_e2 digits_of_e1 exp3_8 rfib tak x2n1 primes"
     -- bernouilli - has CAFs
     -- gen_regexps - non-termination

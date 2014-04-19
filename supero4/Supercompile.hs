@@ -72,7 +72,7 @@ define env x = do
 
 optimise :: [(Var,Exp)] -> Exp -> S Exp
 optimise env (simplify -> x)
-    | V "jail" `elem` universeBi x = dejail env x
+    | vJail `elem` universeBi x = dejail env x
     | Just x <- unfold env x = optimise env x
     | otherwise = do debug $ "peel: " ++ pretty x; peel env $ simplify x
 
@@ -93,7 +93,7 @@ dejail env o@(fromLams -> (root, x)) = do
         f vs (Lam v x) = Lam v <$> f (vs++[v]) x
         f vs (Case v xs) = Case <$> f vs v <*> mapM (g vs) xs
         f vs (Let v x y) = Let v <$> f vs x <*> f (vs++[v]) y
-        f vs (App (Var (V "jail")) x) = do
+        f vs (App (Var ((==) vJail -> True)) x) = do
                 let vs2 = reverse $ nub $ reverse $ vs `intersect` free x
                 (n:ew,bnd) <- get
                 case rlookup (lams vs2 x) bnd of

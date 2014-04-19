@@ -20,8 +20,7 @@ simplifys :: [(Var,Exp)] -> [(Var,Exp)]
 simplifys = map (second simplify)
 
 simplify :: Exp -> Exp
-simplify = \x -> let y = transform f x; yy = transform f y in if y == yy then x ~> y else
-                 error $ "Simplify not idempotent!\nOriginal\n" ++ pretty x ++ "\nFirst result\n" ++ pretty y ++ "\nSecond result\n" ++ pretty yy
+simplify = \x -> x ~> idempotent "simplify" fs x
     where
         fs = transform f
 

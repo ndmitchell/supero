@@ -109,11 +109,12 @@ dejail env o@(fromLams -> (root, x)) = do
 
 
 peel :: [(Var,Exp)] -> Exp -> S Exp
-peel env o = defines env $ equivalent "peel" o $ f [] False o
+peel env o@(fromLams -> (lvs, _)) = defines env $ equivalent "peel" o $ f [] False o
     where
         f vs down (Lam v x) = Lam v $ f (vs++[v]) down x
         f vs down (fromApps -> (Con c, xs)) = apps (Con c) $ map (f vs True) xs
         f vs down (fromApps -> (Var v, xs)) | v `elem` vs || isNothing (lookup v env) = apps (Var v) $ map (f vs True) xs
+        -- f vs down (Case (Var v) xs) | v `elem` lvs = Case (Var v) $ map (g vs) xs
         f vs False (Case v xs) = Case (f vs True v) (map (g vs) xs)
         f vs False (App x y) = App (f vs True x) (f vs True y)
         f vs False (Let v x y) = Let v (f vs True x) (f (vs++[v]) True y)

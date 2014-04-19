@@ -28,6 +28,13 @@ simplify = \x -> equivalent "simplify" x $ idempotent "simplify" fs x
             where v2:_ = fresh $ vars o
         f o@(Case (Let v x y) alts) = fs $ Let v2 x $ Case (subst [(v,Var v2)] y) alts
             where v2:_ = fresh $ vars o
+        {-
+        -- True, but a bit different to the others, since it is information propagation
+        -- Nothing requries it yet
+        f o@(Case (Var v) alts) | map g alts /= alts = fs $ Case (Var v) $ map g alts
+            where g (PCon c vs, x) | v `notElem` vs = (PCon c vs, subst [(v, apps (Con c) $ map Var vs)] x)
+                  g x = x
+        -}
         f (App (Lam v x) y) = f $ Let v y x
         f (Let v x y) | cheap x || linear v y = fs $ subst [(v,x)] y
         f o@(Case (Case on alts1) alts2) = fs $ Case on $ map g alts1

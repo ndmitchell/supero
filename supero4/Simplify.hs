@@ -20,7 +20,7 @@ simplifys :: [(Var,Exp)] -> [(Var,Exp)]
 simplifys = map (second simplify)
 
 simplify :: Exp -> Exp
-simplify = \x -> x ~> idempotent "simplify" fs x
+simplify = \x -> equivalent "simplify" x $ idempotent "simplify" fs x
     where
         fs = transform f
 

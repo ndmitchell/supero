@@ -1,10 +1,11 @@
 {-# LANGUAGE DeriveDataTypeable, PatternGuards, TupleSections, ViewPatterns #-}
 
 module Exp(
-    Var(..), Con(..), Exp(..), Pat(..),
-    fromApps, fromLams, fromLets, lets, lams, apps, (~>),
+    Var(..), Con(..), Exp(..), Pat(..), (~>),
+    fromApps, fromLams, fromLets, lets, lams, apps,
     prettys, pretty,
     vars, free, subst, relabel, count, linear, fresh,
+    eval, equivalent,
     fromHSE, toHSE
     ) where
 
@@ -158,6 +159,28 @@ fresh used = map V (concatMap f [1..]) \\ used
         delam x = x
         delet (Let x y z) = subst [(x,y)] z
         delet x = x
+
+
+eval :: Exp -> Exp
+eval = flip f id
+    where
+        f (Lam v x) k = k $ Lam v $ f x id
+        f (Let v x y) k = f (subst [(v,x)] y) k
+        f (App x y) k = f x $ \x -> case x of
+            Lam v x -> f (subst [(v,y)] x) k
+            x -> f y $ k . App x
+        f o@(Case x alts) k = f x $ \x -> case x of
+            (fromApps -> (Con ctr, xs)) -> f (headNote ("Corrupted constructor:\n" ++ pretty x ++ "\nVs\n" ++ pretty o) $ mapMaybe (g ctr xs) alts) k
+            x -> Case x [(a, f b k) | (a,b) <- alts]
+        f x k = k x
+
+        g ctr xs (PWild, x) = Just x
+        g ctr xs (PCon c vs, x) | c == ctr = Just $ subst (zip vs xs) x
+                                | otherwise = Nothing
+
+
+equivalent :: String -> Exp -> Exp -> Exp
+equivalent = equivalentOn (relabel . eval . relabel)
 
 
 ---------------------------------------------------------------------

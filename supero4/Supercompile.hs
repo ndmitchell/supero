@@ -2,7 +2,7 @@
 
 module Supercompile(supercompile) where
 
-import Exp
+import Exp hiding (equivalent)
 import Simplify
 import Util hiding (fresh)
 import Data.List
@@ -24,10 +24,9 @@ type S a = StateT [(Var, Exp, Exp)] IO a
 debug :: String -> S ()
 debug = liftIO . putStrLn
 
-raw :: Exp -> Exp
-raw = transform f
-    where f (Var (V "jail")) = Lam (V "v") $ Var $ V "v"
-          f (Var (V "define")) = Lam (V "v") $ Var $ V "v"
+
+equivalent = equivalentOn (relabel . eval . relabel . transform f)
+    where f (Var (V i)) | i == "jail" || i == "define" = Lam (V "v") $ Var $ V "v"
           f x = x
 
 ---------------------------------------------------------------------
@@ -71,8 +70,9 @@ dejail env (fromLams -> (root, x)) = do
         -- debug $ "dejail out: " ++ pretty (lams root $ lets (zip vs xs) bod)
         let def x = let fv = root `intersect` free x in flip apps (map Var fv) <$> define env (lams fv x)
         liftIO $ evaluate $
-            raw (lams root x) ~>
-            raw (lams root (apps (lams vs bod) xs))
+            equivalent "dejail"
+            (lams root x)
+            (lams root (apps (lams vs bod) xs))
         lams root <$> (apps <$> def (lams vs bod) <*> mapM def xs)
     where
         f :: [Var] -> Exp -> State ([Var], [(Var,Exp)]) Exp

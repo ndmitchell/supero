@@ -16,7 +16,7 @@ import Data.Generics.Uniplate.Data
 import Debug.Trace
 
 
-simplifys :: [(Fun,Exp)] -> [(Fun,Exp)]
+simplifys :: [(Var,Exp)] -> [(Var,Exp)]
 simplifys = map (second simplify)
 
 simplify :: Exp -> Exp

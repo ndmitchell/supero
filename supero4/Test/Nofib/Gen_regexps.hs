@@ -6,9 +6,10 @@
 -- rather that the output itself, thus avoiding having to generate such a 
 -- huge output file to get a reasonable execution time.
 
-module Test.Nofib.Gen_regexps (main) where
+module Test.Nofib.Gen_regexps(test) where
 
-import Char
+import Data.Char
+#include "Include.h"
 
 numchars :: [String] -> Int
 numchars l = sum $ map length l
@@ -62,56 +63,6 @@ numericRule x = []
 root x = numchars (expand x)
 
 #if MAIN
-main = print $ root "[a-j][a-j][a-j]abcdefghijklmnopqrstuvwxyz"
-error'1 = Prelude.error
-eqChar'2 = (==) :: Char -> Char -> Bool
-gtChar'2 = (>) :: Char -> Char -> Bool
-ltEqChar'2 = (<=) :: Char -> Char -> Bool
-addInt'2 = (+) :: Int -> Int -> Int
-incChar'2 = succ :: Char -> Char
-
-#endif
-
-#if SUPERO
-error = error'1
-(==) = eqChar'2
-(>) = gtChar'2
-($) f x = f x
-(<=) = ltEqChar'2
-(+) = addInt'2
-
-map f x = case x of
-    y:ys -> f y : map f ys
-    [] -> []
-
-concatMap f x = concat (map f x)
-
-concat x = case x of
-    [] -> []
-    x:xs -> x ++ concat xs
-
-(++) xs ys = case xs of
-    [] -> ys
-    x:xs -> x : (xs ++ ys)
-
-enumFromTo from to = case from > to of
-    True -> []
-    False -> from : enumFromTo (incChar'1 from) to
-
-sum x = sumWith 0 x
-sumWith acc x = case x of
-    [] -> acc
-    x:xs -> sumWith (acc+x) xs
-
-length x = lengthWith 0 x
-lengthWith acc x = case x of
-    [] -> acc
-    x:xs -> lengthWith (acc+1) xs
-
-reverse xs = reverseWith [] xs
-reverseWith acc xs = case xs of
-    [] -> acc
-    x:xs -> reverseWith (x:acc) xs
-
+test = (root, "[a-j][a-j][a-j]abcdefghijklmnopqrstuvwxyz")
 #endif
 

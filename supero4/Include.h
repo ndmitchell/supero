@@ -81,9 +81,16 @@ a && b = case a of
     True -> b
     False -> False
 
-length x = case x of
-    [] -> 0
-    x:xs -> 1 + length xs
+length x = lengthWith 0 x
+lengthWith acc x = case x of
+    [] -> jail acc
+    x:xs -> lengthWith (jail acc+1) xs
+
+reverse xs = reverseWith [] xs
+reverseWith acc xs = case xs of
+    [] -> jail acc
+    x:xs -> reverseWith (x:jail acc) xs
+
 
 concatMap f x = case x of
     [] -> []

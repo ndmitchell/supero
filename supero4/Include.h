@@ -13,7 +13,7 @@ iterate f x = x : iterate f (jail (f x))
     [] -> error "bad"
     x:xs -> case y == 0 of
         True -> x
-        False -> (!!) xs (jail (y - 1))
+        False -> (!!) xs (jail y - 1)
 
 succ x = x + 1
 
@@ -27,11 +27,9 @@ zipWith f xs ys = case xs of
         [] -> []
         y:ys -> f x y : zipWith f xs ys
 
-sum xs = sumWith 0 xs
-
-sumWith acc xs = case xs of
-    [] -> jail acc
-    x:xs -> sumWith (x + jail acc) xs
+sum xs = case xs of
+    [] -> 0
+    x:xs -> x + sum xs
 
 head x = case x of
     [] -> error "head"
@@ -81,10 +79,9 @@ a && b = case a of
     True -> b
     False -> False
 
-length x = lengthWith 0 x
-lengthWith acc x = case x of
-    [] -> jail acc
-    x:xs -> lengthWith (jail acc+1) xs
+length x = case x of
+    [] -> 0
+    x:xs -> 1 + length x
 
 reverse xs = reverseWith [] xs
 reverseWith acc xs = case xs of

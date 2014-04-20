@@ -23,7 +23,7 @@ expand ys = case ys of
             False -> constantRule ys
 
 constantRule xs = case xs of
-    c:rest -> map ((:) c) (expand rest)
+    c:rest -> map ((:) c) (jail (expand rest))
     [] -> error "constantRule"
 
 alphabeticRule xs = case xs of
@@ -39,8 +39,8 @@ alphabeticRule xs = case xs of
                     x:rest -> case x == ']' of
                         False -> error "alpha"
                         True -> case a <= b of
-                            True -> power (:) (enumFromTo a b) (expand rest)
-                            False -> power (:) (reverse (enumFromTo b a)) (expand rest)
+                            True -> power (:) (enumFromTo a b) (jail (expand rest))
+                            False -> power (:) (reverse (enumFromTo b a)) (jail (expand rest))
 
 
 power f xs ys = concatMap (\x -> map (\y -> f x y) ys) xs
@@ -63,6 +63,6 @@ numericRule x = []
 root x = numchars (expand x)
 
 #if MAIN
-test = (root, "[a-j][a-j][a-j]abcdefghijklmnopqrstuvwxyz")
+test = (\s -> root s :: Int, "[a-j][a-j][a-j]abcdefghijklmnopqrstuvwxyz")
 #endif
 

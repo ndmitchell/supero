@@ -15,8 +15,6 @@ iterate f x = x : iterate f (jail (f x))
         True -> x
         False -> (!!) xs (jail y - 1)
 
-succ x = x + 1
-
 filter f x = case x of
     [] -> []
     x:xs -> if f x then x : filter f xs else filter f xs
@@ -66,11 +64,11 @@ not x = case x of
 (.) f g x = f (g x)
 
 
-enumFrom x = x : enumFrom (x + 1)
+enumFrom x = x : enumFrom (succ x)
 
 enumFromTo from to = case from > to of
     True -> []
-    False -> from : enumFromTo (jail from + 1) to
+    False -> from : enumFromTo (succ (jail from)) to
 
 a || b = case a of
     True -> True

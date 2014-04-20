@@ -39,9 +39,8 @@ Next step:
 
 
 
-works = words "simple peter other digits_of_e2 digits_of_e1 exp3_8 rfib tak x2n1 primes"
+works = words "simple peter other digits_of_e2 digits_of_e1 exp3_8 rfib tak x2n1 primes gen_regexps"
     -- bernouilli - has CAFs
-    -- gen_regexps - non-termination
     -- integrate - letrec/CAFs
     -- paraffins - unconverted (lots of list comp and arrays)
     -- queens - non-termination

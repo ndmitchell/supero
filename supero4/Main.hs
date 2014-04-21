@@ -35,6 +35,9 @@ Next step:
   - exp3_8 &* requires a jail
   - x2n1 with sum accumulating requires a jail
   - reverse requires a jail
+
+Anything to the left or right of a primitive, or the result of a primitive, can be jailed
+without loss of information (these things don't generate any info anyway)
 -}
 
 

@@ -155,12 +155,12 @@ eval = relabel . flip f id . relabel
         f o@(Case x alts) k = f x $ \x -> case x of
             (fromApps -> (Con ctr, xs)) ->
                 f (headNote ("Corrupted constructor:\n" ++ pretty x ++ "\nVs\n" ++ pretty o) $ mapMaybe (g ctr xs) alts) k
-            Var v -> Case (Var v) [(a, f (g2 v a b) k) | (a,b) <- alts]
+            -- Var v -> Case (Var v) [(a, f (g2 v a b) k) | (a,b) <- alts]
             x -> Case x [(a, f b k) | (a,b) <- alts]
         f x k = k x
 
-        g2 v PWild x = x
-        g2 v (PCon c vs) x = subst [(v, apps (Con c) $ map Var vs)] x
+        g2 v (PCon c vs) x | v `notElem` vs = subst [(v, apps (Con c) $ map Var vs)] x
+        g2 v _ x = x
 
         g ctr xs (PWild, x) = Just x
         g ctr xs (PCon c vs, x) | c == ctr = Just $ subst (zip vs xs) x

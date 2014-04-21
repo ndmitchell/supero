@@ -42,7 +42,7 @@ without loss of information (these things don't generate any info anyway)
 
 
 
-works = words "simple peter other jail digits_of_e2 digits_of_e1 exp3_8 rfib tak x2n1 primes gen_regexps"
+works = words "simple peter other jail digits_of_e2 digits_of_e1 exp3_8 rfib tak x2n1 primes gen_regexps queens"
     -- bernouilli - has CAFs
     -- integrate - letrec/CAFs
     -- paraffins - unconverted (lots of list comp and arrays)

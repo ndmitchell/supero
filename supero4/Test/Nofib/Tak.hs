@@ -1,7 +1,7 @@
 
 module Test.Nofib.Tak(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 tak :: Int -> Int -> Int -> Int
 tak x y z = if not(y < x) then z

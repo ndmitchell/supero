@@ -1,7 +1,7 @@
 
 module Test.Jail.AddMul(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 #if MAIN
 data Nat = Z | S Nat

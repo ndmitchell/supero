@@ -1,7 +1,7 @@
 
 module Test.Peter.Raytracer(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 root xs ys = sum (zipWith (*) xs ys)
 

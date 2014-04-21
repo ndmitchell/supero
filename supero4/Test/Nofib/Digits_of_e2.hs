@@ -5,7 +5,7 @@ Due to John Hughes, Aug 2001
 
 module Test.Nofib.Digits_of_e2(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 {-
 Here's a way to compute all the digits of e. We use the series

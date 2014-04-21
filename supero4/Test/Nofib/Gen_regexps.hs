@@ -9,7 +9,7 @@
 module Test.Nofib.Gen_regexps(test) where
 
 import Data.Char
-#include "Include.h"
+#include "Include.hs"
 
 numchars :: [String] -> Int
 numchars l = sum $ map length l

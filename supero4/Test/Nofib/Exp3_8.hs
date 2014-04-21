@@ -1,7 +1,7 @@
 
 module Test.Nofib.Exp3_8(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 x +& y = case x of
     Z -> y

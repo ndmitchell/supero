@@ -1,7 +1,7 @@
 
 module Test.Simple.Iterate(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 #if STREAM
 import Prelude hiding((!!), iterate, map)

@@ -1,7 +1,7 @@
 
 module Test.Nofib.Digits_of_e1(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 type ContFrac = [Integer]
 

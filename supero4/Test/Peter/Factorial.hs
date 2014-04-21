@@ -1,7 +1,7 @@
 
 module Test.Peter.Factorial(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 fac :: Int -> Int
 fac n = case n == 0 of

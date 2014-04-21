@@ -1,7 +1,7 @@
 
 module Test.Jail.AccRev(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 #if MAIN
 test = (uncurry root, ("test", "more"))

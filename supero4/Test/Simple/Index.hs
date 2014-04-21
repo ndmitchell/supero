@@ -1,7 +1,7 @@
 
 module Test.Simple.Index(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 #if MAIN
 test = (\(s,i) -> root s (i::Int), ("test", 2::Int))

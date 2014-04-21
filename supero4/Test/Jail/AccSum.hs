@@ -5,7 +5,7 @@ module Test.Jail.AccSum(test) where
 test = (root (0 :: Int), [1,2,3] :: [Int])
 #endif
 
-#include "Include.h"
+#include "Include.hs"
 
 root acc n = sumWith_ acc n
 

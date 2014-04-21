@@ -10,6 +10,6 @@ operation :: Int -> Complex Double
 operation n = mkPolar 1 ((2*pi)/fromIntegral n) ^ n
 #endif
 
-#include "Include.h"
+#include "Include.hs"
 
 root n = round (realPart (sum (map operation (enumFromTo 1 n))))

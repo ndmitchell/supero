@@ -1,7 +1,7 @@
 
 module Test.Simple.Evens(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 isdivs :: Int -> Int -> Bool
 isdivs n x = mod x n /= 0

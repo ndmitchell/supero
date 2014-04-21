@@ -1,7 +1,7 @@
 
 module Test.Simple.MapId(test) where
 
-#include "Include.h"
+#include "Include.hs"
 
 #if MAIN
 test = (root, "test")

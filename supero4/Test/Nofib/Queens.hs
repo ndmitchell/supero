@@ -6,12 +6,7 @@ module Test.Nofib.Queens(test) where
 #include "Include.h"
 
 #if MAIN
-test = (\i -> root i :: Int, 12 :: Int)
-addInt'2 = (+) :: Int -> Int -> Int
-subInt'2 = (-) :: Int -> Int -> Int
-neqInt'2 = (/=) :: Int -> Int -> Bool
-eqInt'2 = (==) :: Int -> Int -> Bool
-gtInt'2 = (>) :: Int -> Int -> Bool
+test = (\i -> root (i :: Int) :: Int, 12 :: Int)
 
 safer'3 x d q = x /= q && x /= q+d && x /= q-d 
 #endif
@@ -30,4 +25,4 @@ gen nq n = case n == 0 of
     True -> [[]]
     False -> 
         --[ (q:b) | b <- gen nq (n-1), q <- [1..nq], safe q 1 b]
-        concatMap (\b -> concatMap (\q -> if safe q 1 b then [q:b] else []) (enumFromTo 1 nq)) (gen nq (jail n-1))
+        concatMap (\b -> concatMap (\q -> if safe q 1 b then [q:b] else []) (enumFromTo 1 nq)) (jail (gen nq (jail n-1)))

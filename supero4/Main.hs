@@ -87,7 +87,7 @@ main = do
         src <- lines <$> readFile' "report.csv"
         let grab s = head [read $ takeWhile (/= ',') x :: Double | x <- src, Just x <- [stripPrefix ("\"" ++ s ++ "\",") x]]
         forM_ (map modu files) $ \m ->
-            putStrLn $ m ++ " = " ++ show (grab (m ++ "/Supero") / grab (m ++ "/GHC"))
+            putStrLn $ m ++ " = " ++ showDP 2 (grab (m ++ "/Supero") / grab (m ++ "/GHC"))
 
 opt = "-O2 -fno-full-laziness"
 

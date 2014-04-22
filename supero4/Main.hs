@@ -42,8 +42,7 @@ without loss of information (these things don't generate any info anyway)
 
 
 
-works = words "simple peter other jail digits_of_e2 digits_of_e1 exp3_8 rfib tak x2n1 primes gen_regexps queens integrate bernouilli"
-    -- paraffins - unconverted (lots of list comp and arrays and letrec)
+works = words "simple peter other jail digits_of_e2 digits_of_e1 exp3_8 rfib tak x2n1 primes gen_regexps queens integrate bernouilli paraffins"
     -- wheel_sieve1 - unconverted (CAFs and list comp)
     -- wheel_sieve2 - unconverted (CAFs and letrec)
 

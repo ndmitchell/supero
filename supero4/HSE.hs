@@ -44,11 +44,12 @@ deflateExp :: Exp -> Exp
 deflateExp (Lambda sl ps x) = foldr (\p x -> Lambda sl [p] x) x ps
 deflateExp (LeftSection x (QVarOp y)) = App (Var y) x
 deflateExp (List []) = Con $ spec ListCon
-deflateExp (List [x]) = Con (spec Cons) `App` x `App` Con (spec ListCon)
+deflateExp (List (x:xs)) = Paren $ Con (spec Cons) `App` Paren x `App` deflateExp (List xs)
 deflateExp (Tuple b xs) = foldl App (Con $ spec $ TupleCon b $ length xs) xs
 deflateExp (InfixApp a (QVarOp b) c) = Var b `App` a `App` c
 deflateExp (InfixApp a (QConOp b) c) = Con b `App` a `App` c
 deflateExp (Lit x) = Con $ UnQual $ Ident $ prettyPrint x
+deflateExp (NegApp x) = Paren $ Var (UnQual $ Ident "negate") `App` Paren x
 deflateExp (Case (Var (UnQual v)) (Alt sl (PVar p) (UnGuardedAlt e) (BDecls []):_))
     | v == p = e
     | otherwise = Let (BDecls [PatBind sl (PVar p) Nothing (UnGuardedRhs $ Var $ UnQual v) (BDecls [])]) e
@@ -56,6 +57,7 @@ deflateExp (If a b c) = Case a [f "True" b, f "False" c]
     where f con x = Alt sl (PApp (UnQual $ Ident con) []) (UnGuardedAlt x) (BDecls [])
 deflateExp (Let (BDecls bs) x) = foldr (\b x -> Let (BDecls [b]) x) x bs -- FIXME: Only safe if variables are not mutually recursive
 deflateExp (EnumFromTo x y) = Var (UnQual $ Ident "enumFromTo") `App` x `App` y
+deflateExp (EnumFrom x) = Var (UnQual $ Ident "enumFrom") `App` x
 deflateExp (ListComp res xs) = lst xs
     where
         -- variants returning a Maybe

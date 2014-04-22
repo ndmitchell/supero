@@ -8,6 +8,11 @@ id x = x
 
 iterate f x = x : iterate f (jail (f x))
 
+array lu ies = case lu of
+    (l,u) -> let n = safeRangeSize (l,u)
+             in unsafeArray' (l,u) n
+                     [(safeIndex (l,u) n i, e) | (i, e) <- ies]
+
 (!!) :: [a] -> Int -> a
 (!!) xs y = case xs of
     [] -> error "bad"

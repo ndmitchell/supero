@@ -21,10 +21,8 @@ import Control.Arrow
 import Language.Haskell.Exts hiding (Exp,Name,Pat,Var,Let,App,Case,Con,name)
 import qualified Language.Haskell.Exts as H
 import HSE
-import Language.Haskell.Exts.Pretty
 import Util hiding (fresh)
 import Data.Generics.Uniplate.Data
-import qualified Data.Map as Map
 
 
 ---------------------------------------------------------------------

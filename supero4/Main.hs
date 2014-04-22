@@ -14,10 +14,8 @@ import Language.Haskell.Exts
 import System.Environment
 import System.FilePath
 import Data.List
-import System.Cmd
 import System.Directory
 import System.Exit
-import Control.Exception
 import Language.Preprocessor.Cpphs
 import System.IO.Unsafe
 

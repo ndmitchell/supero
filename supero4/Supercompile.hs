@@ -7,7 +7,6 @@ import Simplify
 import Util hiding (fresh)
 import Data.List
 import Data.Maybe
-import Control.Arrow
 import Control.Monad.Trans.State
 import Control.Monad.IO.Class
 import Data.Generics.Uniplate.Data hiding (children)

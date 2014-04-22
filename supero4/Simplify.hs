@@ -4,16 +4,8 @@ module Simplify(simplifys, simplify) where
 
 import Util hiding (fresh)
 import Exp
-import Control.Applicative
 import Control.Arrow
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import Control.Monad
-import Control.Monad.State
-import Data.Maybe
-import Data.List
 import Data.Generics.Uniplate.Data
-import Debug.Trace
 
 
 simplifys :: [(Var,Exp)] -> [(Var,Exp)]

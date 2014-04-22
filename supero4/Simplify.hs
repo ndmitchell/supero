@@ -24,10 +24,8 @@ simplify = \(relabel -> x) -> equivalent "simplify" x $ idempotent "simplify" fs
     where
         fs = transform f
 
-        f o@(App (fromLets -> (bs@(_:_), Lam v z)) q) = fs $ Let v2 q $ lets bs $ subst [(v,Var v2)] z
-            where v2:_ = fresh $ vars o
-        f o@(Case (Let v x y) alts) = fs $ Let v2 x $ Case (subst [(v,Var v2)] y) alts
-            where v2:_ = fresh $ vars o
+        f o@(App (fromLets -> (bs@(_:_), Lam v z)) q) = fs $ Let v q $ lets bs z
+        f o@(Case (Let v x y) alts) = fs $ Let v x $ Case y alts
         {-
         -- True, but a bit different to the others, since it is information propagation
         -- Nothing requries it yet
@@ -37,14 +35,10 @@ simplify = \(relabel -> x) -> equivalent "simplify" x $ idempotent "simplify" fs
         -}
         f (App (Lam v x) y) = f $ Let v y x
         f (Let v x y) | cheap x || linear v y = fs $ subst [(v,x)] y
-        f o@(Case (Case on alts1) alts2) = fs $ Case on $ map g alts1
-            where new = fresh $ vars o
-                  g (PWild, c) = (PWild, Case c alts2)
-                  g (PCon a vs, c) = let vs2 = take (length vs) new
-                                     in (PCon a vs2, Case (subst (zip vs $ map Var vs2) c) alts2)
-        f x | Just ((unzip -> (vs, xs)), bod) <- caseCon x =
-            let vs2 = take (length vs) $ fresh $ vars x
-            in fs $ lets (zip vs2 xs) $ subst (zip vs $ map Var vs2) bod
+        f o@(Case (Case on alts1) alts2) =  fs $ Case on $ map g alts1
+            where g (PWild, c) = (PWild, Case c alts2)
+                  g (PCon a vs, c) = (PCon a vs, Case c alts2)
+        f x | Just ((unzip -> (vs, xs)), bod) <- caseCon x = fs $ lets (zip vs xs) bod
         f x = x
 
 cheap (Var _) = True

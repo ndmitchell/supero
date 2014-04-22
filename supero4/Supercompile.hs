@@ -7,6 +7,8 @@ import Simplify
 import Util hiding (fresh)
 import Data.List
 import Data.Maybe
+import Control.Monad
+import System.Environment
 import Control.Monad.Trans.State
 import Control.Monad.IO.Class
 import Data.Generics.Uniplate.Data hiding (children)
@@ -21,7 +23,9 @@ import System.IO.Unsafe
 type S a = StateT [(Var, Exp, Exp)] IO a
 
 debug :: String -> S ()
-debug = liftIO . putStrLn
+debug s = liftIO $ do
+    args <- getArgs
+    unless ("--quiet" `elem` args) $ putStrLn s
 
 vDefine = V "define"
 vJail = V "jail"

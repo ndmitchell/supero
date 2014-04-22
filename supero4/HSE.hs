@@ -9,6 +9,14 @@ import Data.Generics.Uniplate.Data
 
 sl = SrcLoc "" 0 0
 
+names :: Data a => a -> [String]
+names = map f . universeBi
+    where f (Ident x) = x
+          f (Symbol x) = x
+
+fresh :: [String] -> [String]
+fresh del = ["v" ++ show i | i  <- [1..]] \\ del
+
 ---------------------------------------------------------------------
 -- DEFLATE
 
@@ -43,6 +51,20 @@ deflateExp (Lit x) = Con $ UnQual $ Ident $ prettyPrint x
 deflateExp (If a b c) = Case a [f "True" b, f "False" c]
     where f con x = Alt sl (PApp (UnQual $ Ident con) []) (UnGuardedAlt x) (BDecls [])
 deflateExp (Let (BDecls bs) x) = foldr (\b x -> Let (BDecls [b]) x) x bs -- FIXME: Only safe if variables are not mutually recursive
+deflateExp (EnumFromTo x y) = Var (UnQual $ Ident "enumFromTo") `App` x `App` y
+deflateExp (ListComp res xs) = f xs
+    where
+        -- optimised shortcuts
+        f o@(QualStmt (Generator _ (PVar p) e):[]) = Var (UnQual $ Ident "map") `App` deflateExp (Lambda sl [PVar p] res) `App` e
+        -- from the report
+        f o@(QualStmt (Generator _ p e):xs) = Var (UnQual $ Ident "concatMap") `App` deflateExp (Lambda sl [PVar new] bod) `App` e
+          where new:_ = map Ident $ fresh $ names $ ListComp res o
+                bod = deflateExp $ Case (Var $ UnQual new)
+                          [Alt sl p (UnGuardedAlt $ f xs) $ BDecls []
+                          ,Alt sl PWildCard (UnGuardedAlt $ deflateExp $ List []) $ BDecls []]
+        f (QualStmt (Qualifier e):xs) = deflateExp $ If e (f xs) (deflateExp $ List [])
+        f (QualStmt (LetStmt bind):xs) = deflateExp $ Let bind $ f xs
+        f xs = ListComp res xs
 deflateExp x = x
 
 deflatePat :: Pat -> Pat
@@ -90,11 +112,6 @@ inflateAlt x = x
 inflateGuardedAlts :: GuardedAlts -> GuardedAlts
 inflateGuardedAlts (UnGuardedAlt (Paren x)) = UnGuardedAlt x
 inflateGuardedAlts x = x
-
-names :: Data a => a -> [String]
-names = map f . universeBi
-    where f (Ident x) = x
-          f (Symbol x) = x
 
 
 ---------------------------------------------------------------------

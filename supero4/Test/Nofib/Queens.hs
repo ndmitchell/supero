@@ -6,7 +6,7 @@ module Test.Nofib.Queens(test) where
 #include "Include.hs"
 
 #if MAIN
-test = (\i -> root (i :: Int) :: Int, 12 :: Int)
+test = (\i -> root (i :: Int) :: Int, 11 :: Int)
 
 safer'3 x d q = x /= q && x /= q+d && x /= q-d 
 #endif

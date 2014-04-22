@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, PatternGuards #-}
+{-# LANGUAGE DeriveDataTypeable, PatternGuards, ViewPatterns #-}
 
 module HSE(deflate, inflate, noCAF, sl) where
 
@@ -41,7 +41,7 @@ deflateQName (Special x) = spec x
 deflateQName x = x
 
 deflateExp :: Exp -> Exp
-deflateExp (Lambda sl ps x) = foldr (\p x -> Lambda sl [p] x) x ps
+deflateExp (Lambda sl ps x) | length ps /= 1 = foldr (\p x -> Lambda sl [p] x) x ps
 deflateExp (LeftSection x (QVarOp y)) = App (Var y) x
 deflateExp (List []) = Con $ spec ListCon
 deflateExp (List (x:xs)) = Paren $ Con (spec Cons) `App` Paren x `App` deflateExp (List xs)
@@ -50,6 +50,8 @@ deflateExp (InfixApp a (QVarOp b) c) = Var b `App` a `App` c
 deflateExp (InfixApp a (QConOp b) c) = Con b `App` a `App` c
 deflateExp (Lit x) = Con $ UnQual $ Ident $ prettyPrint x
 deflateExp (NegApp x) = Paren $ Var (UnQual $ Ident "negate") `App` Paren x
+deflateExp o@(Lambda sl [p] e) | not $ isPVar p = Lambda sl [PVar new] $ Case (Var $ UnQual new) [Alt sl p (UnGuardedAlt e) $ BDecls []]
+    where new:_ = map Ident $ fresh $ names o
 deflateExp (Case (Var (UnQual v)) (Alt sl (PVar p) (UnGuardedAlt e) (BDecls []):_))
     | v == p = e
     | otherwise = Let (BDecls [PatBind sl (PVar p) Nothing (UnGuardedRhs $ Var $ UnQual v) (BDecls [])]) e
@@ -67,13 +69,13 @@ deflateExp (ListComp res xs) = lst xs
         may _ = Nothing
 
         -- optimised shortcuts (use map or mapMaybe)
-        lst (QualStmt (Generator _ (PVar p) e):[]) = Var (UnQual $ Ident "map") `App` deflateExp (Lambda sl [PVar p] res) `App` e
+        lst (QualStmt (Generator _ p e):[]) | irrefutable p = Var (UnQual $ Ident "map") `App` deflateExp (Lambda sl [p] res) `App` e
         lst o@(QualStmt (Generator _ p e):xs) | Just ans <- may xs =
             Var (UnQual $ Ident "mapMaybe") `App` deflateExp (Lambda sl [PVar new] $ bod ans) `App` e
             where new:_ = map Ident $ fresh $ names $ ListComp res o
-                  bod ans = deflateExp $ Case (Var $ UnQual new)
-                            [Alt sl p (UnGuardedAlt ans) $ BDecls []
-                            ,Alt sl PWildCard (UnGuardedAlt $ Con $ UnQual $ Ident "Nothing") $ BDecls []]
+                  bod ans = deflateExp $ Case (Var $ UnQual new) $
+                            [Alt sl p (UnGuardedAlt ans) $ BDecls []] ++
+                            [Alt sl PWildCard (UnGuardedAlt $ Con $ UnQual $ Ident "Nothing") $ BDecls [] | not $ irrefutable p]
 
         -- from the report, returning a list
         lst o@(QualStmt (Generator _ p e):xs) = Var (UnQual $ Ident "concatMap") `App` deflateExp (Lambda sl [PVar new] bod) `App` e
@@ -87,11 +89,19 @@ deflateExp (ListComp res xs) = lst xs
         lst xs = ListComp res xs
 deflateExp x = x
 
+irrefutable :: Pat -> Bool
+irrefutable x = case deflatePat x of
+    PApp (UnQual (Ident ('(':(dropWhile (== ',') -> ")")))) xs -> all irrefutable xs
+    PVar{} -> True
+    _ -> False
+
 deflatePat :: Pat -> Pat
 deflatePat (PInfixApp a b c) = PApp b [a,c]
 deflatePat (PList []) = PApp (spec ListCon) []
 deflatePat (PTuple b xs) = PApp (spec $ TupleCon b $ length xs) xs
 deflatePat x = x
+
+isPVar PVar{} = True; isPVar _ = False
 
 
 ---------------------------------------------------------------------

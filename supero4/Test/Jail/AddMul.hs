@@ -4,8 +4,8 @@ module Test.Jail.AddMul(test) where
 #include "Include.hs"
 
 #if MAIN
-data Nat = Z | S Nat
-test = (id, "")
+data Nat = Z | S Nat deriving (Read,Show)
+test = (\x -> show $ root (read x) (read x), "S (S Z)")
 #endif
 
 add x y = case x of

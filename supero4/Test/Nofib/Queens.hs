@@ -24,5 +24,4 @@ gen :: Int -> Int -> [[Int]]
 gen nq n = case n == 0 of
     True -> [[]]
     False -> 
-        --[ (q:b) | b <- gen nq (n-1), q <- [1..nq], safe q 1 b]
-        concatMap (\b -> concatMap (\q -> if safe q 1 b then [q:b] else []) (enumFromTo 1 nq)) (jail (gen nq (jail n-1)))
+        [ (q:b) | b <- jail (gen nq (n-1)), q <- [1..nq], safe q 1 b]

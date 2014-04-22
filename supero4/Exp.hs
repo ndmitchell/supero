@@ -3,6 +3,7 @@
 module Exp(
     Var(..), Con(..), Exp(..), Pat(..),
     fromApps, fromLams, fromLets, lets, lams, apps,
+    caseCon,
     prettys, pretty,
     vars, free, subst, relabel, count, linear, fresh,
     eval, equivalent,
@@ -45,6 +46,14 @@ data Pat
     = PCon Con [Var]
     | PWild
       deriving (Data,Typeable,Show,Eq)
+
+caseCon :: Exp -> Maybe ([(Var,Exp)], Exp)
+caseCon o@(Case (fromApps -> (Con c, xs)) alts) = Just $ headNote (error "Malformed case: " ++ pretty o) $ mapMaybe f alts
+    where f (PWild, x) = Just ([], x)
+          f (PCon c2 vs, x) | c /= c2 = Nothing
+                            | length vs /= length xs = error "Malformed arity"
+                            | otherwise = Just (zip vs xs, x)
+caseCon _ = Nothing
 
 apps x (y:ys) = apps (App x y) ys
 apps x [] = x
@@ -145,26 +154,16 @@ fresh used = map V (concatMap f [1..]) \\ used
 
 
 eval :: Exp -> Exp
-eval = relabel . flip f id . relabel
+eval = relabel . nf . relabel
     where
-        f (Lam v x) k = k $ Lam v $ f x id
-        f (Let v x y) k = f (subst [(v,x)] y) k
-        f (App x y) k = f x $ \x -> case x of
-            Lam v x -> f (subst [(v,y)] x) k
-            x -> f y $ k . App x
-        f o@(Case x alts) k = f x $ \x -> case x of
-            (fromApps -> (Con ctr, xs)) ->
-                f (headNote ("Corrupted constructor:\n" ++ pretty x ++ "\nVs\n" ++ pretty o) $ mapMaybe (g ctr xs) alts) k
-            -- Var v -> Case (Var v) [(a, f (g2 v a b) k) | (a,b) <- alts]
-            x -> Case x [(a, f b k) | (a,b) <- alts]
-        f x k = k x
+        whnf (Let v x y) = whnf $ subst [(v,x)] y
+        whnf (App (whnf -> Lam v x) y) = whnf $ subst [(v,y)] x
+        whnf (App (whnf -> Case x alts) y) = whnf $ Case x $ map (second $ flip App y) alts
+        whnf (Case (whnf -> x) alts) | Just (bs, bod) <- caseCon $ Case x alts = whnf $ subst bs bod
+        whnf (Case (whnf -> Case x alts1) alts2) = Case x [(a, Case b alts2) | (a,b) <- alts1]
+        whnf x = x
 
-        g2 v (PCon c vs) x | v `notElem` vs = subst [(v, apps (Con c) $ map Var vs)] x
-        g2 v _ x = x
-
-        g ctr xs (PWild, x) = Just x
-        g ctr xs (PCon c vs, x) | c == ctr = Just $ subst (zip vs xs) x
-                                | otherwise = Nothing
+        nf = descend nf . whnf
 
 
 equivalent :: String -> Exp -> Exp -> Exp

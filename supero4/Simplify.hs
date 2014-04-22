@@ -20,7 +20,7 @@ simplifys :: [(Var,Exp)] -> [(Var,Exp)]
 simplifys = map (second simplify)
 
 simplify :: Exp -> Exp
-simplify = \x -> equivalent "simplify" x $ idempotent "simplify" fs x
+simplify = \(relabel -> x) -> equivalent "simplify" x $ idempotent "simplify" fs x
     where
         fs = transform f
 
@@ -42,11 +42,9 @@ simplify = \x -> equivalent "simplify" x $ idempotent "simplify" fs x
                   g (PWild, c) = (PWild, Case c alts2)
                   g (PCon a vs, c) = let vs2 = take (length vs) new
                                      in (PCon a vs2, Case (subst (zip vs $ map Var vs2) c) alts2)
-        f o@(Case (fromApps -> (Con ctr, xs)) alts) = headNote ("Couldn't match constructor: " ++ pretty o) $ mapMaybe g alts
-            where g (PWild, x) = Just $ x
-                  g (PCon c vs, x) | c == ctr = let vs2 = take (length vs) $ fresh $ vars o
-                                                in Just $ fs $ lets (zip vs2 xs) $ subst (zip vs $ map Var vs2) x
-                                   | otherwise = Nothing
+        f x | Just ((unzip -> (vs, xs)), bod) <- caseCon x =
+            let vs2 = take (length vs) $ fresh $ vars x
+            in fs $ lets (zip vs2 xs) $ subst (zip vs $ map Var vs2) bod
         f x = x
 
 cheap (Var _) = True

@@ -6,6 +6,7 @@ import Data.Data
 import Data.List
 import Language.Haskell.Exts
 import Data.Generics.Uniplate.Data
+import Control.Applicative
 
 sl = SrcLoc "" 0 0
 
@@ -48,23 +49,40 @@ deflateExp (Tuple b xs) = foldl App (Con $ spec $ TupleCon b $ length xs) xs
 deflateExp (InfixApp a (QVarOp b) c) = Var b `App` a `App` c
 deflateExp (InfixApp a (QConOp b) c) = Con b `App` a `App` c
 deflateExp (Lit x) = Con $ UnQual $ Ident $ prettyPrint x
+deflateExp (Case (Var (UnQual v)) (Alt sl (PVar p) (UnGuardedAlt e) (BDecls []):_))
+    | v == p = e
+    | otherwise = Let (BDecls [PatBind sl (PVar p) Nothing (UnGuardedRhs $ Var $ UnQual v) (BDecls [])]) e
 deflateExp (If a b c) = Case a [f "True" b, f "False" c]
     where f con x = Alt sl (PApp (UnQual $ Ident con) []) (UnGuardedAlt x) (BDecls [])
 deflateExp (Let (BDecls bs) x) = foldr (\b x -> Let (BDecls [b]) x) x bs -- FIXME: Only safe if variables are not mutually recursive
 deflateExp (EnumFromTo x y) = Var (UnQual $ Ident "enumFromTo") `App` x `App` y
-deflateExp (ListComp res xs) = f xs
+deflateExp (ListComp res xs) = lst xs
     where
-        -- optimised shortcuts
-        f o@(QualStmt (Generator _ (PVar p) e):[]) = Var (UnQual $ Ident "map") `App` deflateExp (Lambda sl [PVar p] res) `App` e
-        -- from the report
-        f o@(QualStmt (Generator _ p e):xs) = Var (UnQual $ Ident "concatMap") `App` deflateExp (Lambda sl [PVar new] bod) `App` e
+        -- variants returning a Maybe
+        may [] = Just $ Con (UnQual $ Ident "Just") `App` Paren res
+        may (QualStmt (LetStmt bind):xs) = deflateExp . Let bind <$> may xs
+        may (QualStmt (Qualifier e):xs) = (\xs -> Paren $ deflateExp $ If e xs $ Con $ UnQual $ Ident "Nothing") <$> may xs
+        may _ = Nothing
+
+        -- optimised shortcuts (use map or mapMaybe)
+        lst (QualStmt (Generator _ (PVar p) e):[]) = Var (UnQual $ Ident "map") `App` deflateExp (Lambda sl [PVar p] res) `App` e
+        lst o@(QualStmt (Generator _ p e):xs) | Just ans <- may xs =
+            Var (UnQual $ Ident "mapMaybe") `App` deflateExp (Lambda sl [PVar new] $ bod ans) `App` e
+            where new:_ = map Ident $ fresh $ names $ ListComp res o
+                  bod ans = deflateExp $ Case (Var $ UnQual new)
+                            [Alt sl p (UnGuardedAlt ans) $ BDecls []
+                            ,Alt sl PWildCard (UnGuardedAlt $ Con $ UnQual $ Ident "Nothing") $ BDecls []]
+
+        -- from the report, returning a list
+        lst o@(QualStmt (Generator _ p e):xs) = Var (UnQual $ Ident "concatMap") `App` deflateExp (Lambda sl [PVar new] bod) `App` e
           where new:_ = map Ident $ fresh $ names $ ListComp res o
                 bod = deflateExp $ Case (Var $ UnQual new)
-                          [Alt sl p (UnGuardedAlt $ f xs) $ BDecls []
+                          [Alt sl p (UnGuardedAlt $ lst xs) $ BDecls []
                           ,Alt sl PWildCard (UnGuardedAlt $ deflateExp $ List []) $ BDecls []]
-        f (QualStmt (Qualifier e):xs) = deflateExp $ If e (f xs) (deflateExp $ List [])
-        f (QualStmt (LetStmt bind):xs) = deflateExp $ Let bind $ f xs
-        f xs = ListComp res xs
+        lst (QualStmt (Qualifier e):xs) = Paren $ deflateExp $ If e (lst xs) (deflateExp $ List [])
+        lst (QualStmt (LetStmt bind):xs) = Paren $ deflateExp $ Let bind $ lst xs
+        lst [] = deflateExp $ List [res]
+        lst xs = ListComp res xs
 deflateExp x = x
 
 deflatePat :: Pat -> Pat

@@ -9,10 +9,15 @@ import Control.Monad
 import Criterion.Main
 import Control.DeepSeq
 import Control.Exception
+import System.IO
 
 
 tests :: [IO ()] -> IO ()
-tests = sequence_
+tests xs = do
+    hSetBuffering stdout NoBuffering
+    putStrLn $ "Testing " ++ show (length xs)
+    sequence_ xs
+    putStrLn "Test completed successfully"
 
 test :: (NFData b, Show b, Eq b) => String -> (a -> b, a) -> (a -> b, a) -> IO ()
 test name orig opt = do

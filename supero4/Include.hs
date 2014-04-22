@@ -91,7 +91,13 @@ reverseWith acc xs = case xs of
 
 concatMap f x = case x of
     [] -> []
-    x:xs -> f x ++ jail (concatMap f (jail xs))
+    x:xs -> f x ++ jail (concatMap f xs)
+
+mapMaybe f x = case x of
+    [] -> []
+    x:xs -> case f x of
+        Nothing -> mapMaybe f xs
+        Just y -> y : mapMaybe f xs
 
 #else
 

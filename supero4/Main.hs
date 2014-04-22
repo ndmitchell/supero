@@ -46,7 +46,6 @@ works = words "simple peter other jail digits_of_e2 digits_of_e1 exp3_8 rfib tak
     -- bernouilli - has CAFs
     -- integrate - letrec/CAFs
     -- paraffins - unconverted (lots of list comp and arrays)
-    -- queens - non-termination
     -- wheel_sieve1 - unconverted (CAFs and list comp)
     -- wheel_sieve2 - unconverted (looks easy)
 

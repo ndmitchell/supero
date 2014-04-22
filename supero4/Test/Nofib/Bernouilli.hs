@@ -27,30 +27,26 @@ rat1 = 0
 
 -- powers = [[r^n | r<-[2..]] | n<-1..]
 -- type signature required for compilers lacking the monomorphism restriction
-powers :: [[Integer]]
-powers = iterate (zipWith (*) [two..]) [two..]
 
 -- powers = [[(-1)^r * r^n | r<-[2..]] | n<-1..]
 -- type signature required for compilers lacking the monomorphism restriction
-neg_powers :: [[Integer]]
-neg_powers = 
-  map (zipWith (\n x -> if n then x else negate x) (iterate not True)) powers
-
-pascal :: [[Integer]]
-pascal = iterate op [1,two,1]
-op line = zipWith (+) (line++[zero]) (zero:line)
-
+neg_powers :: Int -> [Integer]
+neg_powers n = 
+    let powers = iterate (zipWith (*) [two..]) [two..]
+    in map (zipWith (\n x -> if n then x else negate x) (iterate not True)) powers !! n
 
 bernoulli :: Int -> Rational
 bernoulli n =
     if n == zInt then rat1
     else if n == 1 then rat1
     else if odd n then rat1
-    else let powers = neg_powers !! (n-1)
+    else let powers = neg_powers (n-1)
         in (-1)%2 
              + sum [ fromIntegral ((sum $ zipWith (*) powers (tail $ tail combs)) - 
                                     fromIntegral k) %
                      fromIntegral (k+1)
-             | (k,combs)<- zip [2..n] pascal]
+             | (k,combs)<- zip [2..n] $ iterate op [1,two,1]]
+
+op line = zipWith (+) (line++[zero]) (zero:line)
 
 root x = bernoulli x

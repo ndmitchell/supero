@@ -51,6 +51,7 @@ main = do
         exitSuccess
     let (opts,files) = partition ("-" `isPrefixOf`) args
     files <- findFiles $ (if "--work" `elem` opts then works else []) ++ files
+    files <- return $ if "--nofib" `notElem` opts then files else filter ("Nofib" `isInfixOf`) files
     createDirectoryIfMissing True "obj"
     let modu = intercalate "." . splitDirectories . dropExtension
     forM_ files $ \inp -> do

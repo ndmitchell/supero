@@ -1,6 +1,8 @@
 
 module Test.Nofib.Integrate(test) where
 
+#include "Include.hs"
+
 integrate1D :: Double -> Double -> (Double->Double) -> Double
 integrate1D l u f =
   let  d = (u-l)/8.0 in
@@ -23,13 +25,18 @@ zark u v = integrate2D 0.0 u 0.0 v (\x->(\y->x*y))
 
 -- type signature required for compilers lacking the monomorphism restriction
 
+refold x = refolder (head x) (tail x)
+refolder acc x = acc : case x of
+    [] -> []
+    x:xs -> refolder (x + jail acc) xs
+
 etotal n =
     let ints = enumFrom 1.0 
         zarks = zipWith zark ints (map (2.0*) ints)
-        rtotals = head zarks : zipWith (+) (tail zarks) rtotals
+        rtotals = refold zarks -- head zarks : zipWith (+) (tail zarks) rtotals
 
         is = map (pow 4) ints
-        itotals = head is : zipWith (+) (tail is) itotals
+        itotals = refold is -- head is : zipWith (+) (tail is) itotals
     in sum $ take n $ map (pow 2) (zipWith (-) rtotals itotals)
 
 -- The (analytical) result should be zero
@@ -38,5 +45,5 @@ root n = etotal n
 pow x y = y ^ x
 
 #if MAIN
-test = (root, 5000)
+test = (\i -> root (i :: Int) :: Double, 5000 :: Int)
 #endif

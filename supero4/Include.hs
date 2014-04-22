@@ -30,6 +30,12 @@ zipWith f xs ys = case xs of
         [] -> []
         y:ys -> f x y : zipWith f xs ys
 
+zip xs ys = case xs of
+    [] -> []
+    x:xs -> case ys of
+        [] -> []
+        y:ys -> (x,y) : zip xs ys
+
 sum xs = sumWith 0 xs
 sumWith acc x = case x of
     [] -> jail acc
@@ -42,6 +48,10 @@ head x = case x of
 tail x = case x of
     [] -> error "tail"
     x:xs -> xs
+
+odd x = not $ even x
+
+even x = x `rem` 2 == 0
 
 concat x = case x of
     [] -> []

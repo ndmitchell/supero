@@ -1,2 +1,23 @@
-:set -fwarn-unused-imports
+:set -fwarn-unused-imports -fno-warn-overlapping-patterns -fwarn-unused-binds 
 :load Main
+
+:def test const $ return ":main --test --work"
+
+:{
+let _ghci_make dir cflags rflags = ":!" ++
+        "(if not exist obj mkdir obj) && " ++
+        "(if not exist obj\\" ++ dir ++ " mkdir obj\\" ++ dir ++ ") && " ++
+        "ghc -rtsopts --make Main.hs -w -outputdir obj/"++dir++" -o obj/"++dir++"/supero "++cflags ++ " && " ++
+        "obj\\" ++ dir ++ "\\supero " ++ rflags
+:}
+
+:{
+:def prof \x -> return $ unlines
+        [_ghci_make "prof" "-prof -auto-all -caf-all -O2" "--work --quiet --fast +RTS -p"
+        ,":!start supero.prof"]
+:}
+
+:{
+:def time \x -> return $ unlines
+        [_ghci_make "time" "-O2" "--work --quiet --fast"]
+:}

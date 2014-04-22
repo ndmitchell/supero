@@ -6,8 +6,6 @@ module Test.Jail.Concats(test) where
 #include "Include.hs"
 
 #if MAIN
-main = print $ (fst test) (snd test)
-
 test = (\i -> root (i :: Int) :: [[Int]], 3 :: Int)
 #endif
 

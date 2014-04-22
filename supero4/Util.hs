@@ -19,6 +19,8 @@ import Data.Char
 import System.IO
 import GHC.IO.Handle(hDuplicate,hDuplicateTo)
 import Safe
+import Numeric
+import Control.Arrow
 import System.Environment
 
 
@@ -45,9 +47,11 @@ timer act = do
     start <- getTime
     act
     end <- getTime
-    print (end - start)
+    putStrLn $ showDP 2 (end - start) ++ "s"
 
-
+showDP :: Int -> Double -> String
+showDP n x = a ++ "." ++ b ++ replicate (n - length b) '0'
+    where (a,b) = second (drop 1) $ break (== '.') $ showFFloat (Just n) x ""
 
 delFst :: Eq a => a -> [(a,b)] -> [(a,b)]
 delFst x = filter ((/=) x . fst)

@@ -42,12 +42,10 @@ without loss of information (these things don't generate any info anyway)
 
 
 
-works = words "simple peter other jail digits_of_e2 digits_of_e1 exp3_8 rfib tak x2n1 primes gen_regexps queens"
-    -- bernouilli - has CAFs
-    -- integrate - letrec/CAFs
-    -- paraffins - unconverted (lots of list comp and arrays)
+works = words "simple peter other jail digits_of_e2 digits_of_e1 exp3_8 rfib tak x2n1 primes gen_regexps queens integrate bernouilli"
+    -- paraffins - unconverted (lots of list comp and arrays and letrec)
     -- wheel_sieve1 - unconverted (CAFs and list comp)
-    -- wheel_sieve2 - unconverted (looks easy)
+    -- wheel_sieve2 - unconverted (CAFs and letrec)
 
 main = do
     args <- getArgs
@@ -106,7 +104,7 @@ findFiles want = do
 
 fleshOut :: String -> String -> String -> String
 fleshOut modu orig new =
-    "{-# LANGUAGE UnboxedTuples #-}\n" ++
+    "{-# LANGUAGE UnboxedTuples, NoMonomorphismRestriction #-}\n" ++
     "module " ++ modu ++ "(test) where\n" ++
     f "IMPORT_SUPERO" ++ f "MAIN" ++ f "MAIN_SUPERO" ++ new ++ "\n\n"
     where f x = unlines $ takeWhile (/= "#endif") $ drop 1 $ dropWhile (/= ("#if " ++ x)) $ lines orig

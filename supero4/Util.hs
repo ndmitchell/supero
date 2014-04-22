@@ -19,6 +19,7 @@ import Data.Char
 import System.IO
 import GHC.IO.Handle(hDuplicate,hDuplicateTo)
 import Safe
+import System.Environment
 
 
 rlookup :: Eq a => a -> [(b,a)] -> Maybe b
@@ -190,9 +191,11 @@ system_ cmd = do
     res <- system cmd
     when (res /= ExitSuccess) $ error $ "system command failed: " ++ cmd
 
+fast = "--fast" `elem` unsafePerformIO getArgs
 
 idempotent :: (ShowNice a, Eq a) => String -> (a -> a) -> (a -> a)
 idempotent name f x0
+    | fast = x1
     | x1 == x2 = x1
     | otherwise = error $ unlines
         ["START Idempotent check failed for " ++ name ++ "!"
@@ -209,6 +212,7 @@ idempotent name f x0
 
 equivalentOn :: (ShowNice a, ShowNice b, Eq b) => (a -> b) -> String -> a -> a -> a
 equivalentOn op name x y
+    | fast = y
     | xx == yy = y
     | otherwise = unsafePerformIO $ do
         writeFile "error.log" $ "-- Equivalent check failed for " ++ name ++ "\n" ++ showNice x

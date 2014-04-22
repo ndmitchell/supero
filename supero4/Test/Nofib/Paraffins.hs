@@ -5,27 +5,32 @@
  - Original author: Steve Heller
  -}
 
-module Main (main) where
-import Array
-import System
+module Test.Nofib.Paraffins(test) where
 
 -- Generation of radicals
 
+#if MAIN
+import GHC.Arr
+import Data.Function
 data Radical = H | C Radical Radical Radical
+test = (root, 17 :: Int)
+#endif
+
+#include "Include.hs"
+
+root num = [length (rads!i) | rads <- [(radical_generator num)], i <- [0..num]]
+
 
 three_partitions :: Int -> [(Int,Int,Int)]
 three_partitions m =
   [ (i,j,k) | i <- [0..(div m 3)], j <- [i..(div (m-i) 2)], k <- [m - (i+j)]]
 
-remainders [] = []
-remainders (r:rs) = (r:rs) : (remainders rs)
+remainders x = case x of
+    [] -> []
+    r:rs -> (r:rs) : (remainders rs)
 
 radical_generator :: Int -> Array Int [Radical]
-radical_generator n =
-  radicals
- where 
-  radicals =
-    array (0,n) ((0,[H]) : [(j,rads_of_size_n radicals j) | j <- [1..n]])
+radical_generator n = fix $ \r -> array (0,n) ((0,[H]) : [(j,rads_of_size_n r j) | j <- [1..n]])
 
 rads_of_size_n :: Array Int [Radical] -> Int -> [Radical]
 rads_of_size_n radicals n =
@@ -65,27 +70,16 @@ ccp_generator radicals n =
 
 bcp_until :: Int -> [Int]
 bcp_until n =
+  let radicals = radical_generator (div n 2) in
   [length(bcp_generator radicals j) | j <- [1..n]]
- where
-  radicals = radical_generator (div n 2)
 
 ccp_until :: Int -> [Int]
 ccp_until n =
+  let radicals = radical_generator (div n 2) in
   [length(ccp_generator radicals j) | j <- [1..n]]
- where
-  radicals = radical_generator (div n 2)
 
 paraffins_until :: Int -> [Int]
 paraffins_until n =
+  let radicals = radical_generator (div n 2) in
   [length (bcp_generator radicals j) + length (ccp_generator radicals j)
    | j <- [1..n]]
- where
-  radicals = radical_generator (div n 2)
-
-main = do
-  [arg] <- getArgs
-  let num = read arg
-  print [length (rads!i) | rads <- [(radical_generator num)], i <- [0..num]]
-  print (bcp_until num)
-  print (ccp_until num)
-  print (paraffins_until num)

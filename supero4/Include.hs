@@ -6,7 +6,7 @@ map f x = case x of
 
 id x = x
 
-iterate f x = x : iterate f (jail (f x))
+iterate f x = let x2 = jail x in x2 : iterate f (f x2)
 
 array lu ies = case lu of
     (l,u) -> let n = safeRangeSize (l,u)
@@ -79,11 +79,11 @@ not x = case x of
 (.) f g x = f (g x)
 
 
-enumFrom x = x : enumFrom (succ x)
+enumFrom x = let x2 = jail x in x2 : enumFrom (succ x2)
 
-enumFromTo from to = case from > to of
+enumFromTo from to = let from2 = jail from in case from2 > to of
     True -> []
-    False -> from : enumFromTo (succ (jail from)) to
+    False -> from2 : enumFromTo (succ from2) to
 
 a || b = case a of
     True -> True

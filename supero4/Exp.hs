@@ -5,7 +5,7 @@ module Exp(
     fromApps, fromLams, fromLets, lets, lams, apps,
     caseCon,
     prettys, pretty,
-    vars, free, subst, relabel, count, linear, fresh,
+    vars, varsP, free, subst, relabel, fresh,
     eval, equivalent,
     fromHSE, toHSE
     ) where
@@ -113,17 +113,6 @@ subst ren e = case e of
     Let a b y -> Let a (f [] b) $ f [a] y
     x -> x
     where f del x = subst (filter (flip notElem del . fst) ren) x
-
-linear :: Var -> Exp -> Bool
-linear v x = count v x <= 1
-
-count :: Var -> Exp -> Int
-count v (Var x) = if v == x then 1 else 0
-count v (Lam w y) = if v == w then 0 else count v y
-count v (Let w x y) = count v x + (if v == w then 0 else count v y)
-count v (Case x alts) = count v x + maximum [if v `elem` varsP p then 0 else count v c | (p,c) <- alts]
-count v (App x y) = count v x + count v y
-count v _ = 0
 
 relabel :: Exp -> Exp
 relabel x = evalState (f $ safe x) (fresh $ free x)

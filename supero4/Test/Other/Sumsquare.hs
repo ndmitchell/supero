@@ -4,8 +4,7 @@ module Test.Other.Sumsquare(test) where
 #include "Include.hs"
 
 f :: Int -> Int
--- f n = sum [ k * m | k <- [1..n], m <- [1..k] ]
-f n = sum (concatMap (\k -> map (\m -> k * m) (enumFromTo 1 k)) (enumFromTo 1 n))
+f n = sum [ k * m | k <- [1..n], m <- [1..k] ]
 
 root x = f x
 

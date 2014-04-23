@@ -1,0 +1,11 @@
+
+name: plugin
+version: 1
+cabal-version: >= 1.6
+build-type: Simple
+
+library
+    hs-source-dirs:     src
+    exposed-modules:
+        SayNames.Plugin
+    build-depends: base, ghc

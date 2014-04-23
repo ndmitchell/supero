@@ -44,7 +44,7 @@ linear v x = count v x <= 1
 
 count :: Var -> Exp -> Int
 count v (Var x) = if v == x then 1 else 0
-count v (Lam w y) = if v == w then 0 else count v y
+count v (Lam w y) = if v == w then 0 else count v y * 2 -- lambda count is infinite, but 2 is close enough
 count v (Let w x y) = count v x + (if v == w then 0 else count v y)
 count v (Case x alts) = count v x + maximum [if v `elem` varsP p then 0 else count v c | (p,c) <- alts]
 count v (App x y) = count v x + count v y

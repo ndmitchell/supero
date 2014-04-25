@@ -115,22 +115,18 @@ subst ren e = case e of
     where f del x = subst (filter (flip notElem del . fst) ren) x
 
 relabel :: Exp -> Exp
-relabel x = evalState (f $ safe x) (fresh $ free x)
+relabel x = evalState (f [] x) (fresh $ free x)
     where
-        safe :: Exp -> Exp
-        -- imagine: \b a, trying to rename to \a b, the first subst doesn't work
-        safe x = transformBi (\v -> if v `elem` frees then v else V $ '!' : fromVar v) x
-            where frees = free x
+        f :: [(Var,Var)] -> Exp -> State [Var] Exp
+        f mp (Lam v x) = do i <- var; Lam i <$> f ((v,i):mp) x
+        f mp (Let v x y) = do i <- var; Let i <$> f mp x <*> f ((v,i):mp) y
+        f mp (Case x alts) = Case <$> f mp x <*> mapM (g mp) alts
+        f mp (App x y) = App <$> f mp x <*> f mp y
+        f mp (Var x) = return $ Var $ fromMaybe x $ lookup x mp
+        f mp x = return x
 
-        f :: Exp -> State [Var] Exp
-        f (Lam v x) = do i <- var; Lam i <$> f (subst [(v,Var i)] x)
-        f (Let v x y) = do i <- var; Let i <$> f x <*> f (subst [(v,Var i)] y)
-        f (Case x alts) = Case <$> f x <*> mapM g alts
-        f (App x y) = App <$> f x <*> f y
-        f x = return x
-
-        g (PWild, x) = (PWild,) <$> f x
-        g (PCon c vs, x) = do is <- replicateM (length vs) var; (PCon c is,) <$> f (subst (zip vs $ map Var is) x)
+        g mp (PWild, x) = (PWild,) <$> f mp x
+        g mp (PCon c vs, x) = do is <- replicateM (length vs) var; (PCon c is,) <$> f (zip vs is ++ mp) x
 
         var = do s:ss <- get; put ss; return s
 

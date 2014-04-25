@@ -79,7 +79,10 @@ main = do
         when ("--compile" `elem` opts || "--test" `elem` opts || "--benchmark" `elem` opts) $ do
             createDirectoryIfMissing True $ "obj" </> takeDirectory out
             timer $ system_ $ "ghc " ++ opt ++ " " ++ out ++ " -ddump-simpl -outputdir obj > obj/" ++ out ++ ".core"
-            timer $ system_ $ "ghc -XCPP -DMAIN -I. " ++ opt ++ " " ++ inp ++ " -ddump-simpl -outputdir obj > obj/" ++ inp ++ ".core"
+            timer $ system_ $ "ghc -XCPP -DMAIN -I. " ++ opt ++ " " ++ inp ++ " -ddump-simpl -outputdir obj > obj/" ++ inp ++ ".core_"
+            src <- readFile' $ "obj/" ++ inp ++ ".core_"
+            when (src /= "") $ writeFile ("obj/" ++ inp ++ ".core") src
+            removeFile $ "obj/" ++ inp ++ ".core_"
 
     let execute fun args = do
         createDirectoryIfMissing True "obj"

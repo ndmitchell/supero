@@ -44,6 +44,21 @@ works = words "simple peter other jail digits_of_e2 digits_of_e1 exp3_8 rfib tak
     -- wheel_sieve1 - unconverted (CAFs and list comp)
     -- wheel_sieve2 - unconverted (CAFs and letrec)
 
+{-
+Test.Nofib.Bernouilli = 0.92
+Test.Nofib.Digits_of_e1 = 1.73
+Test.Nofib.Digits_of_e2 = 1.08
+Test.Nofib.Exp3_8 = 1.05
+Test.Nofib.Gen_regexps = 0.65
+Test.Nofib.Integrate = 1.01
+Test.Nofib.Paraffins = 4.21
+Test.Nofib.Primes = 0.72
+Test.Nofib.Queens = 1.89
+Test.Nofib.Rfib = 0.98
+Test.Nofib.Tak = 0.92
+Test.Nofib.X2n1 = 0.55
+-}
+
 main = do
     args <- getArgs
     when (null args) $ do

@@ -114,6 +114,11 @@ mapMaybe f x = case x of
         Nothing -> mapMaybe f xs
         Just y -> y : mapMaybe f xs
 
+foldr :: (a -> b -> b) -> b -> [a] -> b
+foldr f z x = case x of
+    [] -> z
+    x:xs -> f x (jail (foldr f z xs))
+
 #else
 
 {-# INLINE jail #-}

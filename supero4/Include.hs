@@ -106,7 +106,7 @@ reverseWith acc xs = case xs of
 
 concatMap f x = case x of
     [] -> []
-    x:xs -> f x ++ jail (concatMap f xs)
+    x:xs -> f x ++ concatMap f xs
 
 mapMaybe f x = case x of
     [] -> []

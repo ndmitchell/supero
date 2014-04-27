@@ -73,8 +73,9 @@ main = do
         putStrLn $ "Converting " ++ inp
         let out = dropExtension inp ++ "_gen.hs"
         src <- readFile inp
-        let res = fleshOut (modu out) src $ prettyPrint $ noCAF $ toHSE $ supercompile $ simplifys $ fromHSE $
-                        fromParseResult $ parseFileContents $ cpphs ["SUPERO"] src
+        let res = fleshOut (modu out) src $ prettyPrint $ noCAF $ toHSE $ supercompile $
+                        simplifys $ etas $ simplifys $
+                        fromHSE $ fromParseResult $ parseFileContents $ cpphs ["SUPERO"] src
         timer $ writeFile out res
         when ("--compile" `elem` opts || "--test" `elem` opts || "--benchmark" `elem` opts) $ do
             createDirectoryIfMissing True $ "obj" </> takeDirectory out

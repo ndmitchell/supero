@@ -1,11 +1,18 @@
 {-# LANGUAGE PatternGuards, ViewPatterns #-}
 
-module Simplify(simplifys, simplify) where
+module Simplify(simplifys, simplify, etas) where
 
 import Util hiding (fresh)
 import Exp
 import Control.Arrow
 import Data.Generics.Uniplate.Data
+
+
+etas :: [(Var,Exp)] -> [(Var,Exp)]
+etas env = map (second $ transformBi f) env
+    where
+        f (Var x) | Just (fromLams -> (vs, _)) <- lookup x env = lams vs $ apps (Var x) $ map Var vs
+        f x = x
 
 
 simplifys :: [(Var,Exp)] -> [(Var,Exp)]

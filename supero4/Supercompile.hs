@@ -111,6 +111,9 @@ dejail env o@(fromLams -> (root, x)) = do
         g vs (PCon c ps, x) = (PCon c ps,) <$> f (vs ++ ps) x
 
 
+-- on peel, push down any let's over case that you can (maybe do that always?)
+-- only dejail on peel, never before that!
+
 peel :: [(Var,Exp)] -> Exp -> S Exp
 peel env o@(fromLams -> (lvs, _)) = defines env $ equivalent "peel" o $ f [] False o
     where
@@ -128,6 +131,8 @@ peel env o@(fromLams -> (lvs, _)) = defines env $ equivalent "peel" o $ f [] Fal
         g vs (PCon c ps, x) = (PCon c ps, f (vs ++ ps) True x)
 
 
+-- should i be unfolding things that are pointed at by let? And going through that?
+-- only a win if they ultimately produce a cons or a lambda (since both are cheap)
 unfold :: [(Var,Exp)] -> Exp -> Maybe Exp
 unfold env x = case x of
     Var v -> lookup v env

@@ -1,7 +1,8 @@
 
-import Neil
+import System.Process.Extra
+import Control.Exception.Extra
 
 main :: IO ()
 main = do
-    retry 3 $ cmd "cabal install criterion"
-    cmd "supero --compile --test --benchmark --work --quiet"
+    retry 3 $ system_ "cabal install criterion"
+    system_ "supero --compile --test --benchmark --work --quiet"

@@ -20,6 +20,23 @@ import Language.Preprocessor.Cpphs
 import System.IO.Unsafe
 
 {-
+NEW IDEA:
+
+Unfold - unroll to a normal form as fast as possible, no termination checks, only unroll things on normal path
+       - not even simplification
+Peel - look for self-similar pieces of code, e.g. reverse (_ : _ : []), generalise them away
+     - some places will have jail built in, e.g. reverse, generalise them as well
+     - so jail is ones we _guarantee_ should be split, elsewhere we guess
+     - so auto-infer jail's that are sometimes necessary (e.g. mapfold, concats)
+     - after we have inferred a jail, can _go back_ and reroll down from there!
+     e.g. we infer reverse (jail x) xs = ..., 
+     or just normal homeomoprhic embedding on each define?
+
+     MAKE DEFINE WITH JAIL CALL DEJAIL
+
+-}
+
+{-
 Current thoughts about where jail is necessary:
 
 * Accumulating parameter.
